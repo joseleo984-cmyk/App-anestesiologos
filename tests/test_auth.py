@@ -58,6 +58,9 @@ def test_base_vacia_se_prepara_al_arrancar(db_url, monkeypatch):
     with TestClient(main.app) as cliente:  # ejecuta el arranque
         assert cliente.get("/salud").json() == {"estado": "ok"}
         assert cliente.post("/api/login", json={"email": "admin@clinica.co", "password": "una-clave-larga"}).status_code == 200
+    with psycopg.connect(db_url) as c:
+        sin_rls = c.execute("SELECT count(*) FROM pg_tables WHERE schemaname='public' AND NOT rowsecurity").fetchone()[0]
+        assert sin_rls == 0
     # Reiniciar no duplica el usuario y aplica la nueva contraseña
     monkeypatch.setattr(config, "ADMIN_PASSWORD", "otra-clave-larga")
     inicio.preparar_base_de_datos()

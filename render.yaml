@@ -1,38 +1,29 @@
-# Blueprint de Render: crea la base de datos, la app y el disco de las órdenes.
-# En Render: New > Blueprint > elegir este repositorio.
-databases:
-  - name: anestesia-db
-    databaseName: anestesia
-    user: anestesia
-    plan: basic-256mb
-    region: virginia
-
+# Blueprint de Render: la app en el plan gratis. La base de datos y las órdenes
+# (fotos/PDF) están en Supabase. En Render: New > Blueprint > este repositorio.
 services:
   - type: web
     name: app-anestesiologos
     runtime: python
-    plan: starter            # el disco permanente requiere un plan pago
-    region: virginia         # misma región que la base de datos
+    plan: free               # se duerme tras ~15 min sin uso; el primer acceso tarda ~1 min
+    region: virginia         # junto a Supabase "East US (North Virginia)"
     buildCommand: pip install -r requirements.txt
     # --proxy-headers: Render atiende el HTTPS y le pasa la solicitud a la app
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips='*'
     healthCheckPath: /salud
-    disk:
-      name: ordenes
-      mountPath: /var/data
-      sizeGB: 1
     envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: anestesia-db
-          property: connectionString
-      - key: UPLOAD_DIR
-        value: /var/data/uploads
       - key: COOKIE_SEGURA
         value: "true"
       - key: SESSION_SECRET
         generateValue: true
-      # Estos tres los pide Render al crear el Blueprint (no se guardan en el repositorio)
+      - key: SUPABASE_BUCKET
+        value: ordenes
+      # Render los pide al crear el Blueprint (no se guardan en el repositorio)
+      - key: DATABASE_URL          # Supabase > Connect > Session pooler
+        sync: false
+      - key: SUPABASE_URL          # Supabase > Project Settings > API > Project URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY  # Supabase > Project Settings > API keys > service_role / secret
+        sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
       - key: ADMIN_EMAIL

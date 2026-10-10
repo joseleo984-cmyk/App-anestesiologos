@@ -24,7 +24,8 @@ class DocumentoYaValidado(Exception):
 
 
 def conectar() -> psycopg.Connection:
-    return psycopg.connect(config.DATABASE_URL, row_factory=dict_row)
+    # prepare_threshold=None: sin sentencias preparadas, necesario con el pooler de Supabase
+    return psycopg.connect(config.DATABASE_URL, row_factory=dict_row, prepare_threshold=None)
 
 
 def _nombre_catalogo(nombre: str) -> str:

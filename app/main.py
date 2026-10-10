@@ -18,7 +18,7 @@ from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from app import auth, config, extraccion, inicio, repositorio
+from app import almacenamiento, auth, config, extraccion, inicio, repositorio
 from app.modelos import OrdenConfirmada
 
 log = logging.getLogger(__name__)
@@ -27,6 +27,7 @@ log = logging.getLogger(__name__)
 @asynccontextmanager
 async def ciclo_de_vida(_app):
     inicio.preparar_base_de_datos()
+    almacenamiento.preparar_bucket()
     yield
 
 
@@ -130,11 +131,12 @@ def subir_documento(archivo: UploadFile, conn=Depends(get_conn), anestesiologo_i
     if existente:  # un intento anterior falló: se reintenta con el mismo registro
         documento_id = existente["documento_id"]
     else:
-        config.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-        ruta = config.UPLOAD_DIR / f"{uuid.uuid4().hex}{EXTENSIONES[tipo]}"
-        ruta.write_bytes(datos)
+        try:
+            ubicacion = almacenamiento.guardar(f"{uuid.uuid4().hex}{EXTENSIONES[tipo]}", datos, tipo)
+        except almacenamiento.AlmacenamientoError as e:
+            raise HTTPException(502, str(e))
         documento_id = repositorio.crear_documento(
-            conn, anestesiologo_id, "PDF" if tipo == "application/pdf" else "IMAGEN", str(ruta), hash_sha256)
+            conn, anestesiologo_id, "PDF" if tipo == "application/pdf" else "IMAGEN", ubicacion, hash_sha256)
     conn.commit()
 
     try:

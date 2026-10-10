@@ -6,6 +6,8 @@ usuario inicial con ADMIN_EMAIL / ADMIN_PASSWORD.
 import logging
 from pathlib import Path
 
+from psycopg import sql
+
 from app import auth, config, repositorio
 
 log = logging.getLogger(__name__)
@@ -21,6 +23,15 @@ def preparar_base_de_datos() -> None:
             conn.execute(ESQUEMA.read_text())
         # Bases creadas antes de existir el inicio de sesión
         conn.execute("ALTER TABLE anestesiologo ADD COLUMN IF NOT EXISTS password_hash TEXT")
+
+        # Supabase publica las tablas de "public" en su API REST. Con RLS activo y sin
+        # políticas, esa API no ve ninguna fila; la app entra como dueña de las tablas
+        # y no se ve afectada.
+        tablas = conn.execute(
+            "SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND NOT rowsecurity"
+        ).fetchall()
+        for t in tablas:
+            conn.execute(sql.SQL("ALTER TABLE {} ENABLE ROW LEVEL SECURITY").format(sql.Identifier(t["tablename"])))
 
         if config.ADMIN_EMAIL and config.ADMIN_PASSWORD:
             if len(config.ADMIN_PASSWORD) < 10:

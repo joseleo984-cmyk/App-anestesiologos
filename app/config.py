@@ -5,6 +5,10 @@ from pathlib import Path
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql:///anestesia")
 UPLOAD_DIR = Path(os.environ.get("UPLOAD_DIR", "uploads"))
+# Supabase Storage (opcional): si están definidos, las órdenes se guardan allí y no en UPLOAD_DIR
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY")
+SUPABASE_BUCKET = os.environ.get("SUPABASE_BUCKET", "ordenes")
 CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-opus-5-5")
 MAX_ARCHIVO_MB = int(os.environ.get("MAX_ARCHIVO_MB", "20"))
 

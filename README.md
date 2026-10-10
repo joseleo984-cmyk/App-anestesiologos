@@ -34,18 +34,27 @@ Al arrancar, la app crea las tablas si la base está vacía y deja listo el usua
 `ADMIN_EMAIL` con la contraseña `ADMIN_PASSWORD` (cambiar la variable y reiniciar cambia la contraseña).
 Abrir `http://localhost:8000` (desde el celular, con la IP del computador en la misma red).
 
-### En Render
+### En Supabase + Render (pruebas sin costo)
 
-El archivo [`render.yaml`](render.yaml) crea todo de una vez: en Render, **New → Blueprint**,
-elegir este repositorio y la rama, y escribir `ANTHROPIC_API_KEY`, `ADMIN_EMAIL` y `ADMIN_PASSWORD`
-cuando los pida. Render crea la base PostgreSQL, la app con HTTPS y un disco de 1 GB para las órdenes.
+La base de datos y las fotos/PDF van en **Supabase**; la app corre en **Render** (plan gratis).
+
+1. En supabase.com crear un proyecto en la región **East US (North Virginia)**, la misma de Render.
+2. Copiar de Supabase: la cadena de conexión **Session pooler** (botón *Connect*), la
+   **Project URL** y la clave **service_role** (*Project Settings → API keys*).
+3. En Render: **New → Blueprint**, elegir este repositorio y la rama, y pegar esos datos junto con
+   `ANTHROPIC_API_KEY`, `ADMIN_EMAIL` y `ADMIN_PASSWORD` cuando los pida ([`render.yaml`](render.yaml)).
+
+Al arrancar, la app crea las tablas, el bucket privado `ordenes` y activa RLS en todas las tablas:
+la API pública de Supabase no ve ningún dato; solo la app, que se conecta como dueña de las tablas.
 
 | Variable | Por defecto | Para qué |
 |---|---|---|
 | `DATABASE_URL` | `postgresql:///anestesia` | Conexión a PostgreSQL |
 | `ANTHROPIC_API_KEY` | — | Clave de la API de Claude |
 | `CLAUDE_MODEL` | `claude-opus-5-5` | Modelo que lee las órdenes |
-| `UPLOAD_DIR` | `uploads` | Carpeta donde se guardan las fotos y PDF |
+| `UPLOAD_DIR` | `uploads` | Carpeta de las fotos y PDF si no se usa Supabase |
+| `SUPABASE_URL` / `SUPABASE_SERVICE_KEY` | — | Guardar las fotos y PDF en Supabase Storage |
+| `SUPABASE_BUCKET` | `ordenes` | Bucket privado de Supabase Storage |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | — | Usuario inicial (contraseña de 10 caracteres o más) |
 | `ADMIN_NOMBRE` | `Anestesiólogo` | Nombre que se muestra del usuario inicial |
 | `SESSION_SECRET` | aleatorio | Firma de las sesiones; fijarlo para que no se cierren al reiniciar |
