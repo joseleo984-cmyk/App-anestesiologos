@@ -116,3 +116,12 @@ def test_registro_manual(cliente):
 def test_pagina_principal(cliente):
     r = cliente.get("/")
     assert r.status_code == 200 and "Órdenes de cirugía" in r.text
+
+
+def test_foto_heic_aceptada(cliente):
+    import io
+    from PIL import Image
+    buf = io.BytesIO()
+    Image.new("RGB", (64, 48), "white").save(buf, format="HEIF")
+    assert subir(cliente, buf.getvalue(), "IMG_0001.HEIC", "image/heic").status_code == 201
+    assert cliente.llamadas == ["image/heic"]

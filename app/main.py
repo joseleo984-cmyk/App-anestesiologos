@@ -36,7 +36,7 @@ STATIC = Path(__file__).parent / "static"
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 EXTENSIONES = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp",
-               "image/gif": ".gif", "application/pdf": ".pdf"}
+               "image/gif": ".gif", "image/heic": ".heic", "application/pdf": ".pdf"}
 
 
 def get_conn():
@@ -60,6 +60,9 @@ def _tipo_real(datos: bytes) -> str | None:
             return tipo
     if datos[:4] == b"RIFF" and datos[8:12] == b"WEBP":
         return "image/webp"
+    # Fotos de iPhone/Mac (HEIC/HEIF)
+    if datos[4:8] == b"ftyp" and datos[8:12] in (b"heic", b"heix", b"hevc", b"heim", b"heis", b"mif1", b"msf1"):
+        return "image/heic"
     return None
 
 
@@ -121,7 +124,7 @@ def subir_documento(archivo: UploadFile, conn=Depends(get_conn), anestesiologo_i
         raise HTTPException(413, f"El archivo supera {config.MAX_ARCHIVO_MB} MB.")
     tipo = _tipo_real(datos)
     if tipo is None:
-        raise HTTPException(415, "Solo se aceptan fotos (JPG, PNG, WEBP) o PDF.")
+        raise HTTPException(415, "Solo se aceptan fotos (JPG, PNG, WEBP, HEIC) o PDF.")
 
     hash_sha256 = hashlib.sha256(datos).hexdigest()
     existente = repositorio.buscar_documento_por_hash(conn, hash_sha256)

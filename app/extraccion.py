@@ -5,11 +5,14 @@ import json
 
 import anthropic
 from PIL import Image, ImageOps
+from pillow_heif import register_heif_opener
+
+register_heif_opener()  # permite abrir fotos HEIC de iPhone/Mac
 
 from app import config
 from app.modelos import OrdenExtraida
 
-TIPOS_IMAGEN = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+TIPOS_IMAGEN = {"image/jpeg", "image/png", "image/webp", "image/gif", "image/heic"}
 TIPO_PDF = "application/pdf"
 # La API acepta imágenes de hasta 5 MB y las reduce si superan ~1.600 px por lado;
 # las fotos del celular se reducen aquí para no exceder el límite.

@@ -46,6 +46,11 @@
   .principal { display: flex; align-items: center; gap: 6px; font-size: .9rem; margin-top: 8px; }
   .principal input { width: auto; }
   .oculto { display: none; }
+  /* El campo de archivo queda fuera de la vista pero no con display:none (algunos navegadores lo ignoran) */
+  .invisible { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
+  .zona { border: 2px dashed transparent; border-radius: 12px; padding: 4px; }
+  .zona.encima { border-color: var(--accent); }
+  .enlace { color: var(--accent); text-decoration: underline; cursor: pointer; display: inline; margin: 0; font-size: inherit; }
   ul.lista { list-style: none; padding: 0; margin: 0; }
   ul.lista li { border-top: 1px solid var(--line); padding: 10px 0; }
   ul.lista li:first-child { border-top: 0; }
@@ -65,9 +70,15 @@
 
   <section class="card" id="paso-subir">
     <h2>1. Sube la orden</h2>
-    <label class="boton primario grande" for="foto">📷 Tomar foto o elegir archivo</label>
-    <input id="foto" type="file" accept="image/*,application/pdf" class="oculto">
-    <p class="sub">Foto de la orden, autorización o programación, o el PDF. La IA llenará los datos y tú los revisas.</p>
+    <div id="zona" class="zona">
+      <label class="boton primario grande" for="foto">📷 Tomar foto o elegir archivo</label>
+      <p class="sub">También puedes <strong>arrastrar el archivo aquí</strong>. Foto de la orden, autorización
+        o programación, o el PDF. La IA llenará los datos y tú los revisas.</p>
+    </div>
+    <!-- Extensiones además de tipos: Safari en Mac a veces no deja elegir archivos válidos solo con tipos -->
+    <input id="foto" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,image/*,application/pdf" class="invisible">
+    <input id="foto-libre" type="file" class="invisible">
+    <p class="sub">¿No te deja elegir el archivo? <label for="foto-libre" class="enlace">Elegir sin filtro</label></p>
     <button type="button" id="manual">Escribir los datos a mano</button>
     <div id="estado-subida"></div>
   </section>
@@ -258,7 +269,6 @@ function leerFormulario() {
 function cerrarFormulario() {
   $("#paso-revisar").classList.add("oculto");
   documentoId = null;
-  $("#foto").value = "";
 }
 
 $("#cancelar").onclick = cerrarFormulario;
@@ -293,24 +303,36 @@ $("#paso-revisar").onsubmit = async (ev) => {
 };
 
 // ---------------------------------------------------------------- subida
-$("#foto").onchange = async () => {
-  const archivo = $("#foto").files[0];
+async function subirArchivo(archivo) {
   if (!archivo) return;
   cerrarFormulario();
-  $("#estado-subida").innerHTML = `<div class="cargando">Leyendo la orden… puede tardar unos segundos.</div>`;
+  $("#estado-subida").innerHTML = `<div class="cargando">Leyendo «${escapar(archivo.name)}»… puede tardar unos segundos.</div>`;
   const form = new FormData();
   form.append("archivo", archivo);
   try {
     const r = await fetch("/api/documentos", { method: "POST", body: form });
     const cuerpo = await r.json().catch(() => null);
-    if (!r.ok) return aviso($("#estado-subida"), "err", mensajeError(cuerpo, "No se pudo leer la orden."));
+    if (!r.ok) return aviso($("#estado-subida"), "err", mensajeError(cuerpo, `No se pudo leer la orden (error ${r.status}).`));
     documentoId = cuerpo.documento_id;
     aviso($("#estado-subida"), "", "");
     llenarFormulario(cuerpo.datos);
   } catch {
     aviso($("#estado-subida"), "err", "Sin conexión. Intenta de nuevo.");
   }
-};
+}
+
+for (const id of ["#foto", "#foto-libre"]) {
+  $(id).onchange = (ev) => { const a = ev.target.files[0]; ev.target.value = ""; subirArchivo(a); };
+}
+
+// Arrastrar y soltar el archivo sobre la zona
+const zona = $("#zona");
+["dragenter", "dragover"].forEach((t) => zona.addEventListener(t, (e) => { e.preventDefault(); zona.classList.add("encima"); }));
+["dragleave", "drop"].forEach((t) => zona.addEventListener(t, (e) => { e.preventDefault(); zona.classList.remove("encima"); }));
+zona.addEventListener("drop", (e) => subirArchivo(e.dataTransfer.files[0]));
+// Si el archivo se suelta fuera de la zona, que el navegador no lo abra en vez de la app
+window.addEventListener("dragover", (e) => e.preventDefault());
+window.addEventListener("drop", (e) => e.preventDefault());
 
 // ---------------------------------------------------------------- lista
 async function cargarCirugias() {

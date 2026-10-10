@@ -85,3 +85,12 @@ def test_esquema_exige_todos_los_campos():
             for v in nodo:
                 revisar(v)
     revisar(extraccion.ESQUEMA)
+
+
+def test_foto_heic_se_convierte_a_jpeg():
+    buf = io.BytesIO()
+    Image.new("RGB", (640, 480), "white").save(buf, format="HEIF")
+    cliente = ClienteFalso()
+    extraccion.extraer_orden(buf.getvalue(), "image/heic", client=cliente)
+    bloque = cliente.llamadas[0]["messages"][0]["content"][0]
+    assert bloque["type"] == "image" and bloque["source"]["media_type"] == "image/jpeg"
