@@ -164,6 +164,9 @@ def extraer_orden(datos: bytes, media_type: str, client: anthropic.Anthropic | N
             betas=["server-side-fallback-2026-07-01"],
             fallbacks="default",
         )
+    except (anthropic.AuthenticationError, anthropic.PermissionDeniedError) as e:
+        raise ExtraccionError("La clave de Claude (ANTHROPIC_API_KEY) no es válida o no tiene crédito. "
+                              "Revísala en la configuración de Render.") from e
     except anthropic.BadRequestError as e:
         raise ExtraccionError(f"El archivo no se pudo procesar: {e.message}") from e
     except (anthropic.RateLimitError, anthropic.APIConnectionError, anthropic.InternalServerError) as e:

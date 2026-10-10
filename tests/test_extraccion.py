@@ -94,3 +94,16 @@ def test_foto_heic_se_convierte_a_jpeg():
     extraccion.extraer_orden(buf.getvalue(), "image/heic", client=cliente)
     bloque = cliente.llamadas[0]["messages"][0]["content"][0]
     assert bloque["type"] == "image" and bloque["source"]["media_type"] == "image/jpeg"
+
+
+def test_clave_invalida_da_mensaje_claro():
+    import anthropic
+    import httpx
+
+    class ClienteSinClave(ClienteFalso):
+        def _create(self, **kwargs):
+            r = httpx.Response(401, request=httpx.Request("POST", "https://api.anthropic.com/v1/messages"))
+            raise anthropic.AuthenticationError("invalid x-api-key", response=r, body=None)
+
+    with pytest.raises(extraccion.ExtraccionError, match="ANTHROPIC_API_KEY"):
+        extraccion.extraer_orden(b"%PDF-1.7", "application/pdf", client=ClienteSinClave())
