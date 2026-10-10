@@ -1,0 +1,138 @@
+"""API de la app de anestesiólogos.
+
+Flujo:
+  1. POST /api/documentos            sube la foto/PDF; la IA extrae los datos (estado EXTRAIDO)
+  2. El usuario revisa y corrige los datos en pantalla
+  3. POST /api/documentos/{id}/confirmar  guarda la cirugía (estado VALIDADO)
+  4. GET  /api/cirugias              lista las cirugías del anestesiólogo
+"""
+import hashlib
+import logging
+import uuid
+from pathlib import Path
+
+from fastapi import Depends, FastAPI, HTTPException, UploadFile
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+
+from app import config, extraccion, repositorio
+from app.modelos import OrdenConfirmada
+
+log = logging.getLogger(__name__)
+app = FastAPI(title="App Anestesiólogos")
+STATIC = Path(__file__).parent / "static"
+app.mount("/static", StaticFiles(directory=STATIC), name="static")
+
+EXTENSIONES = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp",
+               "image/gif": ".gif", "application/pdf": ".pdf"}
+
+
+def get_conn():
+    with repositorio.conectar() as conn:
+        yield conn
+
+
+def anestesiologo_actual(conn=Depends(get_conn)) -> int:
+    # Pendiente: inicio de sesión. Por ahora se usa el anestesiólogo configurado.
+    if not repositorio.existe_anestesiologo(conn, config.ANESTESIOLOGO_ID):
+        raise HTTPException(500, f"No existe el anestesiólogo {config.ANESTESIOLOGO_ID}; ejecuta db/seeds/demo.sql")
+    return config.ANESTESIOLOGO_ID
+
+
+def _tipo_real(datos: bytes) -> str | None:
+    """Identifica el archivo por su contenido, no por lo que diga el navegador."""
+    firmas = [(b"%PDF", "application/pdf"), (b"\xff\xd8\xff", "image/jpeg"),
+              (b"\x89PNG\r\n\x1a\n", "image/png"), (b"GIF8", "image/gif")]
+    for firma, tipo in firmas:
+        if datos.startswith(firma):
+            return tipo
+    if datos[:4] == b"RIFF" and datos[8:12] == b"WEBP":
+        return "image/webp"
+    return None
+
+
+@app.get("/", include_in_schema=False)
+def inicio():
+    return FileResponse(STATIC / "index.html")
+
+
+@app.post("/api/documentos", status_code=201)
+def subir_documento(archivo: UploadFile, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+    # Función normal (no async): FastAPI la ejecuta en otro hilo, así la lectura con la IA
+    # no bloquea al servidor mientras atiende otras solicitudes.
+    datos = archivo.file.read(config.MAX_ARCHIVO_MB * 1024 * 1024 + 1)
+    if not datos:
+        raise HTTPException(400, "El archivo está vacío.")
+    if len(datos) > config.MAX_ARCHIVO_MB * 1024 * 1024:
+        raise HTTPException(413, f"El archivo supera {config.MAX_ARCHIVO_MB} MB.")
+    tipo = _tipo_real(datos)
+    if tipo is None:
+        raise HTTPException(415, "Solo se aceptan fotos (JPG, PNG, WEBP) o PDF.")
+
+    hash_sha256 = hashlib.sha256(datos).hexdigest()
+    existente = repositorio.buscar_documento_por_hash(conn, hash_sha256)
+    if existente and existente["estado"] != "ERROR":
+        raise HTTPException(409, {"mensaje": "Este archivo ya se había subido.",
+                                  "documento_id": existente["documento_id"]})
+    if existente:  # un intento anterior falló: se reintenta con el mismo registro
+        documento_id = existente["documento_id"]
+    else:
+        config.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+        ruta = config.UPLOAD_DIR / f"{uuid.uuid4().hex}{EXTENSIONES[tipo]}"
+        ruta.write_bytes(datos)
+        documento_id = repositorio.crear_documento(
+            conn, anestesiologo_id, "PDF" if tipo == "application/pdf" else "IMAGEN", str(ruta), hash_sha256)
+    conn.commit()
+
+    try:
+        orden = extraccion.extraer_orden(datos, tipo)
+    except extraccion.ExtraccionError as e:
+        repositorio.marcar_error(conn, documento_id, str(e))
+        conn.commit()
+        raise HTTPException(422, {"mensaje": str(e), "documento_id": documento_id})
+    except Exception:
+        log.exception("Error inesperado extrayendo el documento %s", documento_id)
+        repositorio.marcar_error(conn, documento_id, "error inesperado")
+        conn.commit()
+        raise HTTPException(502, {"mensaje": "No se pudo leer el documento, intenta de nuevo.",
+                                  "documento_id": documento_id})
+
+    repositorio.guardar_extraccion(conn, documento_id, orden)
+    conn.commit()
+    return {"documento_id": documento_id, "estado": "EXTRAIDO", "datos": orden.model_dump(mode="json")}
+
+
+@app.get("/api/documentos/{documento_id}")
+def ver_documento(documento_id: int, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+    doc = repositorio.obtener_documento(conn, documento_id, anestesiologo_id)
+    if doc is None:
+        raise HTTPException(404, "Documento no encontrado.")
+    return doc
+
+
+@app.post("/api/documentos/{documento_id}/confirmar", status_code=201)
+def confirmar_documento(documento_id: int, orden: OrdenConfirmada,
+                        conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+    try:
+        cirugia_id = repositorio.guardar_orden(conn, anestesiologo_id, orden, documento_id)
+    except repositorio.DocumentoNoEncontrado:
+        conn.rollback()
+        raise HTTPException(404, "Documento no encontrado.")
+    except repositorio.DocumentoYaValidado as e:
+        conn.rollback()
+        raise HTTPException(409, {"mensaje": "Esta orden ya fue guardada.", "cirugia_id": e.cirugia_id})
+    conn.commit()
+    return {"cirugia_id": cirugia_id}
+
+
+@app.post("/api/cirugias", status_code=201)
+def crear_cirugia_manual(orden: OrdenConfirmada, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+    """Registro sin foto, escribiendo los datos a mano."""
+    cirugia_id = repositorio.guardar_orden(conn, anestesiologo_id, orden)
+    conn.commit()
+    return {"cirugia_id": cirugia_id}
+
+
+@app.get("/api/cirugias")
+def listar_cirugias(limite: int = 50, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+    return repositorio.listar_cirugias(conn, anestesiologo_id, min(max(limite, 1), 200))

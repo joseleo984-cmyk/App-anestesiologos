@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+# Fotos y PDF de órdenes: contienen datos de pacientes, nunca se suben al repositorio
+uploads/

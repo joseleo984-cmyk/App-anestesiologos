@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Órdenes de cirugía</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E🩺%3C/text%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --text: #1b1f24; --muted: #5b6470; --line: #d9dde3;
+    --accent: #0b6bcb; --accent-text: #ffffff; --warn-bg: #fff4d6; --warn-line: #e0a800;
+    --ok-bg: #e5f5ea; --ok-text: #1d6b35; --err-bg: #fde8e8; --err-text: #a61b1b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12151a; --card: #1b2028; --text: #e7eaee; --muted: #9aa4b1; --line: #313844;
+      --accent: #4b9cf0; --accent-text: #0b0f14; --warn-bg: #3a3014; --warn-line: #c99a1a;
+      --ok-bg: #173323; --ok-text: #8fd9a8; --err-bg: #3d1c1c; --err-text: #f1a3a3;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 720px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 1.35rem; margin: 4px 0 16px; }
+  h2 { font-size: 1.05rem; margin: 0 0 12px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+  button, .boton { font: inherit; border-radius: 10px; border: 1px solid var(--line); background: var(--card);
+                   color: var(--text); padding: 10px 14px; cursor: pointer; }
+  .primario { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; }
+  .grande { display: block; width: 100%; padding: 16px; font-size: 1.05rem; text-align: center; }
+  .fila { display: flex; gap: 8px; flex-wrap: wrap; }
+  .fila > * { flex: 1 1 140px; }
+  label { display: block; font-size: .85rem; color: var(--muted); margin: 10px 0 4px; }
+  input, select { width: 100%; font: inherit; padding: 9px 10px; border-radius: 8px; border: 1px solid var(--line);
+                  background: var(--bg); color: var(--text); }
+  input.dudoso, select.dudoso { background: var(--warn-bg); border-color: var(--warn-line); }
+  fieldset { border: 0; padding: 0; margin: 0 0 8px; }
+  legend { font-weight: 600; margin-top: 8px; }
+  .aviso { padding: 10px 12px; border-radius: 8px; margin: 8px 0; }
+  .aviso.warn { background: var(--warn-bg); border: 1px solid var(--warn-line); }
+  .aviso.ok { background: var(--ok-bg); color: var(--ok-text); }
+  .aviso.err { background: var(--err-bg); color: var(--err-text); }
+  .proc { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px 10px; margin-bottom: 8px; }
+  .proc .fila { align-items: end; }
+  .principal { display: flex; align-items: center; gap: 6px; font-size: .9rem; margin-top: 8px; }
+  .principal input { width: auto; }
+  .oculto { display: none; }
+  ul.lista { list-style: none; padding: 0; margin: 0; }
+  ul.lista li { border-top: 1px solid var(--line); padding: 10px 0; }
+  ul.lista li:first-child { border-top: 0; }
+  .sub { color: var(--muted); font-size: .9rem; }
+  .cargando { text-align: center; padding: 24px 0; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Órdenes de cirugía</h1>
+
+  <section class="card" id="paso-subir">
+    <h2>1. Sube la orden</h2>
+    <label class="boton primario grande" for="foto">📷 Tomar foto o elegir archivo</label>
+    <input id="foto" type="file" accept="image/*,application/pdf" class="oculto">
+    <p class="sub">Foto de la orden, autorización o programación, o el PDF. La IA llenará los datos y tú los revisas.</p>
+    <button type="button" id="manual">Escribir los datos a mano</button>
+    <div id="estado-subida"></div>
+  </section>
+
+  <form class="card oculto" id="paso-revisar" novalidate>
+    <h2>2. Revisa y confirma</h2>
+    <div id="avisos"></div>
+
+    <fieldset>
+      <legend>Paciente</legend>
+      <div class="fila">
+        <div style="flex:0 1 110px"><label for="paciente.tipo_documento">Tipo doc.</label>
+          <select id="paciente.tipo_documento">
+            <option>CC</option><option>TI</option><option>CE</option><option>RC</option>
+            <option>PA</option><option>PPT</option><option>MS</option><option>AS</option>
+          </select></div>
+        <div><label for="paciente.numero_documento">Número de documento</label>
+          <input id="paciente.numero_documento" inputmode="numeric" required></div>
+      </div>
+      <div class="fila">
+        <div><label for="paciente.nombres">Nombres</label><input id="paciente.nombres" required></div>
+        <div><label for="paciente.apellidos">Apellidos</label><input id="paciente.apellidos" required></div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Aseguradora</legend>
+      <div class="fila">
+        <div style="flex:0 1 150px"><label for="aseguradora.tipo">Tipo</label>
+          <select id="aseguradora.tipo">
+            <option value="">Particular</option><option value="EPS">EPS</option>
+            <option value="PREPAGADA">Prepagada</option><option value="POLIZA">Póliza</option>
+          </select></div>
+        <div><label for="aseguradora.nombre">Nombre</label><input id="aseguradora.nombre"></div>
+      </div>
+      <div class="fila">
+        <div><label for="aseguradora.numero_poliza">Nº póliza / afiliación</label><input id="aseguradora.numero_poliza"></div>
+        <div><label for="aseguradora.plan">Plan</label><input id="aseguradora.plan"></div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Clínica</legend>
+      <div class="fila">
+        <div><label for="clinica.nombre">Nombre</label><input id="clinica.nombre" required></div>
+        <div><label for="clinica.ciudad">Ciudad</label><input id="clinica.ciudad"></div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Procedimiento</legend>
+      <label for="fecha_procedimiento">Fecha del procedimiento</label>
+      <input id="fecha_procedimiento" type="date" required>
+      <div id="procedimientos" style="margin-top:12px"></div>
+      <button type="button" id="agregar-proc">+ Agregar procedimiento</button>
+    </fieldset>
+
+    <div id="error-guardar"></div>
+    <div class="fila" style="margin-top:16px">
+      <button type="button" id="cancelar">Cancelar</button>
+      <button type="submit" class="primario">Guardar cirugía</button>
+    </div>
+  </form>
+
+  <section class="card">
+    <h2>Cirugías registradas</h2>
+    <ul class="lista" id="cirugias"><li class="sub">Cargando…</li></ul>
+  </section>
+</main>
+
+<script>
+const $ = (sel) => document.querySelector(sel);
+const campo = (id) => document.getElementById(id);
+let documentoId = null;  // null = registro manual sin foto
+
+function escapar(t) {
+  return String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function mensajeError(cuerpo, porDefecto) {
+  const d = cuerpo && cuerpo.detail;
+  if (!d) return porDefecto;
+  if (typeof d === "string") return d;
+  if (Array.isArray(d)) return d.map((e) => {
+    const ruta = (e.loc || []).slice(1);  // quita "body"
+    const nombres = { paciente: "Paciente", aseguradora: "Aseguradora", clinica: "Clínica",
+                      procedimientos: "Procedimiento", fecha_procedimiento: "Fecha del procedimiento",
+                      codigo: "código", numero_documento: "número de documento", numero_poliza: "nº póliza" };
+    const donde = ruta.map((r) => typeof r === "number" ? r + 1 : (nombres[r] || r.replace(/_/g, " "))).join(" ");
+    return `${donde}: ${String(e.msg).replace(/^Value error, /, "")}`;
+  }).join(" · ");
+  return d.mensaje || porDefecto;
+}
+
+function aviso(contenedor, tipo, texto) {
+  contenedor.innerHTML = texto ? `<div class="aviso ${tipo}">${escapar(texto)}</div>` : "";
+}
+
+// ---------------------------------------------------------------- procedimientos
+function filaProcedimiento(p = {}, dudosos = []) {
+  const div = document.createElement("div");
+  div.className = "proc";
+  div.innerHTML = `
+    <div class="fila">
+      <div style="flex:0 1 120px"><label>Código CUPS</label><input class="codigo" required></div>
+      <div><label>Nombre</label><input class="nombre" required></div>
+    </div>
+    <div class="fila">
+      <label class="principal"><input type="radio" name="principal" class="es-principal"> Principal</label>
+      <button type="button" class="quitar" style="flex:0 0 auto">Quitar</button>
+    </div>`;
+  const cod = div.querySelector(".codigo"), nom = div.querySelector(".nombre");
+  cod.value = p.codigo || ""; nom.value = p.nombre || "";
+  div.querySelector(".es-principal").checked = !!p.es_principal;
+  if (dudosos.includes("codigo")) cod.classList.add("dudoso");
+  if (dudosos.includes("nombre")) nom.classList.add("dudoso");
+  div.querySelector(".quitar").onclick = () => div.remove();
+  return div;
+}
+
+$("#agregar-proc").onclick = () => $("#procedimientos").appendChild(filaProcedimiento());
+
+// ---------------------------------------------------------------- formulario
+const CAMPOS = ["paciente.tipo_documento", "paciente.numero_documento", "paciente.nombres", "paciente.apellidos",
+                "aseguradora.tipo", "aseguradora.nombre", "aseguradora.numero_poliza", "aseguradora.plan",
+                "clinica.nombre", "clinica.ciudad", "fecha_procedimiento"];
+
+function llenarFormulario(datos) {
+  const dudosos = datos.campos_dudosos || [];
+  for (const id of CAMPOS) {
+    const [grupo, nombre] = id.split(".");
+    const valor = nombre ? (datos[grupo] || {})[nombre] : datos[grupo];
+    const el = campo(id);
+    el.value = valor ?? (id === "paciente.tipo_documento" ? "CC" : "");
+    el.classList.toggle("dudoso", dudosos.some((d) => d === id || d.startsWith(id + ".")));
+  }
+  const lista = $("#procedimientos");
+  lista.innerHTML = "";
+  const procs = datos.procedimientos && datos.procedimientos.length ? datos.procedimientos : [{ es_principal: true }];
+  procs.forEach((p, i) => {
+    const marca = `procedimientos[${i}].`;
+    const dudososFila = dudosos.filter((d) => d.startsWith(marca)).map((d) => d.slice(marca.length));
+    lista.appendChild(filaProcedimiento(p, dudososFila));
+  });
+
+  const avisos = [];
+  if (datos.confianza !== undefined && datos.confianza < 0.8)
+    avisos.push(`<div class="aviso warn">La lectura no es del todo segura (${Math.round(datos.confianza * 100)} %). Revisa todos los datos.</div>`);
+  if (dudosos.length)
+    avisos.push(`<div class="aviso warn">Los campos en amarillo pueden estar mal leídos.</div>`);
+  if (datos.observaciones)
+    avisos.push(`<div class="aviso warn">${escapar(datos.observaciones)}</div>`);
+  $("#avisos").innerHTML = avisos.join("");
+  aviso($("#error-guardar"), "", "");
+  $("#paso-revisar").classList.remove("oculto");
+  $("#paso-revisar").scrollIntoView({ behavior: "smooth" });
+}
+
+function leerFormulario() {
+  const v = (id) => campo(id).value.trim() || null;
+  const tipoAseg = v("aseguradora.tipo");
+  return {
+    paciente: {
+      tipo_documento: v("paciente.tipo_documento"), numero_documento: v("paciente.numero_documento"),
+      nombres: v("paciente.nombres"), apellidos: v("paciente.apellidos"),
+    },
+    aseguradora: tipoAseg ? {
+      tipo: tipoAseg, nombre: v("aseguradora.nombre"),
+      numero_poliza: v("aseguradora.numero_poliza"), plan: v("aseguradora.plan"),
+    } : null,
+    clinica: { nombre: v("clinica.nombre"), ciudad: v("clinica.ciudad") },
+    fecha_procedimiento: v("fecha_procedimiento"),
+    procedimientos: [...document.querySelectorAll("#procedimientos .proc")].map((d) => ({
+      codigo: d.querySelector(".codigo").value.trim(), nombre: d.querySelector(".nombre").value.trim(),
+      es_principal: d.querySelector(".es-principal").checked,
+    })),
+  };
+}
+
+function cerrarFormulario() {
+  $("#paso-revisar").classList.add("oculto");
+  documentoId = null;
+  $("#foto").value = "";
+}
+
+$("#cancelar").onclick = cerrarFormulario;
+
+$("#manual").onclick = () => {
+  documentoId = null;
+  aviso($("#estado-subida"), "", "");
+  llenarFormulario({});
+};
+
+$("#paso-revisar").onsubmit = async (ev) => {
+  ev.preventDefault();
+  const datos = leerFormulario();
+  if (datos.aseguradora && !datos.aseguradora.nombre)
+    return aviso($("#error-guardar"), "err", "Escribe el nombre de la aseguradora o elige «Particular».");
+  if (!datos.procedimientos.length)
+    return aviso($("#error-guardar"), "err", "Agrega al menos un procedimiento.");
+  const url = documentoId ? `/api/documentos/${documentoId}/confirmar` : "/api/cirugias";
+  const boton = ev.submitter; boton.disabled = true;
+  try {
+    const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(datos) });
+    const cuerpo = await r.json().catch(() => null);
+    if (!r.ok) return aviso($("#error-guardar"), "err", mensajeError(cuerpo, "No se pudo guardar."));
+    cerrarFormulario();
+    aviso($("#estado-subida"), "ok", "Cirugía guardada.");
+    cargarCirugias();
+  } catch {
+    aviso($("#error-guardar"), "err", "Sin conexión. Intenta de nuevo.");
+  } finally {
+    boton.disabled = false;
+  }
+};
+
+// ---------------------------------------------------------------- subida
+$("#foto").onchange = async () => {
+  const archivo = $("#foto").files[0];
+  if (!archivo) return;
+  cerrarFormulario();
+  $("#estado-subida").innerHTML = `<div class="cargando">Leyendo la orden… puede tardar unos segundos.</div>`;
+  const form = new FormData();
+  form.append("archivo", archivo);
+  try {
+    const r = await fetch("/api/documentos", { method: "POST", body: form });
+    const cuerpo = await r.json().catch(() => null);
+    if (!r.ok) return aviso($("#estado-subida"), "err", mensajeError(cuerpo, "No se pudo leer la orden."));
+    documentoId = cuerpo.documento_id;
+    aviso($("#estado-subida"), "", "");
+    llenarFormulario(cuerpo.datos);
+  } catch {
+    aviso($("#estado-subida"), "err", "Sin conexión. Intenta de nuevo.");
+  }
+};
+
+// ---------------------------------------------------------------- lista
+async function cargarCirugias() {
+  const ul = $("#cirugias");
+  try {
+    const r = await fetch("/api/cirugias");
+    const filas = await r.json();
+    if (!r.ok) throw new Error(mensajeError(filas, "error"));
+    if (!filas.length) { ul.innerHTML = `<li class="sub">Aún no hay cirugías registradas.</li>`; return; }
+    ul.innerHTML = filas.map((c) => {
+      const procs = (c.procedimientos || []).map((p) => `${escapar(p.codigo)} ${escapar(p.nombre)}`).join("<br>");
+      return `<li><strong>${escapar(c.fecha_procedimiento)}</strong> · ${escapar(c.paciente)}
+        <span class="sub">(${escapar(c.tipo_documento)} ${escapar(c.numero_documento)})</span><br>
+        <span class="sub">${escapar(c.clinica)} · ${escapar(c.aseguradora)}</span><br>${procs}</li>`;
+    }).join("");
+  } catch (e) {
+    ul.innerHTML = `<li class="aviso err">No se pudo cargar la lista: ${escapar(e.message)}</li>`;
+  }
+}
+cargarCirugias();
+</script>
+</body>
+</html>

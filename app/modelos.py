@@ -1,0 +1,144 @@
+"""Modelos de datos.
+
+OrdenExtraida: lo que la IA lee de la foto/PDF. Todo es opcional porque la
+orden puede estar incompleta o ilegible.
+OrdenConfirmada: lo que el usuario confirma en pantalla. Exige lo mínimo para
+crear la cirugía en la base de datos.
+"""
+from datetime import date
+from typing import Literal, Optional
+
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+TipoDocumento = Literal["CC", "TI", "CE", "RC", "PA", "PPT", "MS", "AS"]
+TipoAseguradora = Literal["EPS", "PREPAGADA", "POLIZA"]
+
+
+def _limpiar(v):
+    if isinstance(v, str):
+        v = " ".join(v.split())
+        return v or None
+    return v
+
+
+class _Base(BaseModel):
+    @field_validator("*", mode="before")
+    @classmethod
+    def _quitar_espacios(cls, v):
+        return _limpiar(v)
+
+
+# ---------------------------------------------------------------- extracción
+class PacienteExtraido(_Base):
+    tipo_documento: Optional[TipoDocumento] = None
+    numero_documento: Optional[str] = None
+    nombres: Optional[str] = None
+    apellidos: Optional[str] = None
+
+
+class AseguradoraExtraida(_Base):
+    nombre: Optional[str] = None
+    tipo: Optional[TipoAseguradora] = None
+    numero_poliza: Optional[str] = None
+    plan: Optional[str] = None
+
+
+class ClinicaExtraida(_Base):
+    nombre: Optional[str] = None
+    ciudad: Optional[str] = None
+
+
+class ProcedimientoExtraido(_Base):
+    codigo: Optional[str] = None
+    nombre: Optional[str] = None
+    es_principal: bool = False
+
+
+class OrdenExtraida(_Base):
+    paciente: PacienteExtraido = PacienteExtraido()
+    aseguradora: AseguradoraExtraida = AseguradoraExtraida()
+    clinica: ClinicaExtraida = ClinicaExtraida()
+    procedimientos: list[ProcedimientoExtraido] = []
+    fecha_procedimiento: Optional[date] = None
+    confianza: float = Field(default=0, ge=0, le=1)
+    campos_dudosos: list[str] = []
+    observaciones: Optional[str] = None
+
+    @field_validator("fecha_procedimiento", mode="before")
+    @classmethod
+    def _fecha_invalida_a_nulo(cls, v):
+        # Si la IA devuelve una fecha imposible, se deja vacía para que el usuario la escriba
+        if isinstance(v, str):
+            try:
+                return date.fromisoformat(v)
+            except ValueError:
+                return None
+        return v
+
+    @field_validator("confianza", mode="before")
+    @classmethod
+    def _acotar_confianza(cls, v):
+        return min(max(float(v or 0), 0.0), 1.0)
+
+
+# ---------------------------------------------------------------- confirmación
+class PacienteConfirmado(_Base):
+    tipo_documento: TipoDocumento = "CC"
+    numero_documento: str = Field(min_length=3, max_length=20)
+    nombres: str = Field(min_length=1, max_length=100)
+    apellidos: str = Field(min_length=1, max_length=100)
+
+    @field_validator("numero_documento")
+    @classmethod
+    def _solo_alfanumerico(cls, v: str) -> str:
+        # "1.020.304.050" -> "1020304050"
+        v = "".join(ch for ch in v if ch.isalnum()).upper()
+        if len(v) < 3:
+            raise ValueError("número de documento inválido")
+        return v
+
+
+class AseguradoraConfirmada(_Base):
+    nombre: str = Field(min_length=2, max_length=150)
+    tipo: TipoAseguradora
+    numero_poliza: Optional[str] = Field(default=None, max_length=50)
+    plan: Optional[str] = Field(default=None, max_length=100)
+
+
+class ClinicaConfirmada(_Base):
+    nombre: str = Field(min_length=2, max_length=150)
+    ciudad: Optional[str] = Field(default=None, max_length=80)
+
+
+class ProcedimientoConfirmado(_Base):
+    codigo: str = Field(min_length=3, max_length=10)
+    nombre: str = Field(min_length=2, max_length=255)
+    es_principal: bool = False
+
+    @field_validator("codigo")
+    @classmethod
+    def _normalizar_codigo(cls, v: str) -> str:
+        v = v.replace(" ", "").replace(".", "").replace("-", "").upper()
+        if not v.isalnum():
+            raise ValueError(f"el código {v} solo puede tener letras y números")
+        return v
+
+
+class OrdenConfirmada(_Base):
+    paciente: PacienteConfirmado
+    aseguradora: Optional[AseguradoraConfirmada] = None  # None = particular
+    clinica: ClinicaConfirmada
+    procedimientos: list[ProcedimientoConfirmado] = Field(min_length=1)
+    fecha_procedimiento: date
+
+    @model_validator(mode="after")
+    def _un_principal_y_sin_repetidos(self):
+        codigos = [p.codigo for p in self.procedimientos]
+        if len(codigos) != len(set(codigos)):
+            raise ValueError("hay códigos de procedimiento repetidos")
+        principales = [p for p in self.procedimientos if p.es_principal]
+        if len(principales) > 1:
+            raise ValueError("solo un procedimiento puede ser el principal")
+        if not principales:
+            self.procedimientos[0].es_principal = True
+        return self
