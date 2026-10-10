@@ -50,6 +50,7 @@
   .invisible { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
   .zona { border: 2px dashed transparent; border-radius: 12px; padding: 4px; }
   .zona.encima { border-color: var(--accent); }
+  .selector-simple { width: auto; max-width: 100%; padding: 6px; font-size: .9rem; margin-bottom: 12px; }
   .enlace { color: var(--accent); text-decoration: underline; cursor: pointer; display: inline; margin: 0; font-size: inherit; }
   ul.lista { list-style: none; padding: 0; margin: 0; }
   ul.lista li { border-top: 1px solid var(--line); padding: 10px 0; }
@@ -77,8 +78,8 @@
     </div>
     <!-- Extensiones además de tipos: Safari en Mac a veces no deja elegir archivos válidos solo con tipos -->
     <input id="foto" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,image/*,application/pdf" class="invisible">
-    <input id="foto-libre" type="file" class="invisible">
-    <p class="sub">¿No te deja elegir el archivo? <label for="foto-libre" class="enlace">Elegir sin filtro</label></p>
+    <p class="sub" style="margin-bottom:4px">¿El botón no funciona? Usa este selector:</p>
+    <input id="foto-libre" type="file" class="selector-simple">
     <button type="button" id="manual">Escribir los datos a mano</button>
     <div id="estado-subida"></div>
   </section>
@@ -306,23 +307,39 @@ $("#paso-revisar").onsubmit = async (ev) => {
 async function subirArchivo(archivo) {
   if (!archivo) return;
   cerrarFormulario();
-  $("#estado-subida").innerHTML = `<div class="cargando">Leyendo «${escapar(archivo.name)}»… puede tardar unos segundos.</div>`;
+  const estado = $("#estado-subida");
+  estado.innerHTML = `<div class="cargando">Leyendo «${escapar(archivo.name)}»… puede tardar unos segundos.</div>`;
+  // Se lee el archivo completo antes de enviarlo: Safari puede invalidar el archivo
+  // si el campo se limpia mientras se envía.
+  let contenido;
+  try {
+    contenido = new Blob([await archivo.arrayBuffer()], { type: archivo.type || "application/octet-stream" });
+  } catch (e) {
+    return aviso(estado, "err", `No se pudo abrir el archivo en este equipo (${e.name || e}). Prueba arrastrándolo.`);
+  }
+  if (!contenido.size) return aviso(estado, "err", "El archivo está vacío o no se pudo leer. Prueba arrastrándolo.");
   const form = new FormData();
-  form.append("archivo", archivo);
+  form.append("archivo", contenido, archivo.name || "orden");
   try {
     const r = await fetch("/api/documentos", { method: "POST", body: form });
     const cuerpo = await r.json().catch(() => null);
-    if (!r.ok) return aviso($("#estado-subida"), "err", mensajeError(cuerpo, `No se pudo leer la orden (error ${r.status}).`));
+    if (!r.ok) return aviso(estado, "err", mensajeError(cuerpo, `No se pudo leer la orden (error ${r.status}).`));
     documentoId = cuerpo.documento_id;
-    aviso($("#estado-subida"), "", "");
+    aviso(estado, "", "");
     llenarFormulario(cuerpo.datos);
-  } catch {
-    aviso($("#estado-subida"), "err", "Sin conexión. Intenta de nuevo.");
+  } catch (e) {
+    aviso(estado, "err", `No se pudo enviar el archivo (${e.name || "error"}: ${e.message || e}). Revisa la conexión e intenta de nuevo.`);
   }
 }
 
 for (const id of ["#foto", "#foto-libre"]) {
-  $(id).onchange = (ev) => { const a = ev.target.files[0]; ev.target.value = ""; subirArchivo(a); };
+  $(id).addEventListener("change", async (ev) => {
+    const campo = ev.target;
+    const archivo = campo.files && campo.files[0];
+    if (!archivo) return;
+    await subirArchivo(archivo);
+    campo.value = "";  // solo al final, para poder volver a elegir el mismo archivo
+  });
 }
 
 // Arrastrar y soltar el archivo sobre la zona
