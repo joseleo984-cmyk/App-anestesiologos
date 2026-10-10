@@ -60,3 +60,15 @@ CREATE TABLE IF NOT EXISTS pago_detalle (
 );
 CREATE INDEX IF NOT EXISTS idx_pago_detalle_reporte ON pago_detalle (reporte_id);
 CREATE INDEX IF NOT EXISTS idx_pago_detalle_cirugia ON pago_detalle (cirugia_id);
+
+
+-- Varios anestesiólogos: administración de cuentas y cierre de sesiones
+ALTER TABLE anestesiologo ADD COLUMN IF NOT EXISTS es_admin BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE anestesiologo ADD COLUMN IF NOT EXISTS activo BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE anestesiologo ADD COLUMN IF NOT EXISTS debe_cambiar_clave BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE anestesiologo ADD COLUMN IF NOT EXISTS version_sesion INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE anestesiologo ADD COLUMN IF NOT EXISTS clave_env_aplicada CHAR(64);
+
+-- El mismo archivo puede subirlo cada anestesiólogo (antes era único para todos)
+ALTER TABLE documento_fuente DROP CONSTRAINT IF EXISTS documento_fuente_hash_sha256_key;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_documento_anest_hash ON documento_fuente (anestesiologo_id, hash_sha256);

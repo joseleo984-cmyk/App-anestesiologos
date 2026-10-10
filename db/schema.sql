@@ -12,6 +12,11 @@ CREATE TABLE anestesiologo (
     registro_medico    VARCHAR(30)  UNIQUE,
     email              VARCHAR(150) NOT NULL UNIQUE,
     password_hash      TEXT,                       -- scrypt; NULL = no puede iniciar sesión
+    es_admin           BOOLEAN NOT NULL DEFAULT FALSE,  -- administra las cuentas de los demás
+    activo             BOOLEAN NOT NULL DEFAULT TRUE,
+    debe_cambiar_clave BOOLEAN NOT NULL DEFAULT FALSE,  -- clave temporal: cambiarla al entrar
+    version_sesion     INTEGER NOT NULL DEFAULT 0,      -- al subirla se cierran sus sesiones abiertas
+    clave_env_aplicada CHAR(64),                        -- huella de ADMIN_PASSWORD ya aplicada
     creado_en          TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
 
@@ -82,7 +87,7 @@ CREATE TABLE documento_fuente (
     anestesiologo_id   BIGINT NOT NULL REFERENCES anestesiologo(anestesiologo_id),
     tipo_archivo       VARCHAR(10) NOT NULL CHECK (tipo_archivo IN ('IMAGEN','PDF')),
     url_archivo        TEXT        NOT NULL,       -- ruta en el storage
-    hash_sha256        CHAR(64)    UNIQUE,         -- evita cargar dos veces el mismo archivo
+    hash_sha256        CHAR(64),                   -- evita que un anestesiólogo cargue dos veces el mismo archivo
     estado             VARCHAR(15) NOT NULL DEFAULT 'PENDIENTE'
                        CHECK (estado IN ('PENDIENTE','EXTRAIDO','VALIDADO','ERROR')),
     datos_extraidos    JSONB,                      -- JSON crudo devuelto por la IA
@@ -172,6 +177,8 @@ CREATE INDEX IF NOT EXISTS idx_pago_detalle_reporte ON pago_detalle (reporte_id)
 CREATE INDEX IF NOT EXISTS idx_pago_detalle_cirugia ON pago_detalle (cirugia_id);
 
 -- Índices para las consultas más frecuentes
+-- Cada anestesiólogo puede subir su propia copia de un archivo que otro también tenga
+CREATE UNIQUE INDEX idx_documento_anest_hash ON documento_fuente (anestesiologo_id, hash_sha256);
 CREATE INDEX idx_cirugia_fecha        ON cirugia (anestesiologo_id, fecha_procedimiento);
 CREATE INDEX idx_cirugia_paciente     ON cirugia (paciente_id);
 CREATE INDEX idx_cirugia_clinica      ON cirugia (clinica_id);

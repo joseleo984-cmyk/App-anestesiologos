@@ -18,7 +18,7 @@ from typing import Literal, Optional
 from fastapi import Cookie, Depends, FastAPI, HTTPException, Query, Response, UploadFile
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app import almacenamiento, auth, config, exportar, extraccion, inicio, repositorio
 from app.modelos import OrdenConfirmada
@@ -47,11 +47,32 @@ def get_conn():
         yield conn
 
 
-def anestesiologo_actual(sesion: str | None = Cookie(default=None), conn=Depends(get_conn)) -> int:
-    anestesiologo_id = auth.leer_sesion(sesion)
-    if anestesiologo_id is None or not repositorio.existe_anestesiologo(conn, anestesiologo_id):
+def cuenta_sesion(sesion: str | None = Cookie(default=None), conn=Depends(get_conn)) -> dict:
+    """Cuenta de la sesión: la cookie debe ser válida, la cuenta estar activa y la sesión
+    no haber sido cerrada (cambio de clave o desactivación suben la versión)."""
+    datos = auth.leer_sesion(sesion)
+    cuenta = repositorio.obtener_cuenta(conn, datos[0]) if datos else None
+    if cuenta is None or not cuenta["activo"] or cuenta["version_sesion"] != datos[1]:
         raise HTTPException(401, "Inicia sesión para continuar.")
-    return anestesiologo_id
+    return cuenta
+
+
+def anestesiologo_actual(cuenta: dict = Depends(cuenta_sesion)) -> int:
+    if cuenta["debe_cambiar_clave"]:
+        raise HTTPException(403, {"mensaje": "Cambia tu contraseña temporal para continuar.", "cambiar_clave": True})
+    return cuenta["anestesiologo_id"]
+
+
+def admin_actual(cuenta: dict = Depends(cuenta_sesion), _=Depends(anestesiologo_actual)) -> dict:
+    if not cuenta["es_admin"]:
+        raise HTTPException(403, "Solo el administrador puede gestionar las cuentas.")
+    return cuenta
+
+
+def poner_cookie(response: Response, anestesiologo_id: int, version: int) -> None:
+    response.set_cookie(auth.COOKIE, auth.crear_sesion(anestesiologo_id, version),
+                        max_age=auth.DURACION_SESION, httponly=True, samesite="lax",
+                        secure=config.COOKIE_SEGURA)
 
 
 def _tipo_real(datos: bytes) -> str | None:
@@ -117,13 +138,12 @@ class Credenciales(BaseModel):
 @app.post("/api/login")
 def iniciar_sesion(datos: Credenciales, response: Response, conn=Depends(get_conn)):
     usuario = repositorio.buscar_anestesiologo_por_email(conn, datos.email)
-    if not usuario or not auth.verificar_password(datos.password, usuario["password_hash"]):
+    if (not usuario or not usuario["activo"]
+            or not auth.verificar_password(datos.password, usuario["password_hash"])):
         time.sleep(1)  # frena los intentos de adivinar contraseñas
         raise HTTPException(401, "Correo o contraseña incorrectos.")
-    response.set_cookie(auth.COOKIE, auth.crear_sesion(usuario["anestesiologo_id"]),
-                        max_age=auth.DURACION_SESION, httponly=True, samesite="lax",
-                        secure=config.COOKIE_SEGURA)
-    return {"nombre": usuario["nombre"]}
+    poner_cookie(response, usuario["anestesiologo_id"], usuario["version_sesion"])
+    return {"nombre": usuario["nombre"], "debe_cambiar_clave": usuario["debe_cambiar_clave"]}
 
 
 @app.post("/api/logout")
@@ -133,8 +153,82 @@ def cerrar_sesion(response: Response):
 
 
 @app.get("/api/yo")
-def usuario_actual(conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
-    return {**repositorio.obtener_anestesiologo(conn, anestesiologo_id), "version": config.VERSION}
+def usuario_actual(cuenta: dict = Depends(cuenta_sesion)):
+    return {"anestesiologo_id": cuenta["anestesiologo_id"], "nombre": cuenta["nombre"], "email": cuenta["email"],
+            "es_admin": cuenta["es_admin"], "debe_cambiar_clave": cuenta["debe_cambiar_clave"],
+            "version": config.VERSION}
+
+
+class CambioClave(BaseModel):
+    actual: str
+    nueva: str = Field(min_length=10, max_length=200)
+
+
+@app.post("/api/cambiar-clave")
+def cambiar_mi_clave(datos: CambioClave, response: Response, conn=Depends(get_conn),
+                     cuenta: dict = Depends(cuenta_sesion)):
+    if not auth.verificar_password(datos.actual, cuenta["password_hash"]):
+        time.sleep(1)
+        raise HTTPException(400, "La contraseña actual no es correcta.")
+    if datos.nueva == datos.actual:
+        raise HTTPException(400, "La contraseña nueva debe ser distinta de la actual.")
+    version = repositorio.cambiar_clave(conn, cuenta["anestesiologo_id"], auth.hash_password(datos.nueva), False)
+    conn.commit()
+    poner_cookie(response, cuenta["anestesiologo_id"], version)  # esta sesión sigue; las demás se cierran
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------- cuentas (administrador)
+class NuevoUsuario(BaseModel):
+    nombre: str = Field(min_length=3, max_length=150)
+    email: str = Field(min_length=5, max_length=150, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+    registro_medico: Optional[str] = Field(default=None, max_length=30)
+
+
+class EstadoUsuario(BaseModel):
+    activo: bool
+
+
+@app.get("/api/usuarios")
+def listar_usuarios(conn=Depends(get_conn), _=Depends(admin_actual)):
+    return repositorio.listar_usuarios(conn)
+
+
+@app.post("/api/usuarios", status_code=201)
+def crear_usuario(datos: NuevoUsuario, conn=Depends(get_conn), _=Depends(admin_actual)):
+    """Crea la cuenta con una clave temporal que se muestra una sola vez."""
+    clave = auth.clave_temporal()
+    try:
+        nuevo = repositorio.crear_usuario(conn, " ".join(datos.nombre.split()), datos.email,
+                                          (datos.registro_medico or "").strip() or None, auth.hash_password(clave))
+    except repositorio.EmailYaRegistrado:
+        conn.rollback()
+        raise HTTPException(409, "Ya existe una cuenta con ese correo o registro médico.")
+    conn.commit()
+    return {"anestesiologo_id": nuevo, "clave_temporal": clave}
+
+
+@app.put("/api/usuarios/{usuario_id}")
+def activar_usuario(usuario_id: int, datos: EstadoUsuario, conn=Depends(get_conn), admin=Depends(admin_actual)):
+    if usuario_id == admin["anestesiologo_id"] and not datos.activo:
+        raise HTTPException(400, "No puedes desactivar tu propia cuenta.")
+    if not repositorio.cambiar_activo(conn, usuario_id, datos.activo):
+        raise HTTPException(404, "Cuenta no encontrada.")
+    conn.commit()
+    return {"ok": True}
+
+
+@app.post("/api/usuarios/{usuario_id}/restablecer")
+def restablecer_clave(usuario_id: int, conn=Depends(get_conn), admin=Depends(admin_actual)):
+    """Nueva clave temporal (se muestra una sola vez); cierra las sesiones abiertas de esa cuenta."""
+    if usuario_id == admin["anestesiologo_id"]:
+        raise HTTPException(400, "Para tu propia cuenta usa «Cambiar contraseña».")
+    if repositorio.obtener_cuenta(conn, usuario_id) is None:
+        raise HTTPException(404, "Cuenta no encontrada.")
+    clave = auth.clave_temporal()
+    repositorio.cambiar_clave(conn, usuario_id, auth.hash_password(clave), True)
+    conn.commit()
+    return {"clave_temporal": clave}
 
 
 @app.post("/api/documentos", status_code=201)
@@ -144,7 +238,7 @@ def subir_documento(archivo: UploadFile, conn=Depends(get_conn), anestesiologo_i
     datos, tipo = _leer_subida(archivo)
 
     hash_sha256 = hashlib.sha256(datos).hexdigest()
-    existente = repositorio.buscar_documento_por_hash(conn, hash_sha256)
+    existente = repositorio.buscar_documento_por_hash(conn, anestesiologo_id, hash_sha256)
     if existente and existente["estado"] != "ERROR":
         raise HTTPException(409, {"mensaje": "Este archivo ya se había subido.",
                                   "documento_id": existente["documento_id"]})

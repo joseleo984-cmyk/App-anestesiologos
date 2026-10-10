@@ -45,7 +45,7 @@
   .proc .fila { align-items: end; }
   .principal { display: flex; align-items: center; gap: 6px; font-size: .9rem; margin-top: 8px; }
   .principal input { width: auto; }
-  .oculto { display: none; }
+  .oculto { display: none !important; }
   /* El campo de archivo queda fuera de la vista pero no con display:none (algunos navegadores lo ignoran) */
   .invisible { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
   .zona { border: 2px dashed transparent; border-radius: 12px; padding: 4px; }
@@ -57,8 +57,16 @@
   ul.lista li:first-child { border-top: 0; }
   .sub { color: var(--muted); font-size: .9rem; }
   .encabezado { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .usuario { color: var(--muted); font-size: .9rem; display: flex; align-items: center; gap: 8px; }
-  .usuario button { padding: 6px 10px; }
+  .menu { position: relative; }
+  .menu summary { list-style: none; cursor: pointer; color: var(--muted); font-size: .9rem; padding: 6px 10px;
+                  border: 1px solid var(--line); border-radius: 10px; background: var(--card); }
+  .menu summary::-webkit-details-marker { display: none; }
+  .menu-opciones { position: absolute; right: 0; top: calc(100% + 4px); z-index: 10; display: flex; flex-direction: column;
+                   gap: 4px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 6px;
+                   min-width: 220px; box-shadow: 0 6px 20px rgba(0,0,0,.15); }
+  .menu-opciones button { text-align: left; border: 0; }
+  .clave-temporal { font: 600 1.3rem ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .05em;
+                    padding: 10px; border: 1px dashed var(--accent); border-radius: 8px; text-align: center; margin: 8px 0; }
   .cargando { text-align: center; padding: 24px 0; color: var(--muted); }
   textarea { width: 100%; font: inherit; padding: 9px 10px; border-radius: 8px; border: 1px solid var(--line);
              background: var(--bg); color: var(--text); min-height: 64px; resize: vertical; }
@@ -114,7 +122,14 @@
 <main>
   <header class="encabezado">
     <h1>Órdenes de cirugía</h1>
-    <div class="usuario"><span id="nombre-usuario"></span> <button type="button" id="salir">Salir</button></div>
+    <details class="menu" id="menu-cuenta">
+      <summary><span id="nombre-usuario">Cuenta</span> ▾</summary>
+      <div class="menu-opciones">
+        <button type="button" id="ir-clave">Cambiar contraseña</button>
+        <button type="button" id="ir-usuarios" class="oculto">Anestesiólogos (cuentas)</button>
+        <button type="button" id="salir">Salir</button>
+      </div>
+    </details>
   </header>
 
   <nav class="pestanas" role="tablist">
@@ -185,6 +200,41 @@
       <div class="item-cab"><h2>Reportes subidos</h2>
         <button type="button" id="ver-pendientes" style="flex:0 0 auto">Ver pendientes de pago</button></div>
       <div id="lista-pagos"><p class="sub">Cargando…</p></div>
+    </section>
+  </div>
+
+  <div id="pestana-clave" class="pestana oculto">
+    <form class="card" id="form-clave" novalidate>
+      <h2>Cambiar contraseña</h2>
+      <div id="aviso-clave-obligatoria" class="aviso warn oculto">Estás usando una contraseña temporal. Crea la tuya para continuar.</div>
+      <label for="clave-actual">Contraseña actual</label>
+      <input id="clave-actual" type="password" autocomplete="current-password">
+      <label for="clave-nueva">Contraseña nueva (mínimo 10 caracteres)</label>
+      <input id="clave-nueva" type="password" autocomplete="new-password" minlength="10">
+      <label for="clave-repetir">Repite la contraseña nueva</label>
+      <input id="clave-repetir" type="password" autocomplete="new-password">
+      <div id="estado-clave"></div>
+      <button type="submit" class="primario grande" style="margin-top:12px">Guardar contraseña</button>
+      <p class="sub">Al cambiarla se cierra tu sesión en los demás dispositivos.</p>
+    </form>
+  </div>
+
+  <div id="pestana-usuarios" class="pestana oculto">
+    <form class="card" id="form-usuario" novalidate>
+      <h2>Agregar anestesiólogo</h2>
+      <div class="fila">
+        <div><label for="u-nombre">Nombre completo</label><input id="u-nombre" required></div>
+        <div><label for="u-email">Correo (con el que entrará)</label><input id="u-email" type="email" required></div>
+      </div>
+      <label for="u-registro">Registro médico (opcional)</label>
+      <input id="u-registro">
+      <div id="estado-usuario"></div>
+      <button type="submit" class="primario" style="margin-top:12px">Crear cuenta</button>
+    </form>
+    <section class="card">
+      <h2>Cuentas</h2>
+      <p class="sub">Cada anestesiólogo ve solo sus propias cirugías, pagos y reportes.</p>
+      <div id="lista-usuarios"><p class="sub">Cargando…</p></div>
     </section>
   </div>
 
@@ -308,6 +358,10 @@ const fetchOriginal = window.fetch.bind(window);
 window.fetch = async (...args) => {
   const r = await fetchOriginal(...args);
   if (r.status === 401) location.href = "/login";
+  if (r.status === 403) {
+    const cuerpo = await r.clone().json().catch(() => null);
+    if (cuerpo?.detail?.cambiar_clave) exigirCambioClave();
+  }
   return r;
 };
 
@@ -564,6 +618,7 @@ function mostrarPestana(nombre) {
   if (nombre === "cirugias") cargarCirugias();
   if (nombre === "reportes") cargarReporte();
   if (nombre === "pagos") cargarReportesPago();
+  if (nombre === "usuarios") cargarUsuarios();
 }
 document.querySelectorAll("[data-pestana]").forEach((b) => b.onclick = () => {
   if (modo.tipo === "editar") modo = { tipo: "manual" };
@@ -861,13 +916,90 @@ async function cargarReporte() {
   }
 }
 
+// ---------------------------------------------------------------- cuenta
+let claveObligatoria = false;
+function exigirCambioClave() {
+  claveObligatoria = true;
+  $(".pestanas").classList.add("oculto");
+  $("#aviso-clave-obligatoria").classList.remove("oculto");
+  mostrarPestana("clave");
+}
+$("#ir-clave").onclick = () => { $("#menu-cuenta").open = false; mostrarPestana("clave"); };
+$("#ir-usuarios").onclick = () => { $("#menu-cuenta").open = false; mostrarPestana("usuarios"); };
+$("#salir").onclick = async () => { await fetch("/api/logout", { method: "POST" }); location.href = "/login"; };
+
+$("#form-clave").onsubmit = async (ev) => {
+  ev.preventDefault();
+  const estado = $("#estado-clave");
+  const actual = $("#clave-actual").value, nueva = $("#clave-nueva").value;
+  if (nueva.length < 10) return aviso(estado, "err", "La contraseña nueva debe tener al menos 10 caracteres.");
+  if (nueva !== $("#clave-repetir").value) return aviso(estado, "err", "Las dos contraseñas nuevas no coinciden.");
+  const r = await fetch("/api/cambiar-clave", { method: "POST", headers: { "Content-Type": "application/json" },
+                                                body: JSON.stringify({ actual, nueva }) });
+  const cuerpo = await r.json().catch(() => null);
+  if (!r.ok) return aviso(estado, "err", mensajeError(cuerpo, "No se pudo cambiar la contraseña."));
+  ["#clave-actual", "#clave-nueva", "#clave-repetir"].forEach((id) => $(id).value = "");
+  if (claveObligatoria) { location.reload(); return; }
+  aviso(estado, "ok", "Contraseña actualizada.");
+};
+
+async function cargarUsuarios() {
+  const cont = $("#lista-usuarios");
+  const r = await fetch("/api/usuarios");
+  if (!r.ok) { cont.innerHTML = `<p class="aviso err">No se pudieron cargar las cuentas.</p>`; return; }
+  const usuarios = await r.json();
+  cont.innerHTML = usuarios.map((u) => `<div class="linea-pago">
+    <div class="item-cab"><strong>${escapar(u.nombre)}</strong>
+      <span class="chip ${u.activo ? "" : "CANCELADA"}">${u.es_admin ? "ADMIN" : u.activo ? "ACTIVO" : "INACTIVO"}</span></div>
+    <div class="sub">${escapar(u.email)}${u.registro_medico ? ` · RM ${escapar(u.registro_medico)}` : ""} · ${u.cirugias} cirugía${u.cirugias === 1 ? "" : "s"}
+      ${u.debe_cambiar_clave ? " · aún con clave temporal" : ""}</div>
+    ${u.es_admin ? "" : `<div class="acciones-pago">
+      <button type="button" data-restablecer="${u.anestesiologo_id}" data-nombre="${escapar(u.nombre)}">Nueva clave temporal</button>
+      <button type="button" data-activar="${u.anestesiologo_id}" data-activo="${!u.activo}">${u.activo ? "Desactivar" : "Activar"}</button>
+    </div>`}
+    <div class="resultado-usuario"></div>
+  </div>`).join("");
+  cont.querySelectorAll("[data-restablecer]").forEach((b) => b.onclick = async () => {
+    if (!confirm(`¿Crear una nueva clave temporal para ${b.dataset.nombre}? Se cerrarán sus sesiones abiertas.`)) return;
+    const r = await fetch(`/api/usuarios/${b.dataset.restablecer}/restablecer`, { method: "POST" });
+    const cuerpo = await r.json().catch(() => null);
+    const destino = b.closest(".linea-pago").querySelector(".resultado-usuario");
+    destino.innerHTML = r.ok ? tarjetaClave(cuerpo.clave_temporal) : `<p class="aviso err">${escapar(mensajeError(cuerpo, "Error"))}</p>`;
+  });
+  cont.querySelectorAll("[data-activar]").forEach((b) => b.onclick = async () => {
+    const activar = b.dataset.activo === "true";
+    if (!activar && !confirm("¿Desactivar esta cuenta? No podrá entrar; sus datos se conservan.")) return;
+    await fetch(`/api/usuarios/${b.dataset.activar}`, { method: "PUT", headers: { "Content-Type": "application/json" },
+                                                        body: JSON.stringify({ activo: activar }) });
+    cargarUsuarios();
+  });
+}
+
+const tarjetaClave = (clave) => `<div class="aviso ok">Clave temporal (se muestra <strong>una sola vez</strong>; entrégasela
+  al anestesiólogo, que deberá cambiarla al entrar):<div class="clave-temporal">${escapar(clave)}</div></div>`;
+
+$("#form-usuario").onsubmit = async (ev) => {
+  ev.preventDefault();
+  const estado = $("#estado-usuario");
+  const datos = { nombre: $("#u-nombre").value.trim(), email: $("#u-email").value.trim(),
+                  registro_medico: $("#u-registro").value.trim() || null };
+  if (!datos.nombre || !datos.email) return aviso(estado, "err", "Escribe el nombre y el correo.");
+  const r = await fetch("/api/usuarios", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(datos) });
+  const cuerpo = await r.json().catch(() => null);
+  if (!r.ok) return aviso(estado, "err", mensajeError(cuerpo, "No se pudo crear la cuenta."));
+  estado.innerHTML = `<p><strong>${escapar(datos.nombre)}</strong> ya puede entrar con su correo
+    <strong>${escapar(datos.email)}</strong> en <strong>${escapar(location.origin)}</strong>.</p>${tarjetaClave(cuerpo.clave_temporal)}`;
+  ["#u-nombre", "#u-email", "#u-registro"].forEach((id) => $(id).value = "");
+  cargarUsuarios();
+};
+
 fetch("/api/yo").then((r) => r.ok ? r.json() : null).then((u) => {
   if (!u) return;
   $("#nombre-usuario").textContent = u.nombre;
   $("#version").textContent = `Versión ${u.version}`;
+  $("#ir-usuarios").classList.toggle("oculto", !u.es_admin);
+  if (u.debe_cambiar_clave) exigirCambioClave(); else cargarOpciones();
 });
-$("#salir").onclick = async () => { await fetch("/api/logout", { method: "POST" }); location.href = "/login"; };
-cargarOpciones();
 </script>
 </body>
 </html>

@@ -34,21 +34,28 @@ def _firma(datos: str) -> str:
     return hmac.new(config.SESSION_SECRET.encode(), datos.encode(), hashlib.sha256).hexdigest()
 
 
-def crear_sesion(anestesiologo_id: int) -> str:
-    datos = f"{anestesiologo_id}.{int(time.time())}"
+def crear_sesion(anestesiologo_id: int, version: int = 0) -> str:
+    """La versión permite cerrar todas las sesiones de alguien (al cambiar su clave o desactivarlo)."""
+    datos = f"{anestesiologo_id}.{version}.{int(time.time())}"
     return f"{datos}.{_firma(datos)}"
 
 
-def leer_sesion(valor: Optional[str]) -> Optional[int]:
-    """Devuelve el anestesiólogo de la cookie si la firma es válida y no ha vencido."""
+def leer_sesion(valor: Optional[str]) -> Optional[tuple[int, int]]:
+    """(anestesiólogo, versión) de la cookie si la firma es válida y no ha vencido."""
     if not valor:
         return None
     try:
-        anestesiologo_id, emitida, firma = valor.split(".")
-        if not hmac.compare_digest(firma, _firma(f"{anestesiologo_id}.{emitida}")):
+        anestesiologo_id, version, emitida, firma = valor.split(".")
+        if not hmac.compare_digest(firma, _firma(f"{anestesiologo_id}.{version}.{emitida}")):
             return None
         if time.time() - int(emitida) > DURACION_SESION:
             return None
-        return int(anestesiologo_id)
+        return int(anestesiologo_id), int(version)
     except ValueError:
         return None
+
+
+def clave_temporal() -> str:
+    """Clave fácil de dictar: sin letras ni números que se confundan (0/O, 1/l)."""
+    alfabeto = "abcdefghjkmnpqrstuvwxyz23456789"
+    return "-".join("".join(secrets.choice(alfabeto) for _ in range(4)) for _ in range(3))

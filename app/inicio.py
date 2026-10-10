@@ -3,6 +3,7 @@
 Crea las tablas si la base está vacía (primer despliegue) y deja listo el
 usuario inicial con ADMIN_EMAIL / ADMIN_PASSWORD.
 """
+import hashlib
 import logging
 from pathlib import Path
 
@@ -37,8 +38,22 @@ def preparar_base_de_datos() -> None:
         if config.ADMIN_EMAIL and config.ADMIN_PASSWORD:
             if len(config.ADMIN_PASSWORD) < 10:
                 raise RuntimeError("ADMIN_PASSWORD debe tener al menos 10 caracteres")
+            # La clave de Render se aplica al crear la cuenta y cada vez que se CAMBIA en Render;
+            # si el administrador la cambia desde la app, reiniciar no la devuelve a la de Render.
+            huella = hashlib.sha256(config.ADMIN_PASSWORD.encode()).hexdigest()
             conn.execute(
-                """INSERT INTO anestesiologo (nombre, email, password_hash) VALUES (%s, %s, %s)
-                   ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash""",
-                (config.ADMIN_NOMBRE, config.ADMIN_EMAIL.strip().lower(), auth.hash_password(config.ADMIN_PASSWORD)),
+                """INSERT INTO anestesiologo (nombre, email, password_hash, es_admin, clave_env_aplicada)
+                   VALUES (%(nombre)s, %(email)s, %(hash)s, TRUE, %(huella)s)
+                   ON CONFLICT (email) DO UPDATE SET
+                       es_admin = TRUE, activo = TRUE,
+                       password_hash = CASE WHEN anestesiologo.clave_env_aplicada IS DISTINCT FROM %(huella)s
+                                            THEN %(hash)s ELSE anestesiologo.password_hash END,
+                       debe_cambiar_clave = CASE WHEN anestesiologo.clave_env_aplicada IS DISTINCT FROM %(huella)s
+                                                 THEN FALSE ELSE anestesiologo.debe_cambiar_clave END,
+                       version_sesion = CASE WHEN anestesiologo.clave_env_aplicada IS DISTINCT FROM %(huella)s
+                                             THEN anestesiologo.version_sesion + 1
+                                             ELSE anestesiologo.version_sesion END,
+                       clave_env_aplicada = %(huella)s""",
+                {"nombre": config.ADMIN_NOMBRE, "email": config.ADMIN_EMAIL.strip().lower(),
+                 "hash": auth.hash_password(config.ADMIN_PASSWORD), "huella": huella},
             )

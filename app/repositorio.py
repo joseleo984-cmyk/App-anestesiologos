@@ -34,9 +34,10 @@ def _nombre_catalogo(nombre: str) -> str:
 
 
 # ------------------------------------------------------------ documentos
-def buscar_documento_por_hash(conn, hash_sha256: str) -> Optional[dict]:
+def buscar_documento_por_hash(conn, anestesiologo_id: int, hash_sha256: str) -> Optional[dict]:
     return conn.execute(
-        "SELECT documento_id, estado FROM documento_fuente WHERE hash_sha256 = %s", (hash_sha256,)
+        "SELECT documento_id, estado FROM documento_fuente WHERE anestesiologo_id = %s AND hash_sha256 = %s",
+        (anestesiologo_id, hash_sha256),
     ).fetchone()
 
 
@@ -392,24 +393,62 @@ def obtener_archivo(conn, documento_id: int, anestesiologo_id: int) -> Optional[
     ).fetchone()
 
 
-def existe_anestesiologo(conn, anestesiologo_id: int) -> bool:
-    return conn.execute(
-        "SELECT 1 FROM anestesiologo WHERE anestesiologo_id = %s", (anestesiologo_id,)
-    ).fetchone() is not None
+_CUENTA = """anestesiologo_id, nombre, email, password_hash, es_admin, activo, debe_cambiar_clave,
+             version_sesion"""
+
+
+def obtener_cuenta(conn, anestesiologo_id: int) -> Optional[dict]:
+    return conn.execute(f"SELECT {_CUENTA} FROM anestesiologo WHERE anestesiologo_id = %s",
+                        (anestesiologo_id,)).fetchone()
 
 
 def buscar_anestesiologo_por_email(conn, email: str) -> Optional[dict]:
-    return conn.execute(
-        "SELECT anestesiologo_id, nombre, password_hash FROM anestesiologo WHERE email = %s",
-        (email.strip().lower(),),
-    ).fetchone()
+    return conn.execute(f"SELECT {_CUENTA} FROM anestesiologo WHERE email = %s",
+                        (email.strip().lower(),)).fetchone()
 
 
-def obtener_anestesiologo(conn, anestesiologo_id: int) -> Optional[dict]:
+def cambiar_clave(conn, anestesiologo_id: int, password_hash: str, temporal: bool) -> int:
+    """Guarda la clave nueva y cierra las sesiones abiertas. Devuelve la nueva versión de sesión."""
     return conn.execute(
-        "SELECT anestesiologo_id, nombre, email FROM anestesiologo WHERE anestesiologo_id = %s",
-        (anestesiologo_id,),
-    ).fetchone()
+        """UPDATE anestesiologo SET password_hash = %s, debe_cambiar_clave = %s,
+                  version_sesion = version_sesion + 1
+            WHERE anestesiologo_id = %s RETURNING version_sesion""",
+        (password_hash, temporal, anestesiologo_id),
+    ).fetchone()["version_sesion"]
+
+
+# ------------------------------------------------------------ administración de cuentas
+def listar_usuarios(conn) -> list[dict]:
+    return conn.execute(
+        """SELECT a.anestesiologo_id, a.nombre, a.email, a.registro_medico, a.es_admin, a.activo,
+                  a.debe_cambiar_clave, a.creado_en,
+                  (SELECT COUNT(*) FROM cirugia c WHERE c.anestesiologo_id = a.anestesiologo_id) AS cirugias
+             FROM anestesiologo a ORDER BY a.activo DESC, a.nombre"""
+    ).fetchall()
+
+
+class EmailYaRegistrado(Exception):
+    pass
+
+
+def crear_usuario(conn, nombre: str, email: str, registro_medico: Optional[str], password_hash: str) -> int:
+    try:
+        with conn.transaction():
+            return conn.execute(
+                """INSERT INTO anestesiologo (nombre, email, registro_medico, password_hash, debe_cambiar_clave)
+                   VALUES (%s, %s, %s, %s, TRUE) RETURNING anestesiologo_id""",
+                (nombre, email.strip().lower(), registro_medico, password_hash),
+            ).fetchone()["anestesiologo_id"]
+    except psycopg.errors.UniqueViolation as e:
+        raise EmailYaRegistrado() from e
+
+
+def cambiar_activo(conn, anestesiologo_id: int, activo: bool) -> bool:
+    return conn.execute(
+        """UPDATE anestesiologo SET activo = %s, version_sesion = version_sesion + 1
+            WHERE anestesiologo_id = %s""",
+        (activo, anestesiologo_id),
+    ).rowcount == 1
 
 
 # ------------------------------------------------------------ reportes de pago

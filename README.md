@@ -30,8 +30,9 @@ export ADMIN_EMAIL=tu@correo.com ADMIN_PASSWORD='una-clave-de-10-o-mas'
 .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-Al arrancar, la app crea las tablas si la base está vacía, aplica `db/migraciones.sql` a las bases existentes y deja listo el usuario
-`ADMIN_EMAIL` con la contraseña `ADMIN_PASSWORD` (cambiar la variable y reiniciar cambia la contraseña).
+Al arrancar, la app crea las tablas si la base está vacía, aplica `db/migraciones.sql` a las bases existentes y deja listo el
+administrador `ADMIN_EMAIL` con la contraseña `ADMIN_PASSWORD`. Esa contraseña se aplica al crearlo y cada vez que la
+variable **cambia** en Render; si el administrador la cambia desde la app, reiniciar no la revierte.
 Abrir `http://localhost:8000` (desde el celular, con la IP del computador en la misma red).
 
 ### En Supabase + Render (pruebas sin costo)
@@ -67,6 +68,9 @@ la API pública de Supabase no ve ningún dato; solo la app, que se conecta como
 | Método | Ruta | Qué hace |
 |---|---|---|
 | `POST` | `/api/login` · `/api/logout` | Iniciar y cerrar sesión (todo lo demás exige sesión) |
+| `POST` | `/api/cambiar-clave` | Cambia la propia contraseña (cierra las otras sesiones) |
+| `GET` · `POST` | `/api/usuarios` | Administrador: lista y crea cuentas (devuelve la clave temporal) |
+| `PUT` · `POST` | `/api/usuarios/{id}` · `/restablecer` | Administrador: activa/desactiva · nueva clave temporal |
 | `POST` | `/api/documentos` | Sube la foto/PDF (`archivo`) y devuelve los datos leídos |
 | `GET` | `/api/documentos/{id}` | Estado del documento y datos extraídos |
 | `POST` | `/api/documentos/{id}/confirmar` | Guarda la cirugía con los datos revisados |
@@ -90,6 +94,14 @@ createdb anestesia_test
 Las pruebas no llaman a la API de Claude: usan un cliente falso. La base `anestesia_test`
 se borra y se recrea en cada prueba (`TEST_DATABASE_URL` para usar otra).
 
+## Varios anestesiólogos
+
+El administrador (`ADMIN_EMAIL`) crea las cuentas en **menú de la cuenta → Anestesiólogos (cuentas)**: cada una recibe
+una clave temporal que se muestra una sola vez y que el anestesiólogo debe cambiar al entrar. Puede desactivar cuentas
+y generar claves temporales nuevas; ambas acciones cierran las sesiones abiertas de esa cuenta, igual que cambiar la
+propia contraseña cierra las de los demás dispositivos. Cada anestesiólogo ve solo sus cirugías, órdenes, pagos y
+reportes, y puede subir su propia copia de un archivo que otro también tenga.
+
 ## Pagos: depurar pendientes
 
 La relación de pacientes pagados (p. ej. "Reporte de pagos a prestadores" de la asociación) se sube en
@@ -101,7 +113,6 @@ queda como **pendiente de pago** (filtro y tarjeta en Reportes).
 
 ## Pendiente
 
-- Pantalla para agregar más anestesiólogos (hoy solo el usuario inicial).
 - Módulo de honorarios (`db/honorarios.sql`, tabla UVR del ISS 2001 en `db/seeds/`):
   diseñado, pendiente el valor de la UVR del anestesiólogo.
 - Las fotos y PDF contienen datos de pacientes: en producción deben guardarse cifrados
