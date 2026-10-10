@@ -18,7 +18,9 @@ services:
       - key: SUPABASE_BUCKET
         value: ordenes
       # Render los pide al crear el Blueprint (no se guardan en el repositorio)
-      - key: DATABASE_URL          # Supabase > Connect > Session pooler
+      - key: DATABASE_URL          # Supabase > Connect > Session pooler (se puede pegar con [YOUR-PASSWORD])
+        sync: false
+      - key: DATABASE_PASSWORD     # contraseña de la base de Supabase (reemplaza [YOUR-PASSWORD])
         sync: false
       - key: SUPABASE_URL          # Supabase > Project Settings > API > Project URL
         sync: false

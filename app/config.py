@@ -3,7 +3,13 @@ import os
 import secrets
 from pathlib import Path
 
-DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql:///anestesia")
+from urllib.parse import quote
+
+DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql:///anestesia").strip()
+# Permite pegar la dirección de Supabase tal cual (con [YOUR-PASSWORD]) y dar la
+# contraseña aparte; se codifica para que los símbolos no rompan la dirección.
+if "[YOUR-PASSWORD]" in DATABASE_URL and os.environ.get("DATABASE_PASSWORD"):
+    DATABASE_URL = DATABASE_URL.replace("[YOUR-PASSWORD]", quote(os.environ["DATABASE_PASSWORD"].strip(), safe=""))
 UPLOAD_DIR = Path(os.environ.get("UPLOAD_DIR", "uploads"))
 # Supabase Storage (opcional): si están definidos, las órdenes se guardan allí y no en UPLOAD_DIR
 SUPABASE_URL = os.environ.get("SUPABASE_URL")

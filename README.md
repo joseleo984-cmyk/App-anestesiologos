@@ -50,6 +50,7 @@ la API pública de Supabase no ve ningún dato; solo la app, que se conecta como
 | Variable | Por defecto | Para qué |
 |---|---|---|
 | `DATABASE_URL` | `postgresql:///anestesia` | Conexión a PostgreSQL |
+| `DATABASE_PASSWORD` | — | Si `DATABASE_URL` trae `[YOUR-PASSWORD]` (como la copia Supabase), se reemplaza por esta |
 | `ANTHROPIC_API_KEY` | — | Clave de la API de Claude |
 | `CLAUDE_MODEL` | `claude-opus-5-5` | Modelo que lee las órdenes |
 | `UPLOAD_DIR` | `uploads` | Carpeta de las fotos y PDF si no se usa Supabase |
