@@ -107,3 +107,12 @@ def test_clave_invalida_da_mensaje_claro():
 
     with pytest.raises(extraccion.ExtraccionError, match="ANTHROPIC_API_KEY"):
         extraccion.extraer_orden(b"%PDF-1.7", "application/pdf", client=ClienteSinClave())
+
+
+def test_haiku_no_envia_reintento_con_otro_modelo(monkeypatch):
+    from app import config
+    monkeypatch.setattr(config, "CLAUDE_MODEL", "claude-haiku-5-5")
+    cliente = ClienteFalso()
+    extraccion.extraer_orden(b"%PDF-1.7", "application/pdf", client=cliente)
+    kw = cliente.llamadas[0]
+    assert kw["model"] == "claude-haiku-5-5" and "fallbacks" not in kw and "betas" not in kw

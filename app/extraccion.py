@@ -146,6 +146,10 @@ def _bloque_documento(datos: bytes, media_type: str) -> dict:
 
 def extraer_orden(datos: bytes, media_type: str, client: anthropic.Anthropic | None = None) -> OrdenExtraida:
     client = client or anthropic.Anthropic()
+    # Si un filtro de seguridad rechaza la solicitud, la API la reintenta con otro modelo.
+    # Haiku no tiene ese reintento: con Haiku la opción no se envía.
+    reintento = {} if "haiku" in config.CLAUDE_MODEL else {
+        "betas": ["server-side-fallback-2026-07-01"], "fallbacks": "default"}
     try:
         respuesta = client.beta.messages.create(
             model=config.CLAUDE_MODEL,
@@ -160,9 +164,7 @@ def extraer_orden(datos: bytes, media_type: str, client: anthropic.Anthropic | N
             }],
             thinking={"type": "adaptive"},
             output_config={"effort": "high", "format": {"type": "json_schema", "schema": ESQUEMA}},
-            # Si un filtro de seguridad rechaza la solicitud, la API la reintenta con otro modelo
-            betas=["server-side-fallback-2026-07-01"],
-            fallbacks="default",
+            **reintento,
         )
     except (anthropic.AuthenticationError, anthropic.PermissionDeniedError) as e:
         raise ExtraccionError("La clave de Claude (ANTHROPIC_API_KEY) no es válida o no tiene crédito. "
