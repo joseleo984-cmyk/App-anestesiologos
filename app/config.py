@@ -30,3 +30,6 @@ COOKIE_SEGURA = os.environ.get("COOKIE_SEGURA", "false").lower() == "true"
 ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
 ADMIN_NOMBRE = os.environ.get("ADMIN_NOMBRE", "Anestesiólogo")
+
+# Versión publicada: Render define RENDER_GIT_COMMIT con el commit desplegado
+VERSION = (os.environ.get("RENDER_GIT_COMMIT") or "local")[:7]

@@ -110,7 +110,7 @@ def cerrar_sesion(response: Response):
 
 @app.get("/api/yo")
 def usuario_actual(conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
-    return repositorio.obtener_anestesiologo(conn, anestesiologo_id)
+    return {**repositorio.obtener_anestesiologo(conn, anestesiologo_id), "version": config.VERSION}
 
 
 @app.post("/api/documentos", status_code=201)

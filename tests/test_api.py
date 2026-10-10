@@ -125,3 +125,15 @@ def test_foto_heic_aceptada(cliente):
     Image.new("RGB", (64, 48), "white").save(buf, format="HEIF")
     assert subir(cliente, buf.getvalue(), "IMG_0001.HEIC", "image/heic").status_code == 201
     assert cliente.llamadas == ["image/heic"]
+
+
+def test_el_selector_no_filtra_tipos(cliente):
+    """Con accept, Safari dejaba los PDF sin poder elegirse; el servidor valida el tipo."""
+    import re
+    html = cliente.get("/").text
+    for campo in re.findall(r'<input[^>]*type="file"[^>]*>', html):
+        assert "accept" not in campo
+
+
+def test_yo_incluye_version(cliente):
+    assert cliente.get("/api/yo").json()["version"] == "local"

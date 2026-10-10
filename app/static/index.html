@@ -76,8 +76,9 @@
       <p class="sub">También puedes <strong>arrastrar el archivo aquí</strong>. Foto de la orden, autorización
         o programación, o el PDF. La IA llenará los datos y tú los revisas.</p>
     </div>
-    <!-- Extensiones además de tipos: Safari en Mac a veces no deja elegir archivos válidos solo con tipos -->
-    <input id="foto" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,image/*,application/pdf" class="invisible">
+    <!-- Sin "accept": con ese filtro Safari (Mac y iPhone) dejaba los PDF sin poder elegirse.
+         El servidor valida el tipo real del archivo y rechaza lo que no sea foto o PDF. -->
+    <input id="foto" type="file" class="invisible">
     <p class="sub" style="margin-bottom:4px">¿El botón no funciona? Usa este selector:</p>
     <input id="foto-libre" type="file" class="selector-simple">
     <button type="button" id="manual">Escribir los datos a mano</button>
@@ -148,6 +149,7 @@
     <h2>Cirugías registradas</h2>
     <ul class="lista" id="cirugias"><li class="sub">Cargando…</li></ul>
   </section>
+  <p class="sub" id="version" style="text-align:center"></p>
 </main>
 
 <script>
@@ -369,7 +371,11 @@ async function cargarCirugias() {
     ul.innerHTML = `<li class="aviso err">No se pudo cargar la lista: ${escapar(e.message)}</li>`;
   }
 }
-fetch("/api/yo").then((r) => r.ok ? r.json() : null).then((u) => { if (u) $("#nombre-usuario").textContent = u.nombre; });
+fetch("/api/yo").then((r) => r.ok ? r.json() : null).then((u) => {
+  if (!u) return;
+  $("#nombre-usuario").textContent = u.nombre;
+  $("#version").textContent = `Versión ${u.version}`;
+});
 $("#salir").onclick = async () => { await fetch("/api/logout", { method: "POST" }); location.href = "/login"; };
 cargarCirugias();
 </script>
