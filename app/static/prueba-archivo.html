@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="es">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Prueba de selector</title></head>
+<body style="font: 18px system-ui; padding: 24px">
+<h1>Prueba de selector de archivos</h1>
+<p>Elige el PDF con este botón. No se sube nada: solo muestra si el navegador entrega el archivo.</p>
+<input type="file" id="a">
+<p id="r">Resultado: aún no se ha elegido archivo.</p>
+<script>
+document.getElementById("a").addEventListener("change", (e) => {
+  const f = e.target.files[0];
+  document.getElementById("r").textContent = f
+    ? `Resultado: OK, el navegador entregó «${f.name}» (${Math.round(f.size / 1024)} KB, ${f.type || "sin tipo"}).`
+    : "Resultado: el navegador no entregó ningún archivo.";
+});
+</script>
+</body>
+</html>

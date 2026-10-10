@@ -80,6 +80,12 @@ def pagina_login():
     return FileResponse(STATIC / "login.html")
 
 
+@app.get("/prueba-archivo", include_in_schema=False)
+def pagina_prueba_archivo():
+    """Página mínima para diagnosticar el selector de archivos del navegador (no sube nada)."""
+    return FileResponse(STATIC / "prueba-archivo.html", headers={"Cache-Control": "no-store"})
+
+
 @app.get("/salud", include_in_schema=False)
 def salud(conn=Depends(get_conn)):
     conn.execute("SELECT 1")
