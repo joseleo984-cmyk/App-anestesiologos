@@ -20,8 +20,8 @@ from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from app import almacenamiento, auth, config, exportar, extraccion, inicio, repositorio
-from app.modelos import OrdenConfirmada
+from app import almacenamiento, auth, catalogo, config, exportar, extraccion, inicio, repositorio
+from app.modelos import OrdenConfirmada, Sugerencia
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 log = logging.getLogger(__name__)
@@ -234,6 +234,21 @@ def restablecer_clave(usuario_id: int, conn=Depends(get_conn), admin=Depends(adm
 MAX_PAGINAS = 8
 
 
+def completar_codigos(orden) -> None:
+    """Procedimientos sin código CUPS: se busca su nombre en el manual ISS. Si la coincidencia es
+    clara se pone el código (marcado para revisar); si no, quedan las opciones para elegir."""
+    for i, p in enumerate(orden.procedimientos):
+        if p.codigo or not p.nombre:
+            continue
+        elegido, sugerencias = catalogo.codigo_probable(p.nombre)
+        p.sugerencias = [Sugerencia(codigo=s["codigo"], descripcion=s["descripcion"], uvr=s["uvr"]) for s in sugerencias]
+        if elegido:
+            p.codigo, p.codigo_sugerido = elegido["codigo"], True
+        marca = f"procedimientos[{i}].codigo"
+        if marca not in orden.campos_dudosos:
+            orden.campos_dudosos.append(marca)
+
+
 @app.post("/api/documentos", status_code=201)
 def subir_documento(archivos: list[UploadFile] = File(default=[]), archivo: Optional[UploadFile] = None,
                     conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
@@ -287,6 +302,7 @@ def subir_documento(archivos: list[UploadFile] = File(default=[]), archivo: Opti
                     if orden.clinica.nombre else None)
         orden.clinica.ciudad = conocida or config.CIUDAD_POR_DEFECTO
 
+    completar_codigos(orden)
     repositorio.guardar_extraccion(conn, documento_id, orden)
     conn.commit()
     return {"documento_id": documento_id, "estado": "EXTRAIDO", "paginas": len(paginas),
@@ -377,6 +393,13 @@ def opciones_de_filtro(conn=Depends(get_conn), anestesiologo_id=Depends(anestesi
 @app.get("/api/reportes")
 def reportes(filtros: Filtros = Depends(), conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
     return repositorio.reporte(conn, anestesiologo_id, filtros.valores)
+
+
+@app.get("/api/procedimientos")
+def buscar_procedimientos(q: str = Query(min_length=2, max_length=120), _=Depends(anestesiologo_actual)):
+    """Busca en el manual ISS por código exacto o por nombre (para autocompletar)."""
+    resultados = catalogo.por_prefijo(q) if any(ch.isdigit() for ch in q) else catalogo.buscar(q, limite=8)
+    return [{"codigo": r["codigo"], "descripcion": r["descripcion"], "uvr": r["uvr"]} for r in resultados]
 
 
 @app.get("/api/glosas")

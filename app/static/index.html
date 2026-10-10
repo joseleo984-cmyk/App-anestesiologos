@@ -43,6 +43,8 @@
   .aviso.err { background: var(--err-bg); color: var(--err-text); }
   .proc { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px 10px; margin-bottom: 8px; }
   .proc .fila { align-items: end; }
+  .sugerencias .opcion { display: block; width: 100%; text-align: left; font-size: .85rem; padding: 6px 8px;
+                         margin-bottom: 4px; border-radius: 8px; }
   .principal { display: flex; align-items: center; gap: 6px; font-size: .9rem; margin-top: 8px; }
   .principal input { width: auto; }
   .oculto { display: none !important; }
@@ -413,19 +415,49 @@ function filaProcedimiento(p = {}, dudosos = []) {
   div.className = "proc";
   div.innerHTML = `
     <div class="fila">
-      <div style="flex:0 1 120px"><label>Código CUPS</label><input class="codigo" required></div>
-      <div><label>Nombre</label><input class="nombre" required></div>
+      <div style="flex:0 1 120px"><label>Código CUPS</label><input class="codigo" required autocomplete="off"></div>
+      <div><label>Nombre</label><input class="nombre" required autocomplete="off"></div>
     </div>
+    <div class="sugerencias"></div>
     <div class="fila">
       <label class="principal"><input type="radio" name="principal" class="es-principal"> Principal</label>
       <button type="button" class="quitar" style="flex:0 0 auto">Quitar</button>
     </div>`;
-  const cod = div.querySelector(".codigo"), nom = div.querySelector(".nombre");
+  const cod = div.querySelector(".codigo"), nom = div.querySelector(".nombre"), sug = div.querySelector(".sugerencias");
   cod.value = p.codigo || ""; nom.value = p.nombre || "";
   div.querySelector(".es-principal").checked = !!p.es_principal;
   if (dudosos.includes("codigo")) cod.classList.add("dudoso");
   if (dudosos.includes("nombre")) nom.classList.add("dudoso");
   div.querySelector(".quitar").onclick = () => div.remove();
+
+  // Opciones del manual ISS: al leer la orden (si no traía código) y mientras se escribe
+  const mostrar = (titulo, opciones, ponerNombre) => {
+    if (!opciones.length) { sug.innerHTML = ""; return; }
+    sug.innerHTML = `<p class="sub" style="margin:6px 0 4px">${titulo}</p>` + opciones.map((o, i) =>
+      `<button type="button" class="opcion" data-i="${i}"><strong>${escapar(o.codigo)}</strong> ${escapar(o.descripcion)}${o.uvr ? ` <span class="sub">· ${o.uvr} UVR</span>` : ""}</button>`).join("");
+    sug.querySelectorAll(".opcion").forEach((b) => b.onclick = () => {
+      const o = opciones[Number(b.dataset.i)];
+      cod.value = o.codigo;
+      if (ponerNombre || !nom.value.trim()) nom.value = o.descripcion;
+      cod.classList.remove("dudoso");
+      sug.innerHTML = "";
+    });
+  };
+  if (p.sugerencias && p.sugerencias.length && (!p.codigo || p.codigo_sugerido))
+    mostrar(p.codigo_sugerido ? "El código lo tomé del manual ISS: revísalo. Otras opciones:"
+                              : "La orden no trae el código. Elige del manual ISS:", p.sugerencias, false);
+
+  let espera;
+  const consultar = (texto, ponerNombre) => {
+    clearTimeout(espera);
+    if (texto.trim().length < 4) return;
+    espera = setTimeout(async () => {
+      const r = await fetch(`/api/procedimientos?q=${encodeURIComponent(texto.trim())}`);
+      if (r.ok) mostrar("Del manual ISS:", await r.json(), ponerNombre);
+    }, 350);
+  };
+  nom.addEventListener("input", () => consultar(nom.value, false));
+  cod.addEventListener("input", () => { if (cod.value.trim().length >= 5) consultar(cod.value, true); });
   return div;
 }
 

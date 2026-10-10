@@ -73,6 +73,7 @@ la API pública de Supabase no ve ningún dato; solo la app, que se conecta como
 | `GET` · `POST` | `/api/usuarios` | Administrador: lista y crea cuentas (devuelve la clave temporal) |
 | `PUT` · `POST` | `/api/usuarios/{id}` · `/restablecer` | Administrador: activa/desactiva · nueva clave temporal |
 | `POST` | `/api/documentos` | Sube la orden en una o varias fotos/PDF (`archivos`, máx. 8) y devuelve los datos leídos |
+| `GET` | `/api/procedimientos?q=` | Busca en el manual ISS por nombre o por inicio del código (autocompletar) |
 | `GET` | `/api/documentos/{id}` | Estado del documento y datos extraídos |
 | `POST` | `/api/documentos/{id}/confirmar` | Guarda la cirugía con los datos revisados |
 | `POST` | `/api/cirugias` | Registra una cirugía escrita a mano |
@@ -102,6 +103,20 @@ una clave temporal que se muestra una sola vez y que el anestesiólogo debe camb
 y generar claves temporales nuevas; ambas acciones cierran las sesiones abiertas de esa cuenta, igual que cambiar la
 propia contraseña cierra las de los demás dispositivos. Cada anestesiólogo ve solo sus cirugías, órdenes, pagos y
 reportes, y puede subir su propia copia de un archivo que otro también tenga.
+
+## Código CUPS desde el manual ISS
+
+Si la orden trae el nombre del procedimiento pero no el código, la app lo busca en el catálogo
+del Manual Tarifario ISS 2001 (`db/seeds/catalogo_cups.csv`, 5.264 procedimientos con sus UVR):
+
+- Si el nombre coincide claramente con uno solo, pone el código y lo marca en amarillo para revisarlo.
+- Si hay varias opciones parecidas (p. ej. "Cesárea": corporal, segmentaria, extraperitoneal), deja
+  el código vacío y muestra las opciones para tocar la correcta.
+- Al escribir un nombre o un código a mano también aparecen opciones del manual.
+
+No se sugieren paquetes (C), servicios (S), consultas (I) ni análisis de aguas (A). Los códigos son
+los del manual ISS 2001; si la aseguradora usa la versión nueva de CUPS, pueden cambiar.
+El catálogo se regenera desde el Excel con `python3 scripts/construir_catalogo.py tablas.xlsx`.
 
 ## Pagos: depurar pendientes
 

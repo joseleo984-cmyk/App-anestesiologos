@@ -8,5 +8,6 @@ pillow-heif==1.8.0
 python-multipart==0.0.32
 httpx==0.28.1
 openpyxl==3.1.5
+rapidfuzz==3.14.6
 # pruebas
 pytest==9.1.1
