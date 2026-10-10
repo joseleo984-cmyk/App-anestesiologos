@@ -23,10 +23,16 @@ def usa_supabase() -> bool:
 
 def _cliente(cliente: Optional[httpx.Client]) -> httpx.Client:
     return cliente or httpx.Client(
-        base_url=f"{config.SUPABASE_URL.rstrip('/')}/storage/v1",
-        headers={"Authorization": f"Bearer {config.SUPABASE_SERVICE_KEY}", "apikey": config.SUPABASE_SERVICE_KEY},
-        timeout=60,
-    )
+        base_url=f"{config.SUPABASE_URL.rstrip('/')}/storage/v1", headers=_encabezados(), timeout=60)
+
+
+def _encabezados() -> dict:
+    clave = config.SUPABASE_SERVICE_KEY.strip()
+    # Las claves nuevas (sb_secret_...) van solo en "apikey"; las antiguas service_role
+    # (un JWT que empieza con eyJ) van también como Bearer.
+    if clave.startswith("sb_"):
+        return {"apikey": clave}
+    return {"apikey": clave, "Authorization": f"Bearer {clave}"}
 
 
 def preparar_bucket(cliente: Optional[httpx.Client] = None) -> None:

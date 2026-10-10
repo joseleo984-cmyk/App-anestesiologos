@@ -50,3 +50,10 @@ def test_bucket_privado_y_ya_existente(supabase):
     assert json.loads(solicitudes[0].content) == {"id": "ordenes", "name": "ordenes", "public": False}
     # Si ya existe no falla
     almacenamiento.preparar_bucket(cliente(httpx.Response(409, text='{"error":"Duplicate","message":"The resource already exists"}'), []))
+
+
+def test_encabezados_segun_tipo_de_clave(supabase, monkeypatch):
+    monkeypatch.setattr(config, "SUPABASE_SERVICE_KEY", "sb_secret_abc")
+    assert almacenamiento._encabezados() == {"apikey": "sb_secret_abc"}
+    monkeypatch.setattr(config, "SUPABASE_SERVICE_KEY", " eyJhbGciOi.x.y ")
+    assert almacenamiento._encabezados() == {"apikey": "eyJhbGciOi.x.y", "Authorization": "Bearer eyJhbGciOi.x.y"}
