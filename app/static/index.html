@@ -65,7 +65,8 @@
   /* Pestañas */
   .pestanas { display: flex; gap: 4px; background: var(--card); border: 1px solid var(--line); border-radius: 12px;
               padding: 4px; margin-bottom: 16px; position: sticky; top: 0; z-index: 5; }
-  .pestanas button { flex: 1; border: 0; background: transparent; padding: 9px 6px; font-weight: 600; color: var(--muted); }
+  .pestanas button { flex: 1; border: 0; background: transparent; padding: 9px 4px; font-weight: 600; color: var(--muted);
+                     font-size: .95rem; }
   .pestanas button[aria-selected="true"] { background: var(--accent); color: var(--accent-text); }
   /* Lista de cirugías */
   .item { display: block; width: 100%; text-align: left; border: 0; border-top: 1px solid var(--line);
@@ -97,6 +98,13 @@
   .ranking .pista { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
   .ranking .barra { height: 12px; background: var(--accent); border-radius: 0 4px 4px 0; min-width: 2px; }
   .ranking .detalle { color: var(--muted); font-size: .8rem; margin-top: 2px; }
+  .chip.COINCIDE { background: var(--ok-bg); color: var(--ok-text); border-color: transparent; }
+  .chip.SIN_CIRUGIA { background: var(--warn-bg); border-color: var(--warn-line); color: var(--text); }
+  .linea-pago { border-top: 1px solid var(--line); padding: 10px 0; }
+  .linea-pago:first-child { border-top: 0; }
+  .acciones-pago { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .acciones-pago > * { flex: 1 1 160px; }
+  .kpi.clic { cursor: pointer; }
   .segmentado { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
   .segmentado button { border: 0; border-radius: 0; padding: 6px 10px; font-size: .85rem; }
   .segmentado button[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); }
@@ -110,8 +118,9 @@
   </header>
 
   <nav class="pestanas" role="tablist">
-    <button type="button" role="tab" data-pestana="nueva" aria-selected="true">Nueva orden</button>
+    <button type="button" role="tab" data-pestana="nueva" aria-selected="true">Nueva</button>
     <button type="button" role="tab" data-pestana="cirugias" aria-selected="false">Cirugías</button>
+    <button type="button" role="tab" data-pestana="pagos" aria-selected="false">Pagos</button>
     <button type="button" role="tab" data-pestana="reportes" aria-selected="false">Reportes</button>
   </nav>
 
@@ -149,7 +158,7 @@
         <div class="fila">
           <div><label for="f-aseguradora">Aseguradora</label><select id="f-aseguradora"><option value="">Todas</option></select></div>
           <div><label for="f-estado">Estado</label><select id="f-estado"><option value="">Todos</option>
-            <option>PROGRAMADA</option><option>REALIZADA</option><option>FACTURADA</option>
+            <option value="PENDIENTE">Pendientes de pago</option><option>PROGRAMADA</option><option>REALIZADA</option><option>FACTURADA</option>
             <option>PAGADA</option><option>CANCELADA</option></select></div>
         </div>
         <button type="button" id="limpiar-filtros" style="margin-top:12px">Limpiar filtros</button>
@@ -158,6 +167,24 @@
     <section class="card">
       <h2 id="titulo-lista">Cirugías</h2>
       <div id="cirugias"><p class="sub">Cargando…</p></div>
+    </section>
+  </div>
+
+  <div id="pestana-pagos" class="pestana oculto">
+    <section class="card">
+      <h2>Sube la relación de pagos</h2>
+      <p class="sub">El reporte que te entrega la asociación o el pagador con los pacientes que te pagaron.
+        La app lo lee, lo cruza con tus cirugías y te muestra cuáles quedan pagadas y cuáles siguen pendientes.</p>
+      <div id="zona-pago" class="zona">
+        <button type="button" class="boton primario grande" id="elegir-pago">📄 Elegir reporte (PDF o foto)</button>
+      </div>
+      <div id="estado-pago"></div>
+    </section>
+    <div id="detalle-pago"></div>
+    <section class="card">
+      <div class="item-cab"><h2>Reportes subidos</h2>
+        <button type="button" id="ver-pendientes" style="flex:0 0 auto">Ver pendientes de pago</button></div>
+      <div id="lista-pagos"><p class="sub">Cargando…</p></div>
     </section>
   </div>
 
@@ -496,18 +523,19 @@ async function subirArchivo(archivo) {
 // Botón principal: crea un selector nuevo en cada clic y lo abre desde el propio clic,
 // igual que Google Drive. Así funciona en Safari de Mac, que no abría bien el selector
 // escondido detrás de una etiqueta.
-$("#elegir").addEventListener("click", () => {
+function elegirArchivo(alElegir) {
   const campo = document.createElement("input");
   campo.type = "file";
   campo.className = "invisible";
   document.body.appendChild(campo);
   campo.addEventListener("change", async () => {
     const archivo = campo.files && campo.files[0];
-    if (archivo) await subirArchivo(archivo);
+    if (archivo) await alElegir(archivo);
     campo.remove();
   });
   campo.click();
-});
+}
+$("#elegir").addEventListener("click", () => elegirArchivo(subirArchivo));
 
 $("#foto-libre").addEventListener("change", async (ev) => {
   const campo = ev.target;
@@ -535,6 +563,7 @@ function mostrarPestana(nombre) {
   document.querySelectorAll("[data-pestana]").forEach((b) => b.setAttribute("aria-selected", b.dataset.pestana === nombre));
   if (nombre === "cirugias") cargarCirugias();
   if (nombre === "reportes") cargarReporte();
+  if (nombre === "pagos") cargarReportesPago();
 }
 document.querySelectorAll("[data-pestana]").forEach((b) => b.onclick = () => {
   if (modo.tipo === "editar") modo = { tipo: "manual" };
@@ -570,21 +599,23 @@ let esperaBusqueda;
 $("#f-q").addEventListener("input", () => { clearTimeout(esperaBusqueda); esperaBusqueda = setTimeout(cargarCirugias, 300); });
 ["#f-desde", "#f-hasta", "#f-cirujano", "#f-clinica", "#f-aseguradora", "#f-estado"]
   .forEach((id) => $(id).addEventListener("change", cargarCirugias));
-$("#limpiar-filtros").onclick = () => {
+const limpiarFiltros = () =>
   ["#f-q", "#f-desde", "#f-hasta", "#f-cirujano", "#f-clinica", "#f-aseguradora", "#f-estado"].forEach((id) => $(id).value = "");
-  cargarCirugias();
-};
+$("#limpiar-filtros").onclick = () => { limpiarFiltros(); cargarCirugias(); };
 
 // ---------------------------------------------------------------- lista
+let consultaLista = 0;  // para descartar respuestas viejas si llegan después de una más nueva
 async function cargarCirugias() {
   const cont = $("#cirugias");
   const f = filtrosLista();
+  const esta = ++consultaLista;
   const n = Object.keys(f).filter((k) => k !== "q").length;
   $("#filtros-activos").textContent = n ? `(${n} activo${n > 1 ? "s" : ""})` : "";
   $("#excel").href = `/api/cirugias.xlsx?${consulta(f)}`;
   try {
     const r = await fetch(`/api/cirugias?${consulta(f)}`);
     const filas = await r.json();
+    if (esta !== consultaLista) return;
     if (!r.ok) throw new Error(mensajeError(filas, "error"));
     $("#titulo-lista").textContent = `Cirugías (${filas.length})`;
     if (!filas.length) {
@@ -608,6 +639,125 @@ async function cargarCirugias() {
     cont.innerHTML = `<p class="aviso err">No se pudo cargar la lista: ${escapar(e.message)}</p>`;
   }
 }
+
+// ---------------------------------------------------------------- pagos
+const RESULTADO = {
+  SIN_CIRUGIA: "⚠ Sin cirugía en la app", OTRO_CONCEPTO: "Otro concepto", YA_PAGADA: "Ya estaba pagada",
+};
+const etiquetaResultado = (f) => f.resultado === "COINCIDE"
+  ? (f.estado_cirugia === "PAGADA" ? "✓ Pagada" : "✓ Encontrada") : RESULTADO[f.resultado];
+
+async function subirReportePago(archivo) {
+  const estado = $("#estado-pago");
+  $("#detalle-pago").innerHTML = "";
+  estado.innerHTML = `<div class="cargando">Leyendo el reporte con la IA y cruzándolo con tus cirugías… puede tardar hasta un minuto.<br><span class="sub">${escapar(archivo.name || "")}</span></div>`;
+  const form = new FormData();
+  try {
+    form.append("archivo", new Blob([await archivo.arrayBuffer()], { type: archivo.type || "application/octet-stream" }), archivo.name || "reporte");
+    const r = await fetch("/api/pagos", { method: "POST", body: form });
+    const cuerpo = await r.json().catch(() => null);
+    if (r.status === 409 && cuerpo?.detail?.reporte_id) {
+      aviso(estado, "warn", "Este reporte ya se había subido. Te muestro el que ya está guardado.");
+      return mostrarReportePago(cuerpo.detail.reporte_id);
+    }
+    if (!r.ok) return aviso(estado, "err", mensajeError(cuerpo, `No se pudo leer el reporte (error ${r.status}).`));
+    aviso(estado, "", "");
+    pintarReportePago(cuerpo);
+    cargarReportesPago();
+  } catch (e) {
+    aviso(estado, "err", `No se pudo enviar el reporte (${e.message || e}).`);
+  }
+}
+$("#elegir-pago").addEventListener("click", () => elegirArchivo(subirReportePago));
+const zonaPago = $("#zona-pago");
+["dragenter", "dragover"].forEach((t) => zonaPago.addEventListener(t, (e) => { e.preventDefault(); zonaPago.classList.add("encima"); }));
+["dragleave", "drop"].forEach((t) => zonaPago.addEventListener(t, (e) => { e.preventDefault(); zonaPago.classList.remove("encima"); }));
+zonaPago.addEventListener("drop", (e) => subirReportePago(e.dataTransfer.files[0]));
+
+async function mostrarReportePago(id) {
+  const r = await fetch(`/api/pagos/${id}`);
+  if (r.ok) pintarReportePago(await r.json());
+}
+
+function pintarReportePago(rep) {
+  const cuenta = (res) => rep.filas.filter((f) => f.resultado === res).length;
+  const porAplicar = rep.filas.filter((f) => f.resultado === "COINCIDE" && f.estado_cirugia !== "PAGADA").length;
+  const plural = (n, uno, varios) => `<strong>${n}</strong> ${n === 1 ? uno : varios}`;
+  const cuadre = rep.cuadra === true
+    ? `<div class="aviso ok">✓ Las ${rep.filas.length} líneas suman el total del reporte (${pesos(rep.total_neto)}).</div>`
+    : rep.cuadra === false
+      ? `<div class="aviso err">⚠ Las líneas leídas suman ${pesos(rep.suma_neto)} pero el reporte dice ${pesos(rep.total_neto)}. Revisa el original antes de aplicar: puede faltar o estar mal leída alguna línea.</div>`
+      : `<div class="aviso warn">El reporte no muestra un total general para comprobar la lectura. Suma de líneas: ${pesos(rep.suma_neto)}.</div>`;
+  $("#detalle-pago").innerHTML = `<section class="card">
+    <h2>${escapar(rep.pagador || "Reporte de pagos")}</h2>
+    <p class="sub">Proceso: ${escapar(rep.fecha_proceso || "—")} · Periodo: ${escapar(rep.periodo_desde || "—")} a ${escapar(rep.periodo_hasta || "—")}
+      · <a href="/api/pagos/${rep.reporte_id}/archivo" target="_blank" rel="noopener">📄 Ver original</a></p>
+    ${cuadre}
+    <p>${plural(cuenta("COINCIDE"), "pago encontrado en tus cirugías", "pagos encontrados en tus cirugías")} ·
+       ${plural(cuenta("SIN_CIRUGIA"), "sin cirugía en la app", "sin cirugía en la app")} ·
+       ${plural(cuenta("OTRO_CONCEPTO"), "otro concepto", "otros conceptos")}</p>
+    <div>${rep.filas.map((f) => `<div class="linea-pago">
+      <div class="item-cab"><strong>${escapar(f.paciente || "—")}</strong><span class="valor">${pesos(f.neto)}</span></div>
+      <div class="sub">${escapar(f.documento_paciente || "")} · ${escapar(f.fecha_servicio || "")} · ${escapar(f.empresa || "")}
+        ${Number(f.glosas) ? ` · glosas ${pesos(f.glosas)}` : ""}${Number(f.descuentos) ? ` · descuentos ${pesos(f.descuentos)}` : ""}</div>
+      <div style="margin-top:4px"><span class="chip ${f.resultado}">${etiquetaResultado(f)}</span>
+        ${f.cirugia_id ? `<span class="sub"> · cirugía del ${escapar(f.fecha_procedimiento)} (${escapar(f.paciente_app)})</span>` : ""}</div>
+    </div>`).join("")}</div>
+    ${rep.estado === "APLICADO" && !porAplicar ? `<div class="aviso ok">Este reporte ya se aplicó.</div>` : ""}
+    <div class="acciones-pago">
+      ${porAplicar ? `<button type="button" class="primario" id="aplicar-pago">
+        Marcar ${porAplicar} cirugía${porAplicar === 1 ? "" : "s"} como pagada${porAplicar === 1 ? "" : "s"}</button>` : ""}
+      ${cuenta("SIN_CIRUGIA") ? `<button type="button" id="cruzar-pago">Volver a cruzar</button>` : ""}
+      ${rep.estado === "LEIDO" ? `<button type="button" id="descartar-pago">Descartar reporte</button>` : ""}
+    </div>
+    ${cuenta("SIN_CIRUGIA") ? `<p class="sub">Los pagos «sin cirugía en la app» son pacientes que no registraste, o con otro documento o una fecha muy distinta. Regístralos en «Nueva» y luego toca «Volver a cruzar».</p>` : ""}
+  </section>`;
+  const aplicar = $("#aplicar-pago");
+  if (aplicar) aplicar.onclick = async () => {
+    aplicar.disabled = true;
+    const r = await fetch(`/api/pagos/${rep.reporte_id}/aplicar`, { method: "POST" });
+    const cuerpo = await r.json().catch(() => null);
+    if (!r.ok) { aplicar.disabled = false; return aviso($("#estado-pago"), "err", mensajeError(cuerpo, "No se pudo aplicar.")); }
+    aviso($("#estado-pago"), "ok", `Listo: ${cuerpo.marcadas} cirugía${cuerpo.marcadas === 1 ? "" : "s"} quedaron como pagadas.`);
+    mostrarReportePago(rep.reporte_id);
+    cargarReportesPago();
+  };
+  const cruzar = $("#cruzar-pago");
+  if (cruzar) cruzar.onclick = async () => {
+    cruzar.disabled = true;
+    const r = await fetch(`/api/pagos/${rep.reporte_id}/cruzar`, { method: "POST" });
+    if (r.ok) { aviso($("#estado-pago"), "", ""); pintarReportePago(await r.json()); cargarReportesPago(); }
+    else cruzar.disabled = false;
+  };
+  const descartar = $("#descartar-pago");
+  if (descartar) descartar.onclick = async () => {
+    if (!confirm("¿Descartar este reporte? No se marcará ninguna cirugía.")) return;
+    await fetch(`/api/pagos/${rep.reporte_id}`, { method: "DELETE" });
+    $("#detalle-pago").innerHTML = "";
+    aviso($("#estado-pago"), "", "");
+    cargarReportesPago();
+  };
+}
+
+async function cargarReportesPago() {
+  const cont = $("#lista-pagos");
+  const r = await fetch("/api/pagos");
+  const filas = await r.json().catch(() => []);
+  if (!r.ok || !filas.length) { cont.innerHTML = `<p class="sub">Aún no has subido reportes de pago.</p>`; return; }
+  cont.innerHTML = filas.map((p) => `<button type="button" class="item" data-reporte="${p.reporte_id}">
+    <div class="item-cab"><strong>${escapar(p.fecha_proceso || p.subido_en.slice(0, 10))} · ${escapar(p.pagador || "Reporte")}</strong>
+      <span class="valor">${pesos(p.total_neto)}</span></div>
+    <div class="sub">${p.encontradas} de ${p.lineas} pagos encontrados · <span class="chip">${p.estado === "APLICADO" ? "APLICADO" : "SIN APLICAR"}</span></div>
+  </button>`).join("");
+  cont.querySelectorAll("[data-reporte]").forEach((b) => b.onclick = () => { mostrarReportePago(b.dataset.reporte); window.scrollTo({ top: 0, behavior: "smooth" }); });
+}
+
+function verPendientes() {
+  limpiarFiltros();
+  $("#f-estado").value = "PENDIENTE";
+  mostrarPestana("cirugias");
+}
+$("#ver-pendientes").onclick = verPendientes;
 
 // ---------------------------------------------------------------- reportes
 let metrica = "total";
@@ -664,6 +814,7 @@ async function cargarReporte() {
         <div class="kpi"><div class="etiqueta">Cirugías</div><div class="cifra">${t.cirugias}</div></div>
         <div class="kpi"><div class="etiqueta">Pagado</div><div class="cifra">${pesos(t.pagado)}</div></div>
         <div class="kpi"><div class="etiqueta">Por cobrar</div><div class="cifra">${pesos(t.por_cobrar)}</div></div>
+        <div class="kpi clic" id="kpi-pendientes" title="Ver las cirugías pendientes de pago"><div class="etiqueta">Pendientes de pago ›</div><div class="cifra">${t.pendientes}</div></div>
         <div class="kpi"><div class="etiqueta">Canceladas</div><div class="cifra">${t.canceladas}</div></div>
       </div>
       ${t.sin_valor ? `<div class="aviso warn">${t.sin_valor} cirugía${t.sin_valor > 1 ? "s no tienen" : " no tiene"} valor de honorarios: ábrela${t.sin_valor > 1 ? "s" : ""} en «Cirugías» y agrégalo para que los totales estén completos.</div>` : ""}
@@ -671,6 +822,7 @@ async function cargarReporte() {
       ${ranking("Por clínica", d.por_clinica)}
       ${ranking("Por aseguradora", d.por_aseguradora)}
       ${ranking("Por mes", d.por_mes)}`;
+    $("#kpi-pendientes").onclick = verPendientes;
   } catch (e) {
     cont.innerHTML = `<p class="aviso err">No se pudo cargar el reporte: ${escapar(e.message)}</p>`;
   }

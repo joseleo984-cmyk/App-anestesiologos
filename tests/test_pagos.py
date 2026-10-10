@@ -1,0 +1,147 @@
+"""Reporte de pagos: lectura, cruce con las cirugías y aplicación (datos ficticios)."""
+import json
+
+import pytest
+
+from app import extraccion
+from app.modelos import ReportePagoExtraido
+from tests.test_api import CONFIRMAR, cliente  # noqa: F401  (fixture)
+from tests.test_extraccion import ClienteFalso
+
+REPORTE = {
+    "pagador": "ASOCIACION DE ANESTESIOLOGOS (FICTICIA)", "prestador": "DRA. PRUEBA",
+    "fecha_proceso": "2026-10-07", "periodo_desde": "2026-10-01", "periodo_hasta": "2026-10-31",
+    "total_neto": 7419742,
+    "filas": [
+        {"empresa": "SEGUROS UNO", "documento_paciente": "72000730", "paciente": "PACIENTE UNO",
+         "fecha_servicio": "2026-08-14", "factura": "27111", "autorizacion": "A1", "total": 700405,
+         "glosas": 0, "descuentos": 0, "neto": 700405, "es_paciente": True},
+        {"empresa": "PREPAGADA DOS", "documento_paciente": "32.622.878", "paciente": "PACIENTE DOS",
+         "fecha_servicio": "2026-07-27", "factura": "26898", "autorizacion": "B2", "total": 591976,
+         "glosas": 0, "descuentos": 1039, "neto": 590937, "es_paciente": True},
+        {"empresa": "IPS TRES", "documento_paciente": "979-60", "paciente": "HONORARIOS X",
+         "fecha_servicio": "2026-08-01", "factura": "26982", "autorizacion": "C3", "total": 6000000,
+         "glosas": 0, "descuentos": 0, "neto": 6000000, "es_paciente": False},
+        {"empresa": "SEGUROS UNO", "documento_paciente": "555000", "paciente": "NO REGISTRADO",
+         "fecha_servicio": "2026-08-20", "factura": "1", "autorizacion": "D4", "total": 128400,
+         "glosas": 0, "descuentos": 0, "neto": 128400, "es_paciente": True},
+    ],
+}
+
+
+def crear(cliente, documento, fecha, estado="PROGRAMADA"):
+    datos = {**CONFIRMAR, "fecha_procedimiento": fecha, "estado": estado,
+             "paciente": {**CONFIRMAR["paciente"], "numero_documento": documento}}
+    r = cliente.post("/api/cirugias", json=datos)
+    assert r.status_code == 201, r.text
+    return r.json()["cirugia_id"]
+
+
+@pytest.fixture
+def con_reporte(cliente, monkeypatch):
+    def poner(reporte):
+        monkeypatch.setattr(extraccion, "extraer_reporte_pago",
+                            lambda d, t: ReportePagoExtraido.model_validate(reporte))
+    poner(REPORTE)
+    cliente.poner_reporte = poner
+    return cliente
+
+
+def subir(cliente, contenido=b"%PDF-1.7 reporte"):
+    return cliente.post("/api/pagos", files={"archivo": ("reporte.pdf", contenido, "application/pdf")})
+
+
+def test_cruce_y_aplicacion(con_reporte):
+    c = con_reporte
+    uno = crear(c, "72000730", "2026-08-14")                    # misma fecha
+    dos = crear(c, "32622878", "2026-07-25")                    # 2 días de diferencia
+    pendiente = crear(c, "111222", "2026-09-01")                # no está en el reporte
+    crear(c, "555000", "2026-08-20", estado="CANCELADA")        # cancelada: no se cruza
+
+    r = subir(c)
+    assert r.status_code == 201, r.text
+    rep = r.json()
+    assert rep["cuadra"] is True and rep["estado"] == "LEIDO"
+    assert [f["resultado"] for f in rep["filas"]] == ["COINCIDE", "COINCIDE", "OTRO_CONCEPTO", "SIN_CIRUGIA"]
+    assert [f["cirugia_id"] for f in rep["filas"][:2]] == [uno, dos]
+
+    assert c.post(f"/api/pagos/{rep['reporte_id']}/aplicar").json() == {"marcadas": 2}
+    d = c.get(f"/api/cirugias/{uno}").json()
+    assert d["estado"] == "PAGADA" and d["valor_honorarios"] == 700405 and d["fecha_pago"] == "2026-10-07"
+    assert c.get(f"/api/cirugias/{dos}").json()["valor_honorarios"] == 590937  # el neto, con descuento
+
+    # Aplicar otra vez no cambia nada: lo ya pagado no se toca
+    assert c.post(f"/api/pagos/{rep['reporte_id']}/aplicar").json() == {"marcadas": 0}
+    pendientes = c.get("/api/cirugias?estado=PENDIENTE").json()
+    assert [x["cirugia_id"] for x in pendientes] == [pendiente]
+    assert c.get("/api/reportes").json()["totales"]["pendientes"] == 1
+    assert c.get("/api/pagos").json()[0]["encontradas"] == 2
+
+
+def test_un_pago_no_se_cuenta_dos_veces(con_reporte):
+    c = con_reporte
+    crear(c, "72000730", "2026-08-14")
+    rep = subir(c).json()
+    c.post(f"/api/pagos/{rep['reporte_id']}/aplicar")
+    # Otro reporte que repite el mismo paciente y fecha: la cirugía ya fue pagada por el primero
+    c.poner_reporte({**REPORTE, "filas": REPORTE["filas"][:1], "total_neto": 700405})
+    otro = subir(c, b"%PDF-1.7 otro reporte").json()
+    assert otro["filas"][0]["resultado"] == "SIN_CIRUGIA"
+
+
+def test_dos_cirugias_del_mismo_paciente(con_reporte):
+    c = con_reporte
+    primera = crear(c, "72000730", "2026-08-01")
+    segunda = crear(c, "72000730", "2026-08-14")
+    fila = REPORTE["filas"][0]
+    c.poner_reporte({**REPORTE, "total_neto": None,
+                     "filas": [fila, {**fila, "fecha_servicio": "2026-08-02", "factura": "2"}]})
+    rep = subir(c).json()
+    assert [f["cirugia_id"] for f in rep["filas"]] == [segunda, primera]
+    assert rep["cuadra"] is None
+
+
+def test_fuera_de_tolerancia_no_se_cruza(con_reporte):
+    c = con_reporte
+    crear(c, "72000730", "2026-06-01")  # más de 15 días antes
+    assert subir(c).json()["filas"][0]["resultado"] == "SIN_CIRUGIA"
+
+
+def test_reporte_que_no_cuadra(con_reporte):
+    c = con_reporte
+    c.poner_reporte({**REPORTE, "total_neto": 1})
+    assert subir(c).json()["cuadra"] is False
+
+
+def test_duplicado_y_descartar(con_reporte):
+    c = con_reporte
+    rep = subir(c).json()
+    assert subir(c).status_code == 409
+    assert c.delete(f"/api/pagos/{rep['reporte_id']}").status_code == 204
+    rep = subir(c).json()  # tras descartarlo se puede volver a subir
+    c.post(f"/api/pagos/{rep['reporte_id']}/aplicar")
+    assert c.delete(f"/api/pagos/{rep['reporte_id']}").status_code == 409
+    assert c.get(f"/api/pagos/{rep['reporte_id']}/archivo").content == b"%PDF-1.7 reporte"
+
+
+def test_lectura_del_reporte_con_claude():
+    cliente = ClienteFalso(texto=json.dumps(REPORTE))
+    r = extraccion.extraer_reporte_pago(b"%PDF-1.7", "application/pdf", client=cliente)
+    kw = cliente.llamadas[0]
+    assert kw["output_config"]["format"]["schema"] is extraccion.ESQUEMA_PAGO
+    assert kw["output_config"]["effort"] == "medium" and kw["system"] is extraccion.INSTRUCCIONES_PAGO
+    assert r.filas[1].documento_paciente == "32622878" and r.cuadra is True
+
+
+def test_volver_a_cruzar_tras_registrar_el_faltante(con_reporte):
+    c = con_reporte
+    uno = crear(c, "72000730", "2026-08-14")
+    rep = subir(c).json()
+    c.post(f"/api/pagos/{rep['reporte_id']}/aplicar")
+    assert rep["filas"][3]["resultado"] == "SIN_CIRUGIA"
+    faltante = crear(c, "555000", "2026-08-20")               # se registra el paciente que faltaba
+    rep = c.post(f"/api/pagos/{rep['reporte_id']}/cruzar").json()
+    assert rep["filas"][0]["cirugia_id"] == uno                # lo ya pagado se conserva
+    assert rep["filas"][3]["cirugia_id"] == faltante and rep["filas"][3]["estado_cirugia"] == "PROGRAMADA"
+    assert c.post(f"/api/pagos/{rep['reporte_id']}/aplicar").json() == {"marcadas": 1}
+    assert c.get(f"/api/cirugias/{faltante}").json()["valor_honorarios"] == 128400

@@ -69,6 +69,21 @@ def _tipo_real(datos: bytes) -> str | None:
     return None
 
 
+def _leer_subida(archivo: UploadFile) -> tuple[bytes, str]:
+    """Lee el archivo subido y valida tamaño y tipo real (por contenido)."""
+    datos = archivo.file.read(config.MAX_ARCHIVO_MB * 1024 * 1024 + 1)
+    if not datos:
+        raise HTTPException(400, "El archivo está vacío.")
+    if len(datos) > config.MAX_ARCHIVO_MB * 1024 * 1024:
+        raise HTTPException(413, f"El archivo supera {config.MAX_ARCHIVO_MB} MB.")
+    tipo = _tipo_real(datos)
+    log.info("Archivo recibido: %s, %d bytes, tipo declarado %s, tipo real %s",
+             archivo.filename, len(datos), archivo.content_type, tipo)
+    if tipo is None:
+        raise HTTPException(415, "Solo se aceptan fotos (JPG, PNG, WEBP, HEIC) o PDF.")
+    return datos, tipo
+
+
 @app.get("/", include_in_schema=False)
 def pagina_principal(sesion: str | None = Cookie(default=None)):
     # no-store: que el navegador no muestre una copia guardada después de cerrar sesión
@@ -126,16 +141,7 @@ def usuario_actual(conn=Depends(get_conn), anestesiologo_id=Depends(anestesiolog
 def subir_documento(archivo: UploadFile, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
     # Función normal (no async): FastAPI la ejecuta en otro hilo, así la lectura con la IA
     # no bloquea al servidor mientras atiende otras solicitudes.
-    datos = archivo.file.read(config.MAX_ARCHIVO_MB * 1024 * 1024 + 1)
-    if not datos:
-        raise HTTPException(400, "El archivo está vacío.")
-    if len(datos) > config.MAX_ARCHIVO_MB * 1024 * 1024:
-        raise HTTPException(413, f"El archivo supera {config.MAX_ARCHIVO_MB} MB.")
-    tipo = _tipo_real(datos)
-    log.info("Archivo recibido: %s, %d bytes, tipo declarado %s, tipo real %s",
-             archivo.filename, len(datos), archivo.content_type, tipo)
-    if tipo is None:
-        raise HTTPException(415, "Solo se aceptan fotos (JPG, PNG, WEBP, HEIC) o PDF.")
+    datos, tipo = _leer_subida(archivo)
 
     hash_sha256 = hashlib.sha256(datos).hexdigest()
     existente = repositorio.buscar_documento_por_hash(conn, hash_sha256)
@@ -216,7 +222,8 @@ class Filtros:
     def __init__(self, desde: Optional[date] = None, hasta: Optional[date] = None,
                  clinica_id: Optional[int] = None, cirujano_id: Optional[int] = None,
                  aseguradora_id: Optional[str] = Query(default=None, pattern=r"^(\d+|PARTICULAR)$"),
-                 estado: Optional[Literal["PROGRAMADA", "REALIZADA", "CANCELADA", "FACTURADA", "PAGADA"]] = None,
+                 estado: Optional[Literal["PROGRAMADA", "REALIZADA", "CANCELADA", "FACTURADA", "PAGADA",
+                                          "PENDIENTE"]] = None,
                  q: Optional[str] = Query(default=None, max_length=100)):
         self.valores = {"desde": desde, "hasta": hasta, "clinica_id": clinica_id, "cirujano_id": cirujano_id,
                         "aseguradora_id": aseguradora_id, "estado": estado, "q": (q or "").strip() or None}
@@ -271,3 +278,89 @@ def corregir_cirugia(cirugia_id: int, orden: OrdenConfirmada,
         raise HTTPException(404, "Cirugía no encontrada.")
     conn.commit()
     return {"cirugia_id": cirugia_id}
+
+
+# ---------------------------------------------------------------- reportes de pago
+@app.post("/api/pagos", status_code=201)
+def subir_reporte_pago(archivo: UploadFile, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+    """Sube la relación de pacientes pagados, la lee con la IA y la cruza con las cirugías."""
+    datos, tipo = _leer_subida(archivo)
+    hash_sha256 = hashlib.sha256(datos).hexdigest()
+    existente = repositorio.buscar_reporte_por_hash(conn, anestesiologo_id, hash_sha256)
+    if existente:
+        raise HTTPException(409, {"mensaje": "Este reporte ya se había subido.", "reporte_id": existente["reporte_id"]})
+    try:
+        reporte = extraccion.extraer_reporte_pago(datos, tipo)
+    except extraccion.ExtraccionError as e:
+        log.warning("No se pudo leer el reporte de pago: %s (causa: %r)", e, e.__cause__)
+        raise HTTPException(422, {"mensaje": str(e)})
+    if not reporte.filas:
+        raise HTTPException(422, {"mensaje": "No se encontraron pagos en el documento. ¿Es un reporte de pagos?"})
+    try:
+        ubicacion = almacenamiento.guardar(f"pago-{uuid.uuid4().hex}{EXTENSIONES[tipo]}", datos, tipo)
+    except almacenamiento.AlmacenamientoError as e:
+        raise HTTPException(502, str(e))
+    reporte_id = repositorio.crear_reporte(conn, anestesiologo_id, ubicacion, hash_sha256, reporte)
+    conn.commit()
+    return repositorio.obtener_reporte(conn, anestesiologo_id, reporte_id)
+
+
+@app.get("/api/pagos")
+def listar_reportes_pago(conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+    return repositorio.listar_reportes(conn, anestesiologo_id)
+
+
+@app.get("/api/pagos/{reporte_id}")
+def ver_reporte_pago(reporte_id: int, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+    reporte = repositorio.obtener_reporte(conn, anestesiologo_id, reporte_id)
+    if reporte is None:
+        raise HTTPException(404, "Reporte no encontrado.")
+    return reporte
+
+
+@app.post("/api/pagos/{reporte_id}/aplicar")
+def aplicar_reporte_pago(reporte_id: int, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+    try:
+        marcadas = repositorio.aplicar_reporte(conn, anestesiologo_id, reporte_id)
+    except repositorio.DocumentoNoEncontrado:
+        conn.rollback()
+        raise HTTPException(404, "Reporte no encontrado.")
+    conn.commit()
+    return {"marcadas": marcadas}
+
+
+@app.post("/api/pagos/{reporte_id}/cruzar")
+def volver_a_cruzar(reporte_id: int, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+    """Repite el cruce (por ejemplo, después de registrar las cirugías que faltaban)."""
+    if repositorio.obtener_reporte(conn, anestesiologo_id, reporte_id) is None:
+        raise HTTPException(404, "Reporte no encontrado.")
+    repositorio.conciliar(conn, anestesiologo_id, reporte_id)
+    conn.commit()
+    return repositorio.obtener_reporte(conn, anestesiologo_id, reporte_id)
+
+
+@app.delete("/api/pagos/{reporte_id}", status_code=204)
+def descartar_reporte_pago(reporte_id: int, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+    """Descarta un reporte leído (por ejemplo, si la lectura quedó mal). Uno aplicado no se borra."""
+    borrado = conn.execute(
+        "DELETE FROM reporte_pago WHERE reporte_id = %s AND anestesiologo_id = %s AND estado = 'LEIDO'",
+        (reporte_id, anestesiologo_id),
+    ).rowcount
+    if not borrado:
+        raise HTTPException(409, "Solo se puede descartar un reporte que aún no se ha aplicado.")
+    conn.commit()
+    return Response(status_code=204)
+
+
+@app.get("/api/pagos/{reporte_id}/archivo")
+def ver_reporte_original(reporte_id: int, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+    fila = conn.execute("SELECT url_archivo FROM reporte_pago WHERE reporte_id = %s AND anestesiologo_id = %s",
+                        (reporte_id, anestesiologo_id)).fetchone()
+    if fila is None:
+        raise HTTPException(404, "Reporte no encontrado.")
+    try:
+        datos = almacenamiento.leer(fila["url_archivo"])
+    except almacenamiento.AlmacenamientoError as e:
+        raise HTTPException(502, str(e))
+    return Response(datos, media_type=_tipo_real(datos) or "application/octet-stream",
+                    headers={"Cache-Control": "private, no-store"})

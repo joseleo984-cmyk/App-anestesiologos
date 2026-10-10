@@ -22,13 +22,25 @@ RESPUESTA = {
 class ClienteFalso:
     def __init__(self, texto=json.dumps(RESPUESTA), stop_reason="end_turn"):
         self.llamadas = []
-        self.beta = SimpleNamespace(messages=SimpleNamespace(create=self._create))
+        self.beta = SimpleNamespace(messages=SimpleNamespace(create=self._create, stream=self._stream))
         self._respuesta = SimpleNamespace(stop_reason=stop_reason,
                                           content=[SimpleNamespace(type="text", text=texto)])
 
     def _create(self, **kwargs):
         self.llamadas.append(kwargs)
         return self._respuesta
+
+    def _stream(self, **kwargs):
+        """Imita client.beta.messages.stream(): un administrador de contexto con get_final_message()."""
+        respuesta = self._create(**kwargs)
+
+        class Flujo:
+            def __enter__(self):
+                return SimpleNamespace(get_final_message=lambda: respuesta)
+
+            def __exit__(self, *exc):
+                return False
+        return Flujo()
 
 
 def foto(ancho=800, alto=600, formato="JPEG"):
@@ -85,6 +97,7 @@ def test_esquema_exige_todos_los_campos():
             for v in nodo:
                 revisar(v)
     revisar(extraccion.ESQUEMA)
+    revisar(extraccion.ESQUEMA_PAGO)
 
 
 def test_foto_heic_se_convierte_a_jpeg():

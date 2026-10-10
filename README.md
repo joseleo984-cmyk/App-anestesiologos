@@ -75,6 +75,9 @@ la API pública de Supabase no ve ningún dato; solo la app, que se conecta como
 | `GET` · `PUT` | `/api/cirugias/{id}` | Detalle y corrección de una cirugía (cirujano, estado, valor, fecha de pago…) |
 | `GET` | `/api/documentos/{id}/archivo` | Foto o PDF original de la orden |
 | `GET` | `/api/reportes` | Totales y ranking por cirujano, clínica, aseguradora y mes (mismos filtros) |
+| `POST` | `/api/pagos` | Sube la relación de pacientes pagados; la IA la lee y la cruza con las cirugías |
+| `GET` | `/api/pagos` · `/api/pagos/{id}` | Reportes subidos y detalle del cruce (encontrada, sin cirugía, otro concepto) |
+| `POST` | `/api/pagos/{id}/aplicar` · `/cruzar` | Marca como PAGADAS las encontradas (neto y fecha del reporte) · repite el cruce |
 | `GET` | `/api/cirugias.xlsx` | Excel con las cirugías y los resúmenes (mismos filtros) |
 
 ## Pruebas
@@ -86,6 +89,15 @@ createdb anestesia_test
 
 Las pruebas no llaman a la API de Claude: usan un cliente falso. La base `anestesia_test`
 se borra y se recrea en cada prueba (`TEST_DATABASE_URL` para usar otra).
+
+## Pagos: depurar pendientes
+
+La relación de pacientes pagados (p. ej. "Reporte de pagos a prestadores" de la asociación) se sube en
+la pestaña **Pagos**. La IA lee cada línea (empresa, documento, fecha, factura, autorización, total,
+glosas, descuentos, neto) y la app comprueba que las líneas sumen el total del reporte. Cada línea se
+cruza con la cirugía del mismo documento de paciente y la fecha más cercana (hasta 15 días); al
+aplicarlo, esas cirugías quedan **PAGADAS** con el neto y la fecha del reporte. Lo que no aparece
+queda como **pendiente de pago** (filtro y tarjeta en Reportes).
 
 ## Pendiente
 

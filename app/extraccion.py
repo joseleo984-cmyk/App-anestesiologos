@@ -10,7 +10,7 @@ from pillow_heif import register_heif_opener
 register_heif_opener()  # permite abrir fotos HEIC de iPhone/Mac
 
 from app import config
-from app.modelos import OrdenExtraida
+from app.modelos import OrdenExtraida, ReportePagoExtraido
 
 TIPOS_IMAGEN = {"image/jpeg", "image/png", "image/webp", "image/gif", "image/heic"}
 TIPO_PDF = "application/pdf"
@@ -147,28 +147,29 @@ def _bloque_documento(datos: bytes, media_type: str) -> dict:
     raise ExtraccionError(f"Tipo de archivo no soportado: {media_type}")
 
 
-def extraer_orden(datos: bytes, media_type: str, client: anthropic.Anthropic | None = None) -> OrdenExtraida:
+def _llamar_claude(datos: bytes, media_type: str, instrucciones: str, esquema: dict, pedido: str,
+                   esfuerzo: str, client: anthropic.Anthropic | None) -> dict:
+    """Envía el documento a Claude y devuelve el JSON que cumple el esquema."""
     client = client or anthropic.Anthropic()
     # Si un filtro de seguridad rechaza la solicitud, la API la reintenta con otro modelo.
     # Haiku no tiene ese reintento: con Haiku la opción no se envía.
     reintento = {} if "haiku" in config.CLAUDE_MODEL else {
         "betas": ["server-side-fallback-2026-07-01"], "fallbacks": "default"}
     try:
-        respuesta = client.beta.messages.create(
+        # Streaming: los reportes con muchas filas pueden tardar y no deben cortarse por tiempo
+        with client.beta.messages.stream(
             model=config.CLAUDE_MODEL,
-            max_tokens=16000,
-            system=INSTRUCCIONES,
+            max_tokens=64000,
+            system=instrucciones,
             messages=[{
                 "role": "user",
-                "content": [
-                    _bloque_documento(datos, media_type),
-                    {"type": "text", "text": "Extrae los datos de esta orden."},
-                ],
+                "content": [_bloque_documento(datos, media_type), {"type": "text", "text": pedido}],
             }],
             thinking={"type": "adaptive"},
-            output_config={"effort": "high", "format": {"type": "json_schema", "schema": ESQUEMA}},
+            output_config={"effort": esfuerzo, "format": {"type": "json_schema", "schema": esquema}},
             **reintento,
-        )
+        ) as flujo:
+            respuesta = flujo.get_final_message()
     except (anthropic.AuthenticationError, anthropic.PermissionDeniedError) as e:
         raise ExtraccionError("La clave de Claude (ANTHROPIC_API_KEY) no es válida o no tiene crédito. "
                               "Revísala en la configuración de Render.") from e
@@ -184,4 +185,72 @@ def extraer_orden(datos: bytes, media_type: str, client: anthropic.Anthropic | N
     texto = next((b.text for b in respuesta.content if b.type == "text"), None)
     if not texto:
         raise ExtraccionError("La lectura no devolvió datos.")
-    return OrdenExtraida.model_validate(json.loads(texto))
+    return json.loads(texto)
+
+
+def extraer_orden(datos: bytes, media_type: str, client: anthropic.Anthropic | None = None) -> OrdenExtraida:
+    return OrdenExtraida.model_validate(_llamar_claude(
+        datos, media_type, INSTRUCCIONES, ESQUEMA, "Extrae los datos de esta orden.", "high", client))
+
+
+# ---------------------------------------------------------------- reportes de pago
+_NUMERO = {"type": "number"}
+ESQUEMA_PAGO = {
+    "type": "object",
+    "properties": {
+        "pagador": _nullable(_TEXTO),
+        "prestador": _nullable(_TEXTO),
+        "fecha_proceso": _nullable(_TEXTO),
+        "periodo_desde": _nullable(_TEXTO),
+        "periodo_hasta": _nullable(_TEXTO),
+        "total_neto": _nullable(_NUMERO),
+        "filas": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "empresa": _nullable(_TEXTO),
+                    "documento_paciente": _nullable(_TEXTO),
+                    "paciente": _nullable(_TEXTO),
+                    "fecha_servicio": _nullable(_TEXTO),
+                    "factura": _nullable(_TEXTO),
+                    "autorizacion": _nullable(_TEXTO),
+                    "total": _nullable(_NUMERO),
+                    "glosas": _nullable(_NUMERO),
+                    "descuentos": _nullable(_NUMERO),
+                    "neto": _nullable(_NUMERO),
+                    "es_paciente": {"type": "boolean"},
+                },
+                "required": ["empresa", "documento_paciente", "paciente", "fecha_servicio", "factura",
+                             "autorizacion", "total", "glosas", "descuentos", "neto", "es_paciente"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    "required": ["pagador", "prestador", "fecha_proceso", "periodo_desde", "periodo_hasta", "total_neto", "filas"],
+    "additionalProperties": False,
+}
+
+INSTRUCCIONES_PAGO = """Lees reportes de pago que reciben los anestesiólogos en Colombia (por ejemplo \
+"Reporte de pagos a prestadores" o "relación de pacientes pagados" de una asociación o pagador). \
+Extrae:
+
+- pagador: entidad que emite el reporte y paga (ej. la asociación). prestador: nombre del anestesiólogo.
+- fecha_proceso: fecha del proceso o del pago. periodo_desde / periodo_hasta: periodo del reporte.
+- total_neto: el total neto general del reporte, si aparece.
+- filas: UNA por cada línea de detalle, en el mismo orden del documento. Cada línea pertenece a la \
+empresa (aseguradora, EPS, IPS) bajo cuyo encabezado aparece. No incluyas subtotales ni totales como filas.
+  - documento_paciente sin puntos ni espacios; paciente tal como aparece.
+  - fecha_servicio: la fecha de la línea (fecha de la atención o cirugía).
+  - total, glosas, descuentos, neto: valores en pesos como números enteros (700,405 -> 700405).
+  - es_paciente: false si la línea no corresponde a un paciente individual (ej. "HONORARIOS", \
+pagos globales o conceptos); true en los demás casos.
+
+Reglas: todas las fechas en formato AAAA-MM-DD (en Colombia el formato del documento es día/mes/año). \
+Copia los datos tal como están; nunca inventes un valor que no se lee: usa null."""
+
+
+def extraer_reporte_pago(datos: bytes, media_type: str, client: anthropic.Anthropic | None = None) -> ReportePagoExtraido:
+    return ReportePagoExtraido.model_validate(_llamar_claude(
+        datos, media_type, INSTRUCCIONES_PAGO, ESQUEMA_PAGO, "Extrae todas las líneas de este reporte de pagos.",
+        "medium", client))

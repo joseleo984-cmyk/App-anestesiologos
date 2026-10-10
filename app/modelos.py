@@ -159,3 +159,72 @@ class OrdenConfirmada(_Base):
         if not principales:
             self.procedimientos[0].es_principal = True
         return self
+
+
+# ---------------------------------------------------------------- reportes de pago
+def _fecha_o_nulo(v):
+    if isinstance(v, str):
+        try:
+            return date.fromisoformat(v)
+        except ValueError:
+            return None
+    return v
+
+
+def _pesos_o_nulo(v):
+    if isinstance(v, str):
+        digitos = "".join(ch for ch in v if ch.isdigit() or ch == "-")
+        return Decimal(digitos) if digitos.strip("-") else None
+    return v
+
+
+class FilaPago(_Base):
+    empresa: Optional[str] = None
+    documento_paciente: Optional[str] = None
+    paciente: Optional[str] = None
+    fecha_servicio: Optional[date] = None
+    factura: Optional[str] = None
+    autorizacion: Optional[str] = None
+    total: Optional[Decimal] = None
+    glosas: Decimal = Decimal(0)
+    descuentos: Decimal = Decimal(0)
+    neto: Optional[Decimal] = None
+    es_paciente: bool = True
+
+    _f = field_validator("fecha_servicio", mode="before")(_fecha_o_nulo)
+    _p = field_validator("total", "neto", mode="before")(_pesos_o_nulo)
+
+    @field_validator("glosas", "descuentos", mode="before")
+    @classmethod
+    def _cero(cls, v):
+        v = _pesos_o_nulo(v)
+        return Decimal(0) if v is None else v
+
+    @field_validator("documento_paciente")
+    @classmethod
+    def _doc(cls, v):
+        return "".join(ch for ch in v if ch.isalnum()).upper() if v else v
+
+
+class ReportePagoExtraido(_Base):
+    pagador: Optional[str] = None
+    prestador: Optional[str] = None
+    fecha_proceso: Optional[date] = None
+    periodo_desde: Optional[date] = None
+    periodo_hasta: Optional[date] = None
+    total_neto: Optional[Decimal] = None
+    filas: list[FilaPago] = []
+
+    _f = field_validator("fecha_proceso", "periodo_desde", "periodo_hasta", mode="before")(_fecha_o_nulo)
+    _p = field_validator("total_neto", mode="before")(_pesos_o_nulo)
+
+    @property
+    def suma_neto(self) -> Decimal:
+        return sum((f.neto or Decimal(0) for f in self.filas), Decimal(0))
+
+    @property
+    def cuadra(self) -> Optional[bool]:
+        """¿La suma de las filas coincide con el total del reporte? (None si no hay total)."""
+        if self.total_neto is None:
+            return None
+        return abs(self.suma_neto - self.total_neto) <= 1

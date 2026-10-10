@@ -11,7 +11,7 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from app import config
-from app.modelos import OrdenConfirmada, OrdenExtraida
+from app.modelos import OrdenConfirmada, OrdenExtraida, ReportePagoExtraido
 
 
 class DocumentoNoEncontrado(Exception):
@@ -298,7 +298,9 @@ def _filtros(anestesiologo_id: int, f: dict) -> tuple[str, list]:
         condiciones.append("c.cobertura_id IS NULL")
     elif f.get("aseguradora_id"):
         condiciones.append("cb.aseguradora_id = %s"); params.append(int(f["aseguradora_id"]))
-    if f.get("estado"):
+    if f.get("estado") == "PENDIENTE":  # aún sin pagar (ni pagada ni cancelada)
+        condiciones.append("c.estado NOT IN ('PAGADA', 'CANCELADA')")
+    elif f.get("estado"):
         condiciones.append("c.estado = %s"); params.append(f["estado"])
     if f.get("q"):
         condiciones.append("(p.nombres || ' ' || p.apellidos ILIKE %s OR p.numero_documento ILIKE %s)")
@@ -370,7 +372,8 @@ def reporte(conn, anestesiologo_id: int, filtros: Optional[dict] = None) -> dict
                 ORDER BY {orden}""", params).fetchall()
 
     totales = conn.execute(
-        f"""SELECT {metricas}, COUNT(*) FILTER (WHERE c.estado = 'CANCELADA') AS canceladas
+        f"""SELECT {metricas}, COUNT(*) FILTER (WHERE c.estado = 'CANCELADA') AS canceladas,
+                  COUNT(*) FILTER (WHERE c.estado NOT IN ('PAGADA', 'CANCELADA')) AS pendientes
             {_DESDE} WHERE {where}""", params).fetchone()
     return {
         "totales": totales,
@@ -407,3 +410,139 @@ def obtener_anestesiologo(conn, anestesiologo_id: int) -> Optional[dict]:
         "SELECT anestesiologo_id, nombre, email FROM anestesiologo WHERE anestesiologo_id = %s",
         (anestesiologo_id,),
     ).fetchone()
+
+
+# ------------------------------------------------------------ reportes de pago
+DIAS_TOLERANCIA = 15  # diferencia máxima entre la fecha del pago y la de la cirugía
+
+
+def buscar_reporte_por_hash(conn, anestesiologo_id: int, hash_sha256: str) -> Optional[dict]:
+    return conn.execute(
+        "SELECT reporte_id FROM reporte_pago WHERE anestesiologo_id = %s AND hash_sha256 = %s",
+        (anestesiologo_id, hash_sha256),
+    ).fetchone()
+
+
+def crear_reporte(conn, anestesiologo_id: int, url_archivo: str, hash_sha256: str,
+                  reporte: ReportePagoExtraido) -> int:
+    reporte_id = conn.execute(
+        """INSERT INTO reporte_pago (anestesiologo_id, pagador, fecha_proceso, periodo_desde, periodo_hasta,
+                                     total_neto, url_archivo, hash_sha256, datos_extraidos)
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING reporte_id""",
+        (anestesiologo_id, reporte.pagador, reporte.fecha_proceso, reporte.periodo_desde, reporte.periodo_hasta,
+         reporte.total_neto, url_archivo, hash_sha256, Jsonb(reporte.model_dump(mode="json"))),
+    ).fetchone()["reporte_id"]
+    for f in reporte.filas:
+        conn.execute(
+            """INSERT INTO pago_detalle (reporte_id, empresa, documento_paciente, paciente, fecha_servicio,
+                                         factura, autorizacion, total, glosas, descuentos, neto, es_paciente)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+            (reporte_id, f.empresa, f.documento_paciente, f.paciente, f.fecha_servicio, f.factura,
+             f.autorizacion, f.total, f.glosas, f.descuentos, f.neto, f.es_paciente),
+        )
+    conciliar(conn, anestesiologo_id, reporte_id)
+    return reporte_id
+
+
+def conciliar(conn, anestesiologo_id: int, reporte_id: int) -> None:
+    """Busca la cirugía de cada línea: mismo documento del paciente y la fecha más cercana
+    (hasta DIAS_TOLERANCIA días). Una cirugía no se asigna a dos líneas."""
+    filas = conn.execute(
+        """SELECT d.detalle_id, d.documento_paciente, d.fecha_servicio, d.cirugia_id, c.estado
+             FROM pago_detalle d LEFT JOIN cirugia c ON c.cirugia_id = d.cirugia_id
+            WHERE d.reporte_id = %s AND d.es_paciente AND d.documento_paciente IS NOT NULL
+            ORDER BY d.detalle_id""",
+        (reporte_id,),
+    ).fetchall()
+    # Las líneas cuya cirugía ya quedó pagada no se vuelven a cruzar (al repetir el cruce)
+    usadas: set[int] = {f["cirugia_id"] for f in filas if f["estado"] == "PAGADA"}
+    for f in filas:
+        if f["estado"] == "PAGADA":
+            continue
+        candidatas = conn.execute(
+            """SELECT c.cirugia_id,
+                      CASE WHEN %(fecha)s::date IS NULL THEN 0
+                           ELSE abs(c.fecha_procedimiento - %(fecha)s::date) END AS distancia
+                 FROM cirugia c JOIN paciente p ON p.paciente_id = c.paciente_id
+                WHERE c.anestesiologo_id = %(anest)s AND c.estado <> 'CANCELADA'
+                  AND upper(regexp_replace(p.numero_documento, '[^A-Za-z0-9]', '', 'g')) = %(doc)s
+                  AND (%(fecha)s::date IS NULL
+                       OR abs(c.fecha_procedimiento - %(fecha)s::date) <= %(tol)s)
+                  -- no tomar cirugías ya pagadas por otro reporte aplicado
+                  AND NOT EXISTS (SELECT 1 FROM pago_detalle d JOIN reporte_pago r USING (reporte_id)
+                                   WHERE d.cirugia_id = c.cirugia_id AND r.estado = 'APLICADO'
+                                     AND r.reporte_id <> %(rep)s)
+                ORDER BY distancia, c.fecha_procedimiento DESC""",
+            {"fecha": f["fecha_servicio"], "anest": anestesiologo_id, "doc": f["documento_paciente"],
+             "tol": DIAS_TOLERANCIA, "rep": reporte_id},
+        ).fetchall()
+        elegida = next((c["cirugia_id"] for c in candidatas if c["cirugia_id"] not in usadas), None)
+        if elegida:
+            usadas.add(elegida)
+        conn.execute("UPDATE pago_detalle SET cirugia_id = %s WHERE detalle_id = %s", (elegida, f["detalle_id"]))
+
+
+def obtener_reporte(conn, anestesiologo_id: int, reporte_id: int) -> Optional[dict]:
+    cab = conn.execute(
+        """SELECT reporte_id, pagador, fecha_proceso, periodo_desde, periodo_hasta, total_neto, estado,
+                  subido_en, datos_extraidos->>'prestador' AS prestador
+             FROM reporte_pago WHERE reporte_id = %s AND anestesiologo_id = %s""",
+        (reporte_id, anestesiologo_id),
+    ).fetchone()
+    if cab is None:
+        return None
+    filas = conn.execute(
+        """SELECT d.detalle_id, d.empresa, d.documento_paciente, d.paciente, d.fecha_servicio, d.factura,
+                  d.autorizacion, d.total, d.glosas, d.descuentos, d.neto, d.es_paciente, d.cirugia_id,
+                  c.fecha_procedimiento, c.estado AS estado_cirugia,
+                  p.nombres || ' ' || p.apellidos AS paciente_app,
+                  CASE WHEN NOT d.es_paciente THEN 'OTRO_CONCEPTO'
+                       WHEN d.cirugia_id IS NULL THEN 'SIN_CIRUGIA'
+                       WHEN c.estado = 'PAGADA' AND %s <> 'APLICADO' THEN 'YA_PAGADA'
+                       ELSE 'COINCIDE' END AS resultado
+             FROM pago_detalle d
+             LEFT JOIN cirugia c  ON c.cirugia_id = d.cirugia_id
+             LEFT JOIN paciente p ON p.paciente_id = c.paciente_id
+            WHERE d.reporte_id = %s ORDER BY d.detalle_id""",
+        (cab["estado"], reporte_id),
+    ).fetchall()
+    suma = sum((f["neto"] or 0) for f in filas)
+    return {**cab, "suma_neto": suma,
+            "cuadra": None if cab["total_neto"] is None else abs(suma - cab["total_neto"]) <= 1,
+            "filas": filas}
+
+
+def aplicar_reporte(conn, anestesiologo_id: int, reporte_id: int) -> int:
+    """Marca como PAGADAS las cirugías encontradas, con el neto y la fecha del reporte.
+    Las que ya estaban pagadas no se tocan, así que se puede repetir tras volver a cruzar
+    (por ejemplo, después de registrar un paciente que faltaba). Devuelve cuántas se marcaron."""
+    rep = conn.execute(
+        "SELECT estado, fecha_proceso FROM reporte_pago WHERE reporte_id = %s AND anestesiologo_id = %s FOR UPDATE",
+        (reporte_id, anestesiologo_id),
+    ).fetchone()
+    if rep is None:
+        raise DocumentoNoEncontrado()
+    marcadas = conn.execute(
+        """UPDATE cirugia c
+              SET estado = 'PAGADA', valor_honorarios = d.neto,
+                  fecha_pago = COALESCE(%s, CURRENT_DATE)
+             FROM pago_detalle d
+            WHERE d.reporte_id = %s AND d.cirugia_id = c.cirugia_id
+              AND c.anestesiologo_id = %s AND c.estado NOT IN ('PAGADA', 'CANCELADA')""",
+        (rep["fecha_proceso"], reporte_id, anestesiologo_id),
+    ).rowcount
+    conn.execute("UPDATE reporte_pago SET estado = 'APLICADO' WHERE reporte_id = %s", (reporte_id,))
+    return marcadas
+
+
+def listar_reportes(conn, anestesiologo_id: int) -> list[dict]:
+    return conn.execute(
+        """SELECT r.reporte_id, r.pagador, r.fecha_proceso, r.periodo_desde, r.periodo_hasta, r.total_neto,
+                  r.estado, r.subido_en,
+                  COUNT(d.*) FILTER (WHERE d.es_paciente) AS lineas,
+                  COUNT(d.*) FILTER (WHERE d.cirugia_id IS NOT NULL) AS encontradas
+             FROM reporte_pago r LEFT JOIN pago_detalle d USING (reporte_id)
+            WHERE r.anestesiologo_id = %s
+            GROUP BY r.reporte_id ORDER BY r.subido_en DESC""",
+        (anestesiologo_id,),
+    ).fetchall()
