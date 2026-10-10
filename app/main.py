@@ -247,7 +247,8 @@ def listar_cirugias(limite: int = 100, filtros: Filtros = Depends(),
 def exportar_excel(filtros: Filtros = Depends(), conn=Depends(get_conn),
                    anestesiologo_id=Depends(anestesiologo_actual)):
     cirugias = repositorio.listar_cirugias(conn, anestesiologo_id, 100_000, filtros.valores)
-    libro = exportar.libro_cirugias(cirugias, repositorio.reporte(conn, anestesiologo_id, filtros.valores))
+    glosas = repositorio.reporte_glosas(conn, anestesiologo_id, filtros.valores["desde"], filtros.valores["hasta"])
+    libro = exportar.libro_cirugias(cirugias, repositorio.reporte(conn, anestesiologo_id, filtros.valores), glosas)
     return Response(libro, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     headers={"Content-Disposition": f'attachment; filename="cirugias-{date.today()}.xlsx"'})
 
@@ -260,6 +261,12 @@ def opciones_de_filtro(conn=Depends(get_conn), anestesiologo_id=Depends(anestesi
 @app.get("/api/reportes")
 def reportes(filtros: Filtros = Depends(), conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
     return repositorio.reporte(conn, anestesiologo_id, filtros.valores)
+
+
+@app.get("/api/glosas")
+def reporte_de_glosas(desde: Optional[date] = None, hasta: Optional[date] = None,
+                      conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+    return repositorio.reporte_glosas(conn, anestesiologo_id, desde, hasta)
 
 
 @app.get("/api/cirugias/{cirugia_id}")

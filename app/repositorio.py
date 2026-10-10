@@ -546,3 +546,27 @@ def listar_reportes(conn, anestesiologo_id: int) -> list[dict]:
             GROUP BY r.reporte_id ORDER BY r.subido_en DESC""",
         (anestesiologo_id,),
     ).fetchall()
+
+
+def reporte_glosas(conn, anestesiologo_id: int, desde=None, hasta=None) -> dict:
+    """Glosas y descuentos de los reportes de pago, por empresa y línea a línea.
+    El periodo se toma por la fecha del servicio (la de la cirugía)."""
+    where = ["r.anestesiologo_id = %s", "(d.glosas > 0 OR d.descuentos > 0)"]
+    params: list = [anestesiologo_id]
+    if desde:
+        where.append("d.fecha_servicio >= %s"); params.append(desde)
+    if hasta:
+        where.append("d.fecha_servicio <= %s"); params.append(hasta)
+    desde_sql = f"FROM pago_detalle d JOIN reporte_pago r USING (reporte_id) WHERE {' AND '.join(where)}"
+    totales = conn.execute(
+        f"""SELECT COALESCE(SUM(d.glosas), 0) AS glosas, COALESCE(SUM(d.descuentos), 0) AS descuentos,
+                  COALESCE(SUM(d.total), 0) AS facturado, COUNT(*) AS lineas {desde_sql}""", params).fetchone()
+    por_empresa = conn.execute(
+        f"""SELECT COALESCE(d.empresa, 'SIN EMPRESA') AS nombre, COUNT(*) AS lineas,
+                  SUM(d.glosas) AS glosas, SUM(d.descuentos) AS descuentos, SUM(d.total) AS facturado
+             {desde_sql} GROUP BY 1 ORDER BY SUM(d.glosas) + SUM(d.descuentos) DESC""", params).fetchall()
+    lineas = conn.execute(
+        f"""SELECT d.empresa, d.documento_paciente, d.paciente, d.fecha_servicio, d.factura, d.autorizacion,
+                  d.total, d.glosas, d.descuentos, d.neto, r.fecha_proceso, r.pagador
+             {desde_sql} ORDER BY d.fecha_servicio DESC NULLS LAST, d.detalle_id""", params).fetchall()
+    return {"totales": totales, "por_empresa": por_empresa, "lineas": lineas}

@@ -145,3 +145,21 @@ def test_volver_a_cruzar_tras_registrar_el_faltante(con_reporte):
     assert rep["filas"][3]["cirugia_id"] == faltante and rep["filas"][3]["estado_cirugia"] == "PROGRAMADA"
     assert c.post(f"/api/pagos/{rep['reporte_id']}/aplicar").json() == {"marcadas": 1}
     assert c.get(f"/api/cirugias/{faltante}").json()["valor_honorarios"] == 128400
+
+
+def test_reporte_de_glosas(con_reporte):
+    c = con_reporte
+    c.poner_reporte({**REPORTE, "total_neto": None, "filas": [
+        {**REPORTE["filas"][0], "glosas": 50000, "neto": 650405},
+        {**REPORTE["filas"][1]},                                             # solo descuento
+        {**REPORTE["filas"][3]},                                             # sin glosa ni descuento
+        {**REPORTE["filas"][0], "empresa": "OTRA", "fecha_servicio": "2026-01-10", "glosas": 10000}]})
+    subir(c)
+    g = c.get("/api/glosas").json()
+    assert g["totales"]["glosas"] == 60000 and g["totales"]["descuentos"] == 1039 and g["totales"]["lineas"] == 3
+    assert g["por_empresa"][0]["nombre"] == "SEGUROS UNO"
+    assert c.get("/api/glosas?desde=2026-07-01").json()["totales"]["lineas"] == 2  # por fecha del servicio
+    from openpyxl import load_workbook
+    import io
+    wb = load_workbook(io.BytesIO(c.get("/api/cirugias.xlsx").content))
+    assert wb["Glosas"].max_row == 4

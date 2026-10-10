@@ -798,16 +798,48 @@ function ranking(titulo, filas) {
     </li>`).join("")}</ul></section>`;
 }
 
+function seccionGlosas(g) {
+  if (!g || !g.totales.lineas) return "";
+  const t = g.totales;
+  const perdido = Number(t.glosas) + Number(t.descuentos);
+  const pct = Number(t.facturado) ? ` (${(perdido / Number(t.facturado) * 100).toFixed(1).replace(".", ",")} % de lo facturado en esas líneas)` : "";
+  const max = Math.max(...g.por_empresa.map((e) => Number(e.glosas) + Number(e.descuentos)), 1);
+  return `<section class="card"><h2>Glosas y descuentos</h2>
+    <div class="kpis">
+      <div class="kpi"><div class="etiqueta">Glosas</div><div class="cifra">${pesos(t.glosas)}</div></div>
+      <div class="kpi"><div class="etiqueta">Descuentos</div><div class="cifra">${pesos(t.descuentos)}</div></div>
+    </div>
+    <p class="sub">${t.lineas} línea${t.lineas === 1 ? "" : "s"} de los reportes de pago con glosa o descuento${pct}. Fechas según el día de la cirugía.</p>
+    <ul class="ranking">${g.por_empresa.map((e) => {
+      const v = Number(e.glosas) + Number(e.descuentos);
+      return `<li><div class="nombre"><span>${escapar(e.nombre)}</span><span class="valor">${pesos(v)}</span></div>
+        <div class="pista"><div class="barra" style="width:${Math.max(v / max * 100, 0.5)}%"></div></div>
+        <div class="detalle">${e.lineas} línea${e.lineas === 1 ? "" : "s"} · glosas ${pesos(e.glosas)} · descuentos ${pesos(e.descuentos)}</div></li>`;
+    }).join("")}</ul>
+    <details style="margin-top:8px"><summary class="sub" style="cursor:pointer">${t.lineas === 1 ? "Ver la línea" : `Ver las ${t.lineas} líneas`}</summary>
+      ${g.lineas.map((l) => `<div class="linea-pago">
+        <div class="item-cab"><strong>${escapar(l.paciente || "—")}</strong><span class="valor">−${pesos(Number(l.glosas) + Number(l.descuentos))}</span></div>
+        <div class="sub">${escapar(l.documento_paciente || "")} · ${escapar(l.fecha_servicio || "")} · ${escapar(l.empresa || "")} · factura ${escapar(l.factura || "—")}</div>
+        <div class="sub">Total ${pesos(l.total)}${Number(l.glosas) ? ` · glosa ${pesos(l.glosas)}` : ""}${Number(l.descuentos) ? ` · descuento ${pesos(l.descuentos)}` : ""} · neto ${pesos(l.neto)}</div>
+      </div>`).join("")}
+    </details>
+  </section>`;
+}
+
 async function cargarReporte() {
   const cont = $("#reporte");
   const p = periodo();
   $("#r-excel").href = `/api/cirugias.xlsx?${consulta(p)}`;
   try {
-    const r = await fetch(`/api/reportes?${consulta(p)}`);
+    const [r, rg] = await Promise.all([fetch(`/api/reportes?${consulta(p)}`), fetch(`/api/glosas?${consulta(p)}`)]);
     const d = await r.json();
+    const g = rg.ok ? await rg.json() : null;
     if (!r.ok) throw new Error(mensajeError(d, "error"));
     const t = d.totales;
-    if (!t.cirugias && !t.canceladas) { cont.innerHTML = `<section class="card"><p class="sub">No hay cirugías en este periodo.</p></section>`; return; }
+    if (!t.cirugias && !t.canceladas) {
+      cont.innerHTML = `<section class="card"><p class="sub">No hay cirugías en este periodo.</p></section>${seccionGlosas(g)}`;
+      return;
+    }
     cont.innerHTML = `
       <div class="kpis">
         <div class="kpi destacado"><div class="etiqueta">Total generado</div><div class="cifra">${pesos(t.total)}</div></div>
@@ -821,7 +853,8 @@ async function cargarReporte() {
       ${ranking("Por cirujano", d.por_cirujano)}
       ${ranking("Por clínica", d.por_clinica)}
       ${ranking("Por aseguradora", d.por_aseguradora)}
-      ${ranking("Por mes", d.por_mes)}`;
+      ${ranking("Por mes", d.por_mes)}
+      ${seccionGlosas(g)}`;
     $("#kpi-pendientes").onclick = verPendientes;
   } catch (e) {
     cont.innerHTML = `<p class="aviso err">No se pudo cargar el reporte: ${escapar(e.message)}</p>`;

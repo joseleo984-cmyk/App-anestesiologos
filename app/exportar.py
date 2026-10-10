@@ -25,7 +25,7 @@ def _hoja(ws, titulos: list[str], filas: list[list], columnas_pesos: set[int], a
     ws.auto_filter.ref = ws.dimensions
 
 
-def libro_cirugias(cirugias: list[dict], reporte: dict) -> bytes:
+def libro_cirugias(cirugias: list[dict], reporte: dict, glosas: dict | None = None) -> bytes:
     wb = Workbook()
     ws = wb.active
     ws.title = "Cirugías"
@@ -53,6 +53,16 @@ def libro_cirugias(cirugias: list[dict], reporte: dict) -> bytes:
               [[r["nombre"], r["cirugias"], float(r["total"]), float(r["pagado"]), float(r["por_cobrar"]),
                 r["sin_valor"]] for r in reporte[clave]],
               {3, 4, 5}, [34, 10, 16, 16, 16, 10])
+
+    if glosas and glosas["lineas"]:
+        hoja = wb.create_sheet("Glosas")
+        _hoja(hoja, ["Fecha servicio", "Empresa", "Documento", "Paciente", "Factura", "Autorización",
+                     "Total", "Glosas", "Descuentos", "Neto", "Fecha de proceso", "Pagador"],
+              [[g["fecha_servicio"], g["empresa"], g["documento_paciente"], g["paciente"], g["factura"],
+                g["autorizacion"], *(float(g[k]) if g[k] is not None else None
+                                     for k in ("total", "glosas", "descuentos", "neto")),
+                g["fecha_proceso"], g["pagador"]] for g in glosas["lineas"]],
+              {7, 8, 9, 10}, [14, 30, 14, 30, 10, 16, 14, 14, 14, 14, 14, 30])
 
     salida = io.BytesIO()
     wb.save(salida)
