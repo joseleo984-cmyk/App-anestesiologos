@@ -41,13 +41,20 @@ def buscar_documento_por_hash(conn, anestesiologo_id: int, hash_sha256: str) -> 
     ).fetchone()
 
 
-def crear_documento(conn, anestesiologo_id: int, tipo_archivo: str, url_archivo: str, hash_sha256: str) -> int:
-    fila = conn.execute(
+def crear_documento(conn, anestesiologo_id: int, paginas: list[tuple[str, str]], hash_sha256: str) -> int:
+    """paginas: [(ubicación, 'IMAGEN'|'PDF'), ...] en orden. La primera queda también en documento_fuente."""
+    url, tipo = paginas[0]
+    documento_id = conn.execute(
         """INSERT INTO documento_fuente (anestesiologo_id, tipo_archivo, url_archivo, hash_sha256)
            VALUES (%s, %s, %s, %s) RETURNING documento_id""",
-        (anestesiologo_id, tipo_archivo, url_archivo, hash_sha256),
-    ).fetchone()
-    return fila["documento_id"]
+        (anestesiologo_id, tipo, url, hash_sha256),
+    ).fetchone()["documento_id"]
+    for numero, (url, tipo) in enumerate(paginas, start=1):
+        conn.execute(
+            "INSERT INTO documento_pagina (documento_id, numero, url_archivo, tipo_archivo) VALUES (%s, %s, %s, %s)",
+            (documento_id, numero, url, tipo),
+        )
+    return documento_id
 
 
 def guardar_extraccion(conn, documento_id: int, orden: OrdenExtraida) -> None:
@@ -242,6 +249,9 @@ def obtener_cirugia(conn, anestesiologo_id: int, cirugia_id: int) -> Optional[di
     c = conn.execute(
         """SELECT c.cirugia_id, c.fecha_procedimiento, c.estado, c.valor_honorarios, c.fecha_pago,
                   c.observaciones, c.documento_id, d.tipo_archivo,
+                  CASE WHEN d.documento_id IS NULL THEN 0
+                       ELSE GREATEST((SELECT COUNT(*) FROM documento_pagina x WHERE x.documento_id = d.documento_id), 1)
+                  END AS paginas,
                   p.tipo_documento, p.numero_documento, p.nombres, p.apellidos,
                   a.nombre AS aseguradora_nombre, a.tipo AS aseguradora_tipo,
                   cb.numero_poliza, cb.plan,
@@ -269,6 +279,7 @@ def obtener_cirugia(conn, anestesiologo_id: int, cirugia_id: int) -> Optional[di
         "cirugia_id": c["cirugia_id"],
         "documento_id": c["documento_id"],
         "tipo_archivo": c["tipo_archivo"],
+        "paginas": c["paginas"],
         "paciente": {k: c[k] for k in ("tipo_documento", "numero_documento", "nombres", "apellidos")},
         "aseguradora": None if c["aseguradora_nombre"] is None else {
             "nombre": c["aseguradora_nombre"], "tipo": c["aseguradora_tipo"],
@@ -385,12 +396,29 @@ def reporte(conn, anestesiologo_id: int, filtros: Optional[dict] = None) -> dict
     }
 
 
-def obtener_archivo(conn, documento_id: int, anestesiologo_id: int) -> Optional[dict]:
+def obtener_archivo(conn, documento_id: int, anestesiologo_id: int, pagina: int = 1) -> Optional[dict]:
+    """Ubicación de una página del documento. Los documentos anteriores a las páginas
+    tienen un solo archivo, guardado en documento_fuente."""
     return conn.execute(
-        """SELECT url_archivo, tipo_archivo FROM documento_fuente
-            WHERE documento_id = %s AND anestesiologo_id = %s""",
-        (documento_id, anestesiologo_id),
+        """SELECT COALESCE(p.url_archivo, d.url_archivo) AS url_archivo
+             FROM documento_fuente d
+             LEFT JOIN documento_pagina p ON p.documento_id = d.documento_id AND p.numero = %(pag)s
+            WHERE d.documento_id = %(doc)s AND d.anestesiologo_id = %(anest)s
+              AND (p.numero IS NOT NULL OR (%(pag)s = 1 AND NOT EXISTS (
+                     SELECT 1 FROM documento_pagina x WHERE x.documento_id = d.documento_id)))""",
+        {"doc": documento_id, "anest": anestesiologo_id, "pag": pagina},
     ).fetchone()
+
+
+def ciudad_conocida(conn, anestesiologo_id: int, clinica: str) -> Optional[str]:
+    """Ciudad con la que el anestesiólogo ya registró esa clínica (la más reciente)."""
+    fila = conn.execute(
+        """SELECT cl.ciudad FROM cirugia c JOIN clinica cl USING (clinica_id)
+            WHERE c.anestesiologo_id = %s AND cl.nombre = %s AND cl.ciudad IS NOT NULL
+            ORDER BY c.fecha_procedimiento DESC, c.cirugia_id DESC LIMIT 1""",
+        (anestesiologo_id, _nombre_catalogo(clinica)),
+    ).fetchone()
+    return fila["ciudad"] if fila else None
 
 
 _CUENTA = """anestesiologo_id, nombre, email, password_hash, es_admin, activo, debe_cambiar_clave,

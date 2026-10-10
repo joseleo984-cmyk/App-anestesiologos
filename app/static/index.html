@@ -50,6 +50,15 @@
   .invisible { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
   .zona { border: 2px dashed transparent; border-radius: 12px; padding: 4px; }
   .zona.encima { border-color: var(--accent); }
+  .miniaturas { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; margin: 8px 0; }
+  .mini { position: relative; aspect-ratio: 3 / 4; border: 1px solid var(--line); border-radius: 8px; overflow: hidden;
+          background: var(--bg); display: flex; align-items: center; justify-content: center; font-size: .8rem;
+          color: var(--muted); text-align: center; padding: 4px; }
+  .mini img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .mini .numero { position: absolute; left: 4px; bottom: 4px; background: var(--card); color: var(--text);
+                  border-radius: 999px; padding: 0 7px; font-size: .75rem; font-weight: 600; }
+  .mini .quitar-mini { position: absolute; top: 4px; right: 4px; width: 28px; height: 28px; padding: 0; border-radius: 999px;
+                       background: var(--card); line-height: 1; }
   .selector-simple { width: auto; max-width: 100%; padding: 6px; font-size: .9rem; margin-bottom: 12px; }
   .enlace { color: var(--accent); text-decoration: underline; cursor: pointer; display: inline; margin: 0; font-size: inherit; }
   ul.lista { list-style: none; padding: 0; margin: 0; }
@@ -144,11 +153,20 @@
     <h2>Sube la orden</h2>
     <div id="zona" class="zona">
       <button type="button" class="boton primario grande" id="elegir">📷 Tomar foto o elegir archivo</button>
-      <p class="sub">También puedes <strong>arrastrar el archivo aquí</strong>. Foto de la orden, autorización
-        o programación, o el PDF. La IA llenará los datos y tú los revisas.</p>
+      <div id="bandeja" class="oculto">
+        <p class="sub" id="bandeja-texto"></p>
+        <div class="miniaturas" id="miniaturas"></div>
+        <div class="acciones-pago">
+          <button type="button" id="agregar-foto">＋ Agregar otra foto o página</button>
+          <button type="button" class="primario" id="leer-orden">Leer orden</button>
+        </div>
+        <button type="button" id="vaciar-bandeja" class="enlace" style="border:0;background:none;padding:6px 0">Quitar todas</button>
+      </div>
+      <p class="sub">Si la orden tiene varias hojas (o la orden y su autorización), agrega todas las fotos antes de
+        leerla. También puedes <strong>arrastrar los archivos aquí</strong>. La IA llenará los datos y tú los revisas.</p>
     </div>
     <p class="sub" style="margin-bottom:4px">¿El botón no funciona? Usa este selector:</p>
-    <input id="foto-libre" type="file" class="selector-simple">
+    <input id="foto-libre" type="file" class="selector-simple" multiple>
     <button type="button" id="manual">Escribir los datos a mano</button>
     <div id="estado-subida"></div>
   </section>
@@ -263,7 +281,7 @@
 
   <form class="card oculto" id="paso-revisar" novalidate>
     <h2 id="titulo-form">Revisa y confirma</h2>
-    <p id="ver-original" class="oculto"><a href="#" target="_blank" rel="noopener">📄 Ver la orden original</a></p>
+    <p id="ver-original" class="oculto"></p>
     <div id="avisos"></div>
 
     <fieldset>
@@ -443,8 +461,12 @@ function llenarFormulario(datos) {
   campo("observaciones").value = modo.tipo === "editar" ? (datos.observaciones || "") : "";
   $("#titulo-form").textContent = modo.tipo === "editar" ? "Cirugía" : "Revisa y confirma";
   const docId = modo.tipo === "documento" ? modo.id : datos.documento_id;
+  const paginas = (modo.tipo === "documento" ? modo.paginas : datos.paginas) || 1;
   $("#ver-original").classList.toggle("oculto", !docId);
-  if (docId) $("#ver-original a").href = `/api/documentos/${docId}/archivo`;
+  if (docId) $("#ver-original").innerHTML = paginas === 1
+    ? `<a href="/api/documentos/${docId}/archivo" target="_blank" rel="noopener">📄 Ver la orden original</a>`
+    : `📄 Orden original: ${Array.from({ length: paginas }, (_, i) =>
+        `<a href="/api/documentos/${docId}/archivo?pagina=${i + 1}" target="_blank" rel="noopener">página ${i + 1}</a>`).join(" · ")}`;
 
   const avisos = [];
   if (datos.confianza !== undefined && datos.confianza < 0.8)
@@ -542,68 +564,115 @@ $("#paso-revisar").onsubmit = async (ev) => {
 };
 
 // ---------------------------------------------------------------- subida
-async function subirArchivo(archivo) {
-  if (!archivo) return;
+// Bandeja de fotos/páginas de UNA orden. Cada archivo se lee completo apenas se elige:
+// Safari puede invalidar el archivo después, mientras se siguen agregando fotos.
+const MAX_PAGINAS = 8;
+let bandeja = [];  // [{nombre, tipo, blob, url}]
+
+async function agregarABandeja(archivos) {
+  const estado = $("#estado-subida");
+  aviso(estado, "", "");
+  for (const archivo of archivos) {
+    if (bandeja.length >= MAX_PAGINAS) { aviso(estado, "err", `Máximo ${MAX_PAGINAS} fotos o archivos por orden.`); break; }
+    try {
+      const blob = new Blob([await archivo.arrayBuffer()], { type: archivo.type || "application/octet-stream" });
+      if (!blob.size) { aviso(estado, "err", `El archivo «${archivo.name || "sin nombre"}» llegó vacío.`); continue; }
+      bandeja.push({ nombre: archivo.name || `foto-${bandeja.length + 1}.jpg`, tipo: blob.type, blob, url: URL.createObjectURL(blob) });
+    } catch (e) {
+      aviso(estado, "err", `No se pudo abrir «${archivo.name || "el archivo"}» en este equipo (${e.name || e}). Prueba arrastrándolo.`);
+    }
+  }
+  pintarBandeja();
+}
+
+function vaciarBandeja() {
+  bandeja.forEach((p) => URL.revokeObjectURL(p.url));
+  bandeja = [];
+  pintarBandeja();
+}
+
+function pintarBandeja() {
+  const hay = bandeja.length > 0;
+  $("#elegir").classList.toggle("oculto", hay);
+  $("#bandeja").classList.toggle("oculto", !hay);
+  if (!hay) return;
+  $("#bandeja-texto").textContent = bandeja.length === 1
+    ? "1 foto o archivo de la orden. ¿Tiene más hojas? Agrégalas antes de leerla."
+    : `${bandeja.length} fotos o archivos de la misma orden.`;
+  $("#leer-orden").textContent = bandeja.length === 1 ? "Leer orden" : `Leer orden (${bandeja.length})`;
+  $("#agregar-foto").disabled = bandeja.length >= MAX_PAGINAS;
+  $("#miniaturas").innerHTML = bandeja.map((p, i) => `<div class="mini">
+      ${p.tipo === "application/pdf" ? "📄 PDF" : `<span>📷</span><img src="${p.url}" alt="" onerror="this.remove()">`}
+      <span class="numero">${i + 1}</span>
+      <button type="button" class="quitar-mini" data-quitar="${i}" aria-label="Quitar ${escapar(p.nombre)}">✕</button>
+    </div>`).join("");
+  $("#miniaturas").querySelectorAll("[data-quitar]").forEach((b) => b.onclick = () => {
+    const [quitada] = bandeja.splice(Number(b.dataset.quitar), 1);
+    URL.revokeObjectURL(quitada.url);
+    pintarBandeja();
+  });
+}
+
+async function leerOrden() {
+  if (!bandeja.length) return;
   cerrarFormulario();
   const estado = $("#estado-subida");
-  // Detalle visible del archivo elegido: si algo falla, una captura muestra en qué paso
-  const detalle = `${escapar(archivo.name || "sin nombre")} · ${Math.round((archivo.size || 0) / 1024)} KB · ${escapar(archivo.type || "tipo desconocido")}`;
-  const paso = (texto) => { estado.innerHTML = `<div class="cargando">${texto}<br><span class="sub">${detalle}</span></div>`; };
-  paso("1/3 Archivo elegido, preparándolo…");
-  // Se lee el archivo completo antes de enviarlo: Safari puede invalidar el archivo
-  // si el campo se limpia mientras se envía.
-  let contenido;
-  try {
-    contenido = new Blob([await archivo.arrayBuffer()], { type: archivo.type || "application/octet-stream" });
-  } catch (e) {
-    return aviso(estado, "err", `Paso 1: no se pudo abrir el archivo en este equipo (${e.name || e}). ${archivo.name || ""}`);
-  }
-  if (!contenido.size) return aviso(estado, "err", `Paso 1: el archivo llegó vacío (${archivo.name || "sin nombre"}).`);
-  paso("2/3 Enviando el archivo y leyéndolo con la IA… puede tardar hasta un minuto.");
+  const n = bandeja.length;
+  const detalle = bandeja.map((p) => `${escapar(p.nombre)} · ${Math.round(p.blob.size / 1024)} KB`).join("<br>");
+  estado.innerHTML = `<div class="cargando">Enviando ${n === 1 ? "la orden" : `las ${n} fotos de la orden`} y leyéndola con la IA… puede tardar hasta un minuto.<br><span class="sub">${detalle}</span></div>`;
+  $("#leer-orden").disabled = true;
   const form = new FormData();
-  form.append("archivo", contenido, archivo.name || "orden");
+  bandeja.forEach((p) => form.append("archivos", p.blob, p.nombre));
   try {
     const r = await fetch("/api/documentos", { method: "POST", body: form });
     const cuerpo = await r.json().catch(() => null);
-    if (!r.ok) return aviso(estado, "err", `Paso 3 (error ${r.status}): ${mensajeError(cuerpo, "No se pudo leer la orden.")}`);
-    modo = { tipo: "documento", id: cuerpo.documento_id };
+    if (r.status === 409) {  // ya estaba subida: no tiene sentido reenviarla
+      vaciarBandeja();
+      return aviso(estado, "warn", mensajeError(cuerpo, "Esta orden ya se había subido."));
+    }
+    if (!r.ok) return aviso(estado, "err", `No se pudo leer la orden (error ${r.status}): ${mensajeError(cuerpo, "intenta de nuevo.")}`);
+    modo = { tipo: "documento", id: cuerpo.documento_id, paginas: cuerpo.paginas };
+    vaciarBandeja();
     aviso(estado, "", "");
     llenarFormulario(cuerpo.datos);
   } catch (e) {
-    aviso(estado, "err", `Paso 2: no se pudo enviar (${e.name || "error"}: ${e.message || e}). Revisa la conexión e intenta de nuevo.`);
+    aviso(estado, "err", `No se pudo enviar (${e.name || "error"}: ${e.message || e}). Revisa la conexión e intenta de nuevo.`);
+  } finally {
+    $("#leer-orden").disabled = false;
   }
 }
 
 // Botón principal: crea un selector nuevo en cada clic y lo abre desde el propio clic,
 // igual que Google Drive. Así funciona en Safari de Mac, que no abría bien el selector
 // escondido detrás de una etiqueta.
-function elegirArchivo(alElegir) {
+function elegirArchivo(alElegir, varios = false) {
   const campo = document.createElement("input");
   campo.type = "file";
+  campo.multiple = varios;
   campo.className = "invisible";
   document.body.appendChild(campo);
   campo.addEventListener("change", async () => {
-    const archivo = campo.files && campo.files[0];
-    if (archivo) await alElegir(archivo);
+    const archivos = [...(campo.files || [])];
+    if (archivos.length) await alElegir(varios ? archivos : archivos[0]);
     campo.remove();
   });
   campo.click();
 }
-$("#elegir").addEventListener("click", () => elegirArchivo(subirArchivo));
+$("#elegir").addEventListener("click", () => elegirArchivo(agregarABandeja, true));
+$("#agregar-foto").addEventListener("click", () => elegirArchivo(agregarABandeja, true));
+$("#leer-orden").addEventListener("click", leerOrden);
+$("#vaciar-bandeja").addEventListener("click", vaciarBandeja);
 
 $("#foto-libre").addEventListener("change", async (ev) => {
-  const campo = ev.target;
-  const archivo = campo.files && campo.files[0];
-  if (!archivo) return;
-  await subirArchivo(archivo);
-  campo.value = "";  // solo al final, para poder volver a elegir el mismo archivo
+  await agregarABandeja([...(ev.target.files || [])]);
+  ev.target.value = "";  // ya se leyeron: se puede limpiar para volver a elegir
 });
 
-// Arrastrar y soltar el archivo sobre la zona
+// Arrastrar y soltar los archivos sobre la zona
 const zona = $("#zona");
 ["dragenter", "dragover"].forEach((t) => zona.addEventListener(t, (e) => { e.preventDefault(); zona.classList.add("encima"); }));
 ["dragleave", "drop"].forEach((t) => zona.addEventListener(t, (e) => { e.preventDefault(); zona.classList.remove("encima"); }));
-zona.addEventListener("drop", (e) => subirArchivo(e.dataTransfer.files[0]));
+zona.addEventListener("drop", (e) => agregarABandeja([...e.dataTransfer.files]));
 // Si el archivo se suelta fuera de la zona, que el navegador no lo abra en vez de la app
 window.addEventListener("dragover", (e) => e.preventDefault());
 window.addEventListener("drop", (e) => e.preventDefault());

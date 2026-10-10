@@ -71,13 +71,13 @@ la API pública de Supabase no ve ningún dato; solo la app, que se conecta como
 | `POST` | `/api/cambiar-clave` | Cambia la propia contraseña (cierra las otras sesiones) |
 | `GET` · `POST` | `/api/usuarios` | Administrador: lista y crea cuentas (devuelve la clave temporal) |
 | `PUT` · `POST` | `/api/usuarios/{id}` · `/restablecer` | Administrador: activa/desactiva · nueva clave temporal |
-| `POST` | `/api/documentos` | Sube la foto/PDF (`archivo`) y devuelve los datos leídos |
+| `POST` | `/api/documentos` | Sube la orden en una o varias fotos/PDF (`archivos`, máx. 8) y devuelve los datos leídos |
 | `GET` | `/api/documentos/{id}` | Estado del documento y datos extraídos |
 | `POST` | `/api/documentos/{id}/confirmar` | Guarda la cirugía con los datos revisados |
 | `POST` | `/api/cirugias` | Registra una cirugía escrita a mano |
 | `GET` | `/api/cirugias` | Lista con filtros: `desde`, `hasta`, `cirujano_id`, `clinica_id`, `aseguradora_id` (o `PARTICULAR`), `estado`, `q` |
 | `GET` · `PUT` | `/api/cirugias/{id}` | Detalle y corrección de una cirugía (cirujano, estado, valor, fecha de pago…) |
-| `GET` | `/api/documentos/{id}/archivo` | Foto o PDF original de la orden |
+| `GET` | `/api/documentos/{id}/archivo?pagina=N` | Foto o PDF original de la orden (cada página) |
 | `GET` | `/api/reportes` | Totales y ranking por cirujano, clínica, aseguradora y mes (mismos filtros) |
 | `POST` | `/api/pagos` | Sube la relación de pacientes pagados; la IA la lee y la cruza con las cirugías |
 | `GET` | `/api/pagos` · `/api/pagos/{id}` | Reportes subidos y detalle del cruce (encontrada, sin cirugía, otro concepto) |

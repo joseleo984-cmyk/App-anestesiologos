@@ -15,7 +15,7 @@ from datetime import date
 from pathlib import Path
 from typing import Literal, Optional
 
-from fastapi import Cookie, Depends, FastAPI, HTTPException, Query, Response, UploadFile
+from fastapi import Cookie, Depends, FastAPI, File, HTTPException, Query, Response, UploadFile
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -231,30 +231,44 @@ def restablecer_clave(usuario_id: int, conn=Depends(get_conn), admin=Depends(adm
     return {"clave_temporal": clave}
 
 
-@app.post("/api/documentos", status_code=201)
-def subir_documento(archivo: UploadFile, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
-    # Función normal (no async): FastAPI la ejecuta en otro hilo, así la lectura con la IA
-    # no bloquea al servidor mientras atiende otras solicitudes.
-    datos, tipo = _leer_subida(archivo)
+MAX_PAGINAS = 8
 
-    hash_sha256 = hashlib.sha256(datos).hexdigest()
+
+@app.post("/api/documentos", status_code=201)
+def subir_documento(archivos: list[UploadFile] = File(default=[]), archivo: Optional[UploadFile] = None,
+                    conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+    """Sube una orden en uno o varios archivos (fotos o páginas de la misma orden) y la lee con la IA.
+    Función normal (no async): FastAPI la ejecuta en otro hilo, así la lectura con la IA
+    no bloquea al servidor mientras atiende otras solicitudes."""
+    subidos = ([archivo] if archivo else []) + list(archivos)
+    if not subidos:
+        raise HTTPException(400, "No llegó ningún archivo.")
+    if len(subidos) > MAX_PAGINAS:
+        raise HTTPException(413, f"Máximo {MAX_PAGINAS} fotos o archivos por orden.")
+    paginas = [_leer_subida(a) for a in subidos]
+    if sum(len(d) for d, _ in paginas) > 2 * config.MAX_ARCHIVO_MB * 1024 * 1024:
+        raise HTTPException(413, f"Entre todos los archivos superan {2 * config.MAX_ARCHIVO_MB} MB.")
+
+    # Un solo archivo conserva su huella de siempre; varios, la huella del conjunto en su orden
+    huellas = [hashlib.sha256(d).hexdigest() for d, _ in paginas]
+    hash_sha256 = huellas[0] if len(huellas) == 1 else hashlib.sha256("".join(huellas).encode()).hexdigest()
     existente = repositorio.buscar_documento_por_hash(conn, anestesiologo_id, hash_sha256)
     if existente and existente["estado"] != "ERROR":
-        raise HTTPException(409, {"mensaje": "Este archivo ya se había subido.",
+        raise HTTPException(409, {"mensaje": "Esta orden ya se había subido.",
                                   "documento_id": existente["documento_id"]})
     if existente:  # un intento anterior falló: se reintenta con el mismo registro
         documento_id = existente["documento_id"]
     else:
         try:
-            ubicacion = almacenamiento.guardar(f"{uuid.uuid4().hex}{EXTENSIONES[tipo]}", datos, tipo)
+            ubicaciones = [(almacenamiento.guardar(f"{uuid.uuid4().hex}{EXTENSIONES[t]}", d, t),
+                            "PDF" if t == "application/pdf" else "IMAGEN") for d, t in paginas]
         except almacenamiento.AlmacenamientoError as e:
             raise HTTPException(502, str(e))
-        documento_id = repositorio.crear_documento(
-            conn, anestesiologo_id, "PDF" if tipo == "application/pdf" else "IMAGEN", ubicacion, hash_sha256)
+        documento_id = repositorio.crear_documento(conn, anestesiologo_id, ubicaciones, hash_sha256)
     conn.commit()
 
     try:
-        orden = extraccion.extraer_orden(datos, tipo)
+        orden = extraccion.extraer_orden(paginas)
     except extraccion.ExtraccionError as e:
         log.warning("No se pudo leer el documento %s: %s (causa: %r)", documento_id, e, e.__cause__)
         repositorio.marcar_error(conn, documento_id, str(e))
@@ -267,9 +281,14 @@ def subir_documento(archivo: UploadFile, conn=Depends(get_conn), anestesiologo_i
         raise HTTPException(502, {"mensaje": "No se pudo leer el documento, intenta de nuevo.",
                                   "documento_id": documento_id})
 
+    # Sin ciudad en la orden: la que el anestesiólogo ya usó para esa clínica
+    if orden.clinica.nombre and not orden.clinica.ciudad:
+        orden.clinica.ciudad = repositorio.ciudad_conocida(conn, anestesiologo_id, orden.clinica.nombre)
+
     repositorio.guardar_extraccion(conn, documento_id, orden)
     conn.commit()
-    return {"documento_id": documento_id, "estado": "EXTRAIDO", "datos": orden.model_dump(mode="json")}
+    return {"documento_id": documento_id, "estado": "EXTRAIDO", "paginas": len(paginas),
+            "datos": orden.model_dump(mode="json")}
 
 
 @app.get("/api/documentos/{documento_id}")
@@ -296,9 +315,10 @@ def confirmar_documento(documento_id: int, orden: OrdenConfirmada,
 
 
 @app.get("/api/documentos/{documento_id}/archivo")
-def ver_archivo_original(documento_id: int, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
-    """La foto o el PDF original de la orden (solo para su dueño)."""
-    doc = repositorio.obtener_archivo(conn, documento_id, anestesiologo_id)
+def ver_archivo_original(documento_id: int, pagina: int = Query(default=1, ge=1, le=MAX_PAGINAS),
+                         conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+    """Una foto o PDF original de la orden (solo para su dueño)."""
+    doc = repositorio.obtener_archivo(conn, documento_id, anestesiologo_id, pagina)
     if doc is None:
         raise HTTPException(404, "Documento no encontrado.")
     try:
@@ -307,7 +327,7 @@ def ver_archivo_original(documento_id: int, conn=Depends(get_conn), anestesiolog
         raise HTTPException(502, str(e))
     tipo = _tipo_real(datos) or "application/octet-stream"
     return Response(datos, media_type=tipo,
-                    headers={"Content-Disposition": f'inline; filename="orden-{documento_id}{EXTENSIONES.get(tipo, "")}"',
+                    headers={"Content-Disposition": f'inline; filename="orden-{documento_id}-{pagina}{EXTENSIONES.get(tipo, "")}"',
                              "Cache-Control": "private, no-store"})
 
 

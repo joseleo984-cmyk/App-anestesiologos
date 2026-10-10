@@ -51,7 +51,7 @@ def foto(ancho=800, alto=600, formato="JPEG"):
 
 def test_pdf_se_envia_como_documento():
     cliente = ClienteFalso()
-    orden = extraccion.extraer_orden(b"%PDF-1.7 ...", "application/pdf", client=cliente)
+    orden = extraccion.extraer_orden([(b"%PDF-1.7 ...", "application/pdf")], client=cliente)
     bloque = cliente.llamadas[0]["messages"][0]["content"][0]
     assert bloque["type"] == "document" and bloque["source"]["media_type"] == "application/pdf"
     assert orden.paciente.numero_documento == "1020304050"
@@ -61,7 +61,7 @@ def test_pdf_se_envia_como_documento():
 
 def test_solicitud_usa_salida_estructurada_y_fallback():
     cliente = ClienteFalso()
-    extraccion.extraer_orden(foto(), "image/jpeg", client=cliente)
+    extraccion.extraer_orden([(foto(), "image/jpeg")], client=cliente)
     kw = cliente.llamadas[0]
     assert kw["output_config"]["format"]["schema"] is extraccion.ESQUEMA
     assert kw["fallbacks"] == "default"
@@ -76,12 +76,12 @@ def test_foto_grande_se_reduce():
 
 def test_rechazo_lanza_error():
     with pytest.raises(extraccion.ExtraccionError):
-        extraccion.extraer_orden(foto(), "image/jpeg", client=ClienteFalso(stop_reason="refusal"))
+        extraccion.extraer_orden([(foto(), "image/jpeg")], client=ClienteFalso(stop_reason="refusal"))
 
 
 def test_tipo_no_soportado():
     with pytest.raises(extraccion.ExtraccionError):
-        extraccion.extraer_orden(b"hola", "text/plain", client=ClienteFalso())
+        extraccion.extraer_orden([(b"hola", "text/plain")], client=ClienteFalso())
 
 
 def test_esquema_exige_todos_los_campos():
@@ -104,7 +104,7 @@ def test_foto_heic_se_convierte_a_jpeg():
     buf = io.BytesIO()
     Image.new("RGB", (640, 480), "white").save(buf, format="HEIF")
     cliente = ClienteFalso()
-    extraccion.extraer_orden(buf.getvalue(), "image/heic", client=cliente)
+    extraccion.extraer_orden([(buf.getvalue(), "image/heic")], client=cliente)
     bloque = cliente.llamadas[0]["messages"][0]["content"][0]
     assert bloque["type"] == "image" and bloque["source"]["media_type"] == "image/jpeg"
 
@@ -119,13 +119,13 @@ def test_clave_invalida_da_mensaje_claro():
             raise anthropic.AuthenticationError("invalid x-api-key", response=r, body=None)
 
     with pytest.raises(extraccion.ExtraccionError, match="ANTHROPIC_API_KEY"):
-        extraccion.extraer_orden(b"%PDF-1.7", "application/pdf", client=ClienteSinClave())
+        extraccion.extraer_orden([(b"%PDF-1.7", "application/pdf")], client=ClienteSinClave())
 
 
 def test_haiku_no_envia_reintento_con_otro_modelo(monkeypatch):
     from app import config
     monkeypatch.setattr(config, "CLAUDE_MODEL", "claude-haiku-5-5")
     cliente = ClienteFalso()
-    extraccion.extraer_orden(b"%PDF-1.7", "application/pdf", client=cliente)
+    extraccion.extraer_orden([(b"%PDF-1.7", "application/pdf")], client=cliente)
     kw = cliente.llamadas[0]
     assert kw["model"] == "claude-haiku-5-5" and "fallbacks" not in kw and "betas" not in kw

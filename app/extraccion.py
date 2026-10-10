@@ -95,7 +95,10 @@ identificación, AS adulto sin identificación), número de documento, nombres y
 - Aseguradora: nombre de la entidad que paga y su tipo: EPS (régimen contributivo o subsidiado), \
 PREPAGADA (medicina prepagada o plan complementario) o POLIZA (póliza de salud de una aseguradora). \
 Número de póliza, contrato o afiliación y plan si aparecen. Si el paciente es particular, deja la aseguradora en null.
-- Clínica u hospital donde se realiza el procedimiento y su ciudad.
+- Clínica u hospital donde se realiza el procedimiento y su ciudad. La ciudad solo si está escrita \
+en el documento (por ejemplo en la dirección o el membrete de la clínica); no la deduzcas del nombre de \
+la clínica, de un indicativo telefónico ni de otra pista: en ese caso devuelve null. Si la tomaste del \
+membrete o la dirección y no es claro que sea donde se opera, incluye "clinica.ciudad" en campos_dudosos.
 - Procedimientos: código CUPS (normalmente 6 caracteres) y nombre tal como aparecen. Marca \
 es_principal=true solo en el procedimiento principal (si no se distingue, el primero).
 - cirujano: nombre completo del cirujano que realiza el procedimiento (o del médico que ordena la \
@@ -147,9 +150,12 @@ def _bloque_documento(datos: bytes, media_type: str) -> dict:
     raise ExtraccionError(f"Tipo de archivo no soportado: {media_type}")
 
 
-def _llamar_claude(datos: bytes, media_type: str, instrucciones: str, esquema: dict, pedido: str,
+Archivo = tuple[bytes, str]  # (contenido, tipo MIME)
+
+
+def _llamar_claude(archivos: list[Archivo], instrucciones: str, esquema: dict, pedido: str,
                    esfuerzo: str, client: anthropic.Anthropic | None) -> dict:
-    """Envía el documento a Claude y devuelve el JSON que cumple el esquema."""
+    """Envía el documento (una o varias páginas) a Claude y devuelve el JSON que cumple el esquema."""
     client = client or anthropic.Anthropic()
     # Si un filtro de seguridad rechaza la solicitud, la API la reintenta con otro modelo.
     # Haiku no tiene ese reintento: con Haiku la opción no se envía.
@@ -163,7 +169,7 @@ def _llamar_claude(datos: bytes, media_type: str, instrucciones: str, esquema: d
             system=instrucciones,
             messages=[{
                 "role": "user",
-                "content": [_bloque_documento(datos, media_type), {"type": "text", "text": pedido}],
+                "content": [*(_bloque_documento(d, t) for d, t in archivos), {"type": "text", "text": pedido}],
             }],
             thinking={"type": "adaptive"},
             output_config={"effort": esfuerzo, "format": {"type": "json_schema", "schema": esquema}},
@@ -188,9 +194,12 @@ def _llamar_claude(datos: bytes, media_type: str, instrucciones: str, esquema: d
     return json.loads(texto)
 
 
-def extraer_orden(datos: bytes, media_type: str, client: anthropic.Anthropic | None = None) -> OrdenExtraida:
-    return OrdenExtraida.model_validate(_llamar_claude(
-        datos, media_type, INSTRUCCIONES, ESQUEMA, "Extrae los datos de esta orden.", "high", client))
+def extraer_orden(archivos: list[Archivo], client: anthropic.Anthropic | None = None) -> OrdenExtraida:
+    """Lee la orden. Si llega en varias fotos o archivos, se leen juntos como una sola orden."""
+    pedido = ("Extrae los datos de esta orden." if len(archivos) == 1 else
+              f"Estos {len(archivos)} archivos son fotos o páginas de la MISMA orden (por ejemplo la orden y su "
+              "autorización). Combina la información de todos y extrae los datos de esa única orden.")
+    return OrdenExtraida.model_validate(_llamar_claude(archivos, INSTRUCCIONES, ESQUEMA, pedido, "high", client))
 
 
 # ---------------------------------------------------------------- reportes de pago
@@ -252,5 +261,5 @@ Copia los datos tal como están; nunca inventes un valor que no se lee: usa null
 
 def extraer_reporte_pago(datos: bytes, media_type: str, client: anthropic.Anthropic | None = None) -> ReportePagoExtraido:
     return ReportePagoExtraido.model_validate(_llamar_claude(
-        datos, media_type, INSTRUCCIONES_PAGO, ESQUEMA_PAGO, "Extrae todas las líneas de este reporte de pagos.",
+        [(datos, media_type)], INSTRUCCIONES_PAGO, ESQUEMA_PAGO, "Extrae todas las líneas de este reporte de pagos.",
         "medium", client))

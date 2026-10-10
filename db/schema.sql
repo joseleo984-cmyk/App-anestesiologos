@@ -176,6 +176,17 @@ CREATE TABLE IF NOT EXISTS pago_detalle (
 CREATE INDEX IF NOT EXISTS idx_pago_detalle_reporte ON pago_detalle (reporte_id);
 CREATE INDEX IF NOT EXISTS idx_pago_detalle_cirugia ON pago_detalle (cirugia_id);
 
+-- ---------------------------------------------------------------------
+-- 11. Páginas de un documento (una orden puede llegar en varias fotos)
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS documento_pagina (
+    documento_id       BIGINT  NOT NULL REFERENCES documento_fuente(documento_id) ON DELETE CASCADE,
+    numero             INTEGER NOT NULL CHECK (numero >= 1),
+    url_archivo        TEXT    NOT NULL,
+    tipo_archivo       VARCHAR(10) NOT NULL CHECK (tipo_archivo IN ('IMAGEN','PDF')),
+    PRIMARY KEY (documento_id, numero)
+);
+
 -- Índices para las consultas más frecuentes
 -- Cada anestesiólogo puede subir su propia copia de un archivo que otro también tenga
 CREATE UNIQUE INDEX idx_documento_anest_hash ON documento_fuente (anestesiologo_id, hash_sha256);

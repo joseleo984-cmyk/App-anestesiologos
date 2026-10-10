@@ -15,7 +15,7 @@ from tests.test_extraccion import RESPUESTA, foto
 @pytest.fixture
 def app_multi(db_url, monkeypatch):
     monkeypatch.setattr(time, "sleep", lambda s: None)
-    monkeypatch.setattr(extraccion, "extraer_orden", lambda d, t: OrdenExtraida.model_validate(RESPUESTA))
+    monkeypatch.setattr(extraccion, "extraer_orden", lambda archivos: OrdenExtraida.model_validate(RESPUESTA))
     with psycopg.connect(db_url, autocommit=True) as c:
         c.execute("UPDATE anestesiologo SET es_admin = TRUE WHERE anestesiologo_id = 1")
     return db_url

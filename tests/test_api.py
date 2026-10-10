@@ -18,8 +18,8 @@ CONFIRMAR = {
 def cliente(db_url, monkeypatch):
     llamadas = []
 
-    def extraer_falso(datos, media_type):
-        llamadas.append(media_type)
+    def extraer_falso(archivos):
+        llamadas.extend(t for _, t in archivos)
         return OrdenExtraida.model_validate(RESPUESTA)
 
     monkeypatch.setattr(extraccion, "extraer_orden", extraer_falso)
@@ -70,7 +70,7 @@ def test_mismo_archivo_dos_veces(cliente):
 
 
 def test_reintento_tras_error_de_lectura(cliente, monkeypatch):
-    def falla(datos, media_type):
+    def falla(archivos):
         raise extraccion.ExtraccionError("borrosa")
     monkeypatch.setattr(extraccion, "extraer_orden", falla)
     datos = foto()
@@ -79,7 +79,7 @@ def test_reintento_tras_error_de_lectura(cliente, monkeypatch):
     doc_id = r.json()["detail"]["documento_id"]
     assert cliente.get(f"/api/documentos/{doc_id}").json()["estado"] == "ERROR"
 
-    monkeypatch.setattr(extraccion, "extraer_orden", lambda d, t: OrdenExtraida.model_validate(RESPUESTA))
+    monkeypatch.setattr(extraccion, "extraer_orden", lambda archivos: OrdenExtraida.model_validate(RESPUESTA))
     r = subir(cliente, datos)
     assert r.status_code == 201 and r.json()["documento_id"] == doc_id
 

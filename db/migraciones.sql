@@ -72,3 +72,14 @@ ALTER TABLE anestesiologo ADD COLUMN IF NOT EXISTS clave_env_aplicada CHAR(64);
 -- El mismo archivo puede subirlo cada anestesiólogo (antes era único para todos)
 ALTER TABLE documento_fuente DROP CONSTRAINT IF EXISTS documento_fuente_hash_sha256_key;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_documento_anest_hash ON documento_fuente (anestesiologo_id, hash_sha256);
+
+-- ---------------------------------------------------------------------
+-- 11. Páginas de un documento (una orden puede llegar en varias fotos)
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS documento_pagina (
+    documento_id       BIGINT  NOT NULL REFERENCES documento_fuente(documento_id) ON DELETE CASCADE,
+    numero             INTEGER NOT NULL CHECK (numero >= 1),
+    url_archivo        TEXT    NOT NULL,
+    tipo_archivo       VARCHAR(10) NOT NULL CHECK (tipo_archivo IN ('IMAGEN','PDF')),
+    PRIMARY KEY (documento_id, numero)
+);
