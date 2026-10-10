@@ -6,12 +6,14 @@ OrdenConfirmada: lo que el usuario confirma en pantalla. Exige lo mínimo para
 crear la cirugía en la base de datos.
 """
 from datetime import date
+from decimal import Decimal
 from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 TipoDocumento = Literal["CC", "TI", "CE", "RC", "PA", "PPT", "MS", "AS"]
 TipoAseguradora = Literal["EPS", "PREPAGADA", "POLIZA"]
+EstadoCirugia = Literal["PROGRAMADA", "REALIZADA", "CANCELADA", "FACTURADA", "PAGADA"]
 
 
 def _limpiar(v):
@@ -60,6 +62,7 @@ class OrdenExtraida(_Base):
     clinica: ClinicaExtraida = ClinicaExtraida()
     procedimientos: list[ProcedimientoExtraido] = []
     fecha_procedimiento: Optional[date] = None
+    cirujano: Optional[str] = None
     confianza: float = Field(default=0, ge=0, le=1)
     campos_dudosos: list[str] = []
     observaciones: Optional[str] = None
@@ -130,6 +133,20 @@ class OrdenConfirmada(_Base):
     clinica: ClinicaConfirmada
     procedimientos: list[ProcedimientoConfirmado] = Field(min_length=1)
     fecha_procedimiento: date
+    cirujano: Optional[str] = Field(default=None, max_length=150)
+    estado: EstadoCirugia = "PROGRAMADA"
+    valor_honorarios: Optional[Decimal] = Field(default=None, ge=0, max_digits=14, decimal_places=2)
+    fecha_pago: Optional[date] = None
+    observaciones: Optional[str] = Field(default=None, max_length=1000)
+
+    @field_validator("valor_honorarios", mode="before")
+    @classmethod
+    def _valor_en_pesos(cls, v):
+        # Acepta "1.200.000", "$ 1,200,000" o 1200000: los pesos se manejan sin decimales
+        if isinstance(v, str):
+            digitos = "".join(ch for ch in v if ch.isdigit())
+            return Decimal(digitos) if digitos else None
+        return v
 
     @model_validator(mode="after")
     def _un_principal_y_sin_repetidos(self):

@@ -132,6 +132,55 @@ def _obtener_o_crear_clinica(conn, c) -> int:
 
 
 # ------------------------------------------------------------ cirugía
+def _nombre_cirujano(nombre: str) -> str:
+    """'Dr. Juan  Pérez' -> 'JUAN PÉREZ' (sin título, para no duplicar al mismo cirujano)."""
+    partes = _nombre_catalogo(nombre).split(" ")
+    while partes and partes[0].rstrip(".") in ("DR", "DRA", "DOCTOR", "DOCTORA"):
+        partes = partes[1:]
+    return " ".join(partes)
+
+
+def _obtener_o_crear_cirujano(conn, nombre: Optional[str]) -> Optional[int]:
+    nombre = _nombre_cirujano(nombre) if nombre else ""
+    if not nombre:
+        return None
+    return conn.execute(
+        """INSERT INTO cirujano (nombre) VALUES (%s)
+           ON CONFLICT (nombre) DO UPDATE SET nombre = EXCLUDED.nombre
+           RETURNING cirujano_id""",
+        (nombre,),
+    ).fetchone()["cirujano_id"]
+
+
+def _resolver_relaciones(conn, orden: OrdenConfirmada) -> dict:
+    """Crea o reutiliza paciente, cobertura, clínica y cirujano de la orden."""
+    paciente_id = _upsert_paciente(conn, orden.paciente)
+    cobertura_id = None
+    if orden.aseguradora:
+        aseguradora_id = _upsert_aseguradora(conn, orden.aseguradora)
+        cobertura_id = _obtener_o_crear_cobertura(conn, paciente_id, aseguradora_id, orden.aseguradora)
+    return {
+        "paciente_id": paciente_id,
+        "cobertura_id": cobertura_id,
+        "clinica_id": _obtener_o_crear_clinica(conn, orden.clinica),
+        "cirujano_id": _obtener_o_crear_cirujano(conn, orden.cirujano),
+    }
+
+
+def _guardar_procedimientos(conn, cirugia_id: int, orden: OrdenConfirmada) -> None:
+    conn.execute("DELETE FROM cirugia_procedimiento WHERE cirugia_id = %s", (cirugia_id,))
+    for p in orden.procedimientos:
+        # El catálogo conserva su nombre oficial si el código ya existe
+        conn.execute(
+            "INSERT INTO procedimiento (codigo, nombre) VALUES (%s, %s) ON CONFLICT (codigo) DO NOTHING",
+            (p.codigo, p.nombre),
+        )
+        conn.execute(
+            "INSERT INTO cirugia_procedimiento (cirugia_id, codigo, es_principal) VALUES (%s, %s, %s)",
+            (cirugia_id, p.codigo, p.es_principal),
+        )
+
+
 def guardar_orden(conn, anestesiologo_id: int, orden: OrdenConfirmada, documento_id: Optional[int] = None) -> int:
     """Crea la cirugía con sus procedimientos. Debe ejecutarse dentro de una transacción."""
     if documento_id is not None:
@@ -147,57 +196,197 @@ def guardar_orden(conn, anestesiologo_id: int, orden: OrdenConfirmada, documento
         if doc["estado"] == "VALIDADO":
             raise DocumentoYaValidado(doc["cirugia_id"])
 
-    paciente_id = _upsert_paciente(conn, orden.paciente)
-    cobertura_id = None
-    if orden.aseguradora:
-        aseguradora_id = _upsert_aseguradora(conn, orden.aseguradora)
-        cobertura_id = _obtener_o_crear_cobertura(conn, paciente_id, aseguradora_id, orden.aseguradora)
-    clinica_id = _obtener_o_crear_clinica(conn, orden.clinica)
-
+    r = _resolver_relaciones(conn, orden)
     cirugia_id = conn.execute(
-        """INSERT INTO cirugia (paciente_id, cobertura_id, clinica_id, anestesiologo_id,
-                                documento_id, fecha_procedimiento)
-           VALUES (%s, %s, %s, %s, %s, %s) RETURNING cirugia_id""",
-        (paciente_id, cobertura_id, clinica_id, anestesiologo_id, documento_id, orden.fecha_procedimiento),
+        """INSERT INTO cirugia (paciente_id, cobertura_id, clinica_id, cirujano_id, anestesiologo_id,
+                                documento_id, fecha_procedimiento, estado, valor_honorarios,
+                                fecha_pago, observaciones)
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING cirugia_id""",
+        (r["paciente_id"], r["cobertura_id"], r["clinica_id"], r["cirujano_id"], anestesiologo_id,
+         documento_id, orden.fecha_procedimiento, orden.estado, orden.valor_honorarios,
+         orden.fecha_pago, orden.observaciones),
     ).fetchone()["cirugia_id"]
-
-    for p in orden.procedimientos:
-        # El catálogo conserva su nombre oficial si el código ya existe
-        conn.execute(
-            "INSERT INTO procedimiento (codigo, nombre) VALUES (%s, %s) ON CONFLICT (codigo) DO NOTHING",
-            (p.codigo, p.nombre),
-        )
-        conn.execute(
-            "INSERT INTO cirugia_procedimiento (cirugia_id, codigo, es_principal) VALUES (%s, %s, %s)",
-            (cirugia_id, p.codigo, p.es_principal),
-        )
+    _guardar_procedimientos(conn, cirugia_id, orden)
 
     if documento_id is not None:
         conn.execute("UPDATE documento_fuente SET estado = 'VALIDADO' WHERE documento_id = %s", (documento_id,))
     return cirugia_id
 
 
-def listar_cirugias(conn, anestesiologo_id: int, limite: int = 50) -> list[dict]:
+def actualizar_orden(conn, anestesiologo_id: int, cirugia_id: int, orden: OrdenConfirmada) -> bool:
+    """Corrige una cirugía existente. Devuelve False si no existe o es de otro anestesiólogo."""
+    existe = conn.execute(
+        "SELECT 1 FROM cirugia WHERE cirugia_id = %s AND anestesiologo_id = %s FOR UPDATE",
+        (cirugia_id, anestesiologo_id),
+    ).fetchone()
+    if not existe:
+        return False
+    r = _resolver_relaciones(conn, orden)
+    conn.execute(
+        """UPDATE cirugia
+              SET paciente_id = %s, cobertura_id = %s, clinica_id = %s, cirujano_id = %s,
+                  fecha_procedimiento = %s, estado = %s, valor_honorarios = %s,
+                  fecha_pago = %s, observaciones = %s
+            WHERE cirugia_id = %s""",
+        (r["paciente_id"], r["cobertura_id"], r["clinica_id"], r["cirujano_id"],
+         orden.fecha_procedimiento, orden.estado, orden.valor_honorarios,
+         orden.fecha_pago, orden.observaciones, cirugia_id),
+    )
+    _guardar_procedimientos(conn, cirugia_id, orden)
+    return True
+
+
+def obtener_cirugia(conn, anestesiologo_id: int, cirugia_id: int) -> Optional[dict]:
+    """Detalle completo, con la misma forma que el formulario de la página."""
+    c = conn.execute(
+        """SELECT c.cirugia_id, c.fecha_procedimiento, c.estado, c.valor_honorarios, c.fecha_pago,
+                  c.observaciones, c.documento_id, d.tipo_archivo,
+                  p.tipo_documento, p.numero_documento, p.nombres, p.apellidos,
+                  a.nombre AS aseguradora_nombre, a.tipo AS aseguradora_tipo,
+                  cb.numero_poliza, cb.plan,
+                  cl.nombre AS clinica_nombre, cl.ciudad AS clinica_ciudad,
+                  ci.nombre AS cirujano
+             FROM cirugia c
+             JOIN paciente p   ON p.paciente_id = c.paciente_id
+             JOIN clinica cl   ON cl.clinica_id = c.clinica_id
+             LEFT JOIN cobertura cb  ON cb.cobertura_id = c.cobertura_id
+             LEFT JOIN aseguradora a ON a.aseguradora_id = cb.aseguradora_id
+             LEFT JOIN cirujano ci   ON ci.cirujano_id = c.cirujano_id
+             LEFT JOIN documento_fuente d ON d.documento_id = c.documento_id
+            WHERE c.cirugia_id = %s AND c.anestesiologo_id = %s""",
+        (cirugia_id, anestesiologo_id),
+    ).fetchone()
+    if c is None:
+        return None
+    procedimientos = conn.execute(
+        """SELECT cp.codigo, pr.nombre, cp.es_principal
+             FROM cirugia_procedimiento cp JOIN procedimiento pr USING (codigo)
+            WHERE cp.cirugia_id = %s ORDER BY cp.es_principal DESC, cp.codigo""",
+        (cirugia_id,),
+    ).fetchall()
+    return {
+        "cirugia_id": c["cirugia_id"],
+        "documento_id": c["documento_id"],
+        "tipo_archivo": c["tipo_archivo"],
+        "paciente": {k: c[k] for k in ("tipo_documento", "numero_documento", "nombres", "apellidos")},
+        "aseguradora": None if c["aseguradora_nombre"] is None else {
+            "nombre": c["aseguradora_nombre"], "tipo": c["aseguradora_tipo"],
+            "numero_poliza": c["numero_poliza"], "plan": c["plan"]},
+        "clinica": {"nombre": c["clinica_nombre"], "ciudad": c["clinica_ciudad"]},
+        "procedimientos": procedimientos,
+        "fecha_procedimiento": c["fecha_procedimiento"],
+        "cirujano": c["cirujano"],
+        "estado": c["estado"],
+        "valor_honorarios": c["valor_honorarios"],
+        "fecha_pago": c["fecha_pago"],
+        "observaciones": c["observaciones"],
+    }
+
+
+def _filtros(anestesiologo_id: int, f: dict) -> tuple[str, list]:
+    """WHERE común para la lista, el Excel y los reportes."""
+    condiciones, params = ["c.anestesiologo_id = %s"], [anestesiologo_id]
+    if f.get("desde"):
+        condiciones.append("c.fecha_procedimiento >= %s"); params.append(f["desde"])
+    if f.get("hasta"):
+        condiciones.append("c.fecha_procedimiento <= %s"); params.append(f["hasta"])
+    if f.get("clinica_id"):
+        condiciones.append("c.clinica_id = %s"); params.append(f["clinica_id"])
+    if f.get("cirujano_id"):
+        condiciones.append("c.cirujano_id = %s"); params.append(f["cirujano_id"])
+    if f.get("aseguradora_id") == "PARTICULAR":
+        condiciones.append("c.cobertura_id IS NULL")
+    elif f.get("aseguradora_id"):
+        condiciones.append("cb.aseguradora_id = %s"); params.append(int(f["aseguradora_id"]))
+    if f.get("estado"):
+        condiciones.append("c.estado = %s"); params.append(f["estado"])
+    if f.get("q"):
+        condiciones.append("(p.nombres || ' ' || p.apellidos ILIKE %s OR p.numero_documento ILIKE %s)")
+        params += [f"%{f['q']}%", f"%{f['q']}%"]
+    return " AND ".join(condiciones), params
+
+
+_DESDE = """
+             FROM cirugia c
+             JOIN paciente p   ON p.paciente_id = c.paciente_id
+             JOIN clinica cl   ON cl.clinica_id = c.clinica_id
+             LEFT JOIN cobertura cb  ON cb.cobertura_id = c.cobertura_id
+             LEFT JOIN aseguradora a ON a.aseguradora_id = cb.aseguradora_id
+             LEFT JOIN cirujano ci   ON ci.cirujano_id = c.cirujano_id"""
+
+
+def listar_cirugias(conn, anestesiologo_id: int, limite: int = 50, filtros: Optional[dict] = None) -> list[dict]:
+    where, params = _filtros(anestesiologo_id, filtros or {})
     return conn.execute(
-        """SELECT c.cirugia_id, c.fecha_procedimiento, c.estado,
+        f"""SELECT c.cirugia_id, c.fecha_procedimiento, c.estado, c.valor_honorarios, c.fecha_pago,
+                  c.documento_id,
                   p.tipo_documento, p.numero_documento, p.nombres || ' ' || p.apellidos AS paciente,
                   cl.nombre AS clinica,
                   COALESCE(a.nombre, 'PARTICULAR') AS aseguradora, a.tipo AS tipo_aseguradora,
+                  cb.numero_poliza, ci.nombre AS cirujano,
                   (SELECT json_agg(json_build_object('codigo', pr.codigo, 'nombre', pr.nombre,
                                                      'es_principal', cp.es_principal)
                                    ORDER BY cp.es_principal DESC, pr.codigo)
                      FROM cirugia_procedimiento cp JOIN procedimiento pr USING (codigo)
                     WHERE cp.cirugia_id = c.cirugia_id) AS procedimientos
-             FROM cirugia c
-             JOIN paciente p   USING (paciente_id)
-             JOIN clinica cl   USING (clinica_id)
-             LEFT JOIN cobertura cb  USING (cobertura_id)
-             LEFT JOIN aseguradora a ON a.aseguradora_id = cb.aseguradora_id
-            WHERE c.anestesiologo_id = %s
+            {_DESDE}
+            WHERE {where}
             ORDER BY c.fecha_procedimiento DESC, c.cirugia_id DESC
             LIMIT %s""",
-        (anestesiologo_id, limite),
+        params + [limite],
     ).fetchall()
+
+
+def opciones_filtro(conn, anestesiologo_id: int) -> dict:
+    """Clínicas, aseguradoras y cirujanos con los que ha trabajado el anestesiólogo."""
+    def lista(sql):
+        return conn.execute(sql, (anestesiologo_id,)).fetchall()
+    return {
+        "clinicas": lista("""SELECT DISTINCT cl.clinica_id AS id, cl.nombre FROM cirugia c
+                               JOIN clinica cl USING (clinica_id) WHERE c.anestesiologo_id = %s ORDER BY 2"""),
+        "aseguradoras": lista("""SELECT DISTINCT a.aseguradora_id AS id, a.nombre, a.tipo FROM cirugia c
+                                   JOIN cobertura cb USING (cobertura_id) JOIN aseguradora a USING (aseguradora_id)
+                                  WHERE c.anestesiologo_id = %s ORDER BY 2"""),
+        "cirujanos": lista("""SELECT DISTINCT ci.cirujano_id AS id, ci.nombre FROM cirugia c
+                                JOIN cirujano ci USING (cirujano_id) WHERE c.anestesiologo_id = %s ORDER BY 2"""),
+    }
+
+
+def reporte(conn, anestesiologo_id: int, filtros: Optional[dict] = None) -> dict:
+    """Totales del periodo y agrupaciones por cirujano, clínica, aseguradora y mes.
+    Las cirugías canceladas no suman en los totales; se cuentan aparte."""
+    where, params = _filtros(anestesiologo_id, filtros or {})
+    metricas = """COUNT(*) FILTER (WHERE c.estado <> 'CANCELADA') AS cirugias,
+                  COALESCE(SUM(c.valor_honorarios) FILTER (WHERE c.estado <> 'CANCELADA'), 0) AS total,
+                  COALESCE(SUM(c.valor_honorarios) FILTER (WHERE c.estado = 'PAGADA'), 0) AS pagado,
+                  COALESCE(SUM(c.valor_honorarios) FILTER (WHERE c.estado NOT IN ('PAGADA','CANCELADA')), 0) AS por_cobrar,
+                  COUNT(*) FILTER (WHERE c.estado <> 'CANCELADA' AND c.valor_honorarios IS NULL) AS sin_valor"""
+
+    def agrupar(etiqueta: str, orden: str = "total DESC, cirugias DESC"):
+        return conn.execute(
+            f"""SELECT {etiqueta} AS nombre, {metricas}
+                {_DESDE} WHERE {where}
+                GROUP BY 1 HAVING COUNT(*) FILTER (WHERE c.estado <> 'CANCELADA') > 0
+                ORDER BY {orden}""", params).fetchall()
+
+    totales = conn.execute(
+        f"""SELECT {metricas}, COUNT(*) FILTER (WHERE c.estado = 'CANCELADA') AS canceladas
+            {_DESDE} WHERE {where}""", params).fetchone()
+    return {
+        "totales": totales,
+        "por_cirujano": agrupar("COALESCE(ci.nombre, 'SIN CIRUJANO')"),
+        "por_clinica": agrupar("cl.nombre"),
+        "por_aseguradora": agrupar("COALESCE(a.nombre, 'PARTICULAR')"),
+        "por_mes": agrupar("to_char(c.fecha_procedimiento, 'YYYY-MM')", "nombre DESC"),
+    }
+
+
+def obtener_archivo(conn, documento_id: int, anestesiologo_id: int) -> Optional[dict]:
+    return conn.execute(
+        """SELECT url_archivo, tipo_archivo FROM documento_fuente
+            WHERE documento_id = %s AND anestesiologo_id = %s""",
+        (documento_id, anestesiologo_id),
+    ).fetchone()
 
 
 def existe_anestesiologo(conn, anestesiologo_id: int) -> bool:

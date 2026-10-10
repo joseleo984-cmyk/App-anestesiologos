@@ -71,14 +71,10 @@ CREATE TABLE convenio_tarifa (
 -- El valor calculado se guarda como "foto" (snapshot): si después cambia
 -- el convenio o la tabla UVR, las cirugías ya liquidadas no se alteran.
 -- ---------------------------------------------------------------------
+-- valor_honorarios, fecha_pago y el estado PAGADA ya vienen en schema.sql
 ALTER TABLE cirugia
     ADD COLUMN convenio_id       BIGINT REFERENCES convenio(convenio_id),
-    ADD COLUMN valor_honorarios  NUMERIC(14,2),
-    ADD COLUMN honorarios_completos BOOLEAN,      -- FALSE = algún código quedó sin tarifa
-    ADD COLUMN fecha_pago        DATE,
-    DROP CONSTRAINT cirugia_estado_check,
-    ADD CONSTRAINT cirugia_estado_check
-        CHECK (estado IN ('PROGRAMADA','REALIZADA','CANCELADA','FACTURADA','PAGADA'));
+    ADD COLUMN honorarios_completos BOOLEAN;      -- FALSE = algún código quedó sin tarifa
 
 ALTER TABLE cirugia_procedimiento
     ADD COLUMN uvr               NUMERIC(8,2),

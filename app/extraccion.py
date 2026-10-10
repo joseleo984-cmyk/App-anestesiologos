@@ -74,13 +74,14 @@ ESQUEMA = {
             },
         },
         "fecha_procedimiento": _nullable(_TEXTO),
+        "cirujano": _nullable(_TEXTO),
         "confianza": {"type": "number"},
         "campos_dudosos": {"type": "array", "items": _TEXTO},
         "observaciones": _nullable(_TEXTO),
     },
     "required": [
         "paciente", "aseguradora", "clinica", "procedimientos",
-        "fecha_procedimiento", "confianza", "campos_dudosos", "observaciones",
+        "fecha_procedimiento", "cirujano", "confianza", "campos_dudosos", "observaciones",
     ],
     "additionalProperties": False,
 }
@@ -97,6 +98,8 @@ Número de póliza, contrato o afiliación y plan si aparecen. Si el paciente es
 - Clínica u hospital donde se realiza el procedimiento y su ciudad.
 - Procedimientos: código CUPS (normalmente 6 caracteres) y nombre tal como aparecen. Marca \
 es_principal=true solo en el procedimiento principal (si no se distingue, el primero).
+- cirujano: nombre completo del cirujano que realiza el procedimiento (o del médico que ordena la \
+cirugía si es el cirujano tratante), sin títulos como "Dr." ni el registro médico. null si no aparece.
 - fecha_procedimiento: fecha programada de la cirugía en formato AAAA-MM-DD. No uses la fecha de \
 expedición de la orden ni la de autorización; si la fecha de cirugía no aparece, devuelve null.
 

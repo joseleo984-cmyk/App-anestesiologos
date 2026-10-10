@@ -60,6 +60,46 @@
   .usuario { color: var(--muted); font-size: .9rem; display: flex; align-items: center; gap: 8px; }
   .usuario button { padding: 6px 10px; }
   .cargando { text-align: center; padding: 24px 0; color: var(--muted); }
+  textarea { width: 100%; font: inherit; padding: 9px 10px; border-radius: 8px; border: 1px solid var(--line);
+             background: var(--bg); color: var(--text); min-height: 64px; resize: vertical; }
+  /* Pestañas */
+  .pestanas { display: flex; gap: 4px; background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+              padding: 4px; margin-bottom: 16px; position: sticky; top: 0; z-index: 5; }
+  .pestanas button { flex: 1; border: 0; background: transparent; padding: 9px 6px; font-weight: 600; color: var(--muted); }
+  .pestanas button[aria-selected="true"] { background: var(--accent); color: var(--accent-text); }
+  /* Lista de cirugías */
+  .item { display: block; width: 100%; text-align: left; border: 0; border-top: 1px solid var(--line);
+          border-radius: 0; background: transparent; padding: 12px 2px; }
+  .item:first-child { border-top: 0; }
+  .item:hover { background: var(--bg); }
+  .item-cab { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+  .valor { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+  .chip { display: inline-block; font-size: .75rem; font-weight: 600; padding: 1px 8px; border-radius: 999px;
+          border: 1px solid var(--line); color: var(--muted); }
+  .chip.PAGADA { background: var(--ok-bg); color: var(--ok-text); border-color: transparent; }
+  .chip.CANCELADA { text-decoration: line-through; }
+  .barra-acciones { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+  .barra-acciones > * { flex: 1 1 auto; }
+  details.filtros summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
+  a { color: var(--accent); }
+  a.boton { text-decoration: none; display: inline-block; text-align: center; color: var(--text); }
+  /* Reportes: tarjetas de totales y barras ordenadas */
+  .kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 16px; }
+  .kpi { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+  .kpi .etiqueta { color: var(--muted); font-size: .8rem; }
+  .kpi .cifra { font-size: 1.35rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .kpi.destacado { grid-column: 1 / -1; }
+  .kpi.destacado .cifra { font-size: 2rem; }
+  .ranking { list-style: none; margin: 0; padding: 0; }
+  .ranking li { padding: 8px 0; border-top: 1px solid var(--line); }
+  .ranking li:first-child { border-top: 0; }
+  .ranking .nombre { display: flex; justify-content: space-between; gap: 8px; font-size: .95rem; }
+  .ranking .pista { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+  .ranking .barra { height: 12px; background: var(--accent); border-radius: 0 4px 4px 0; min-width: 2px; }
+  .ranking .detalle { color: var(--muted); font-size: .8rem; margin-top: 2px; }
+  .segmentado { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .segmentado button { border: 0; border-radius: 0; padding: 6px 10px; font-size: .85rem; }
+  .segmentado button[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); }
 </style>
 </head>
 <body>
@@ -69,8 +109,15 @@
     <div class="usuario"><span id="nombre-usuario"></span> <button type="button" id="salir">Salir</button></div>
   </header>
 
+  <nav class="pestanas" role="tablist">
+    <button type="button" role="tab" data-pestana="nueva" aria-selected="true">Nueva orden</button>
+    <button type="button" role="tab" data-pestana="cirugias" aria-selected="false">Cirugías</button>
+    <button type="button" role="tab" data-pestana="reportes" aria-selected="false">Reportes</button>
+  </nav>
+
+  <div id="pestana-nueva" class="pestana">
   <section class="card" id="paso-subir">
-    <h2>1. Sube la orden</h2>
+    <h2>Sube la orden</h2>
     <div id="zona" class="zona">
       <button type="button" class="boton primario grande" id="elegir">📷 Tomar foto o elegir archivo</button>
       <p class="sub">También puedes <strong>arrastrar el archivo aquí</strong>. Foto de la orden, autorización
@@ -81,9 +128,65 @@
     <button type="button" id="manual">Escribir los datos a mano</button>
     <div id="estado-subida"></div>
   </section>
+  </div>
+
+  <div id="pestana-cirugias" class="pestana oculto">
+    <section class="card">
+      <div class="barra-acciones">
+        <input id="f-q" type="search" placeholder="Buscar paciente o documento" style="flex:2 1 200px">
+        <a class="boton" id="excel" href="/api/cirugias.xlsx">⬇ Excel</a>
+      </div>
+      <details class="filtros">
+        <summary>Filtros <span class="sub" id="filtros-activos"></span></summary>
+        <div class="fila">
+          <div><label for="f-desde">Desde</label><input id="f-desde" type="date"></div>
+          <div><label for="f-hasta">Hasta</label><input id="f-hasta" type="date"></div>
+        </div>
+        <div class="fila">
+          <div><label for="f-cirujano">Cirujano</label><select id="f-cirujano"><option value="">Todos</option></select></div>
+          <div><label for="f-clinica">Clínica</label><select id="f-clinica"><option value="">Todas</option></select></div>
+        </div>
+        <div class="fila">
+          <div><label for="f-aseguradora">Aseguradora</label><select id="f-aseguradora"><option value="">Todas</option></select></div>
+          <div><label for="f-estado">Estado</label><select id="f-estado"><option value="">Todos</option>
+            <option>PROGRAMADA</option><option>REALIZADA</option><option>FACTURADA</option>
+            <option>PAGADA</option><option>CANCELADA</option></select></div>
+        </div>
+        <button type="button" id="limpiar-filtros" style="margin-top:12px">Limpiar filtros</button>
+      </details>
+    </section>
+    <section class="card">
+      <h2 id="titulo-lista">Cirugías</h2>
+      <div id="cirugias"><p class="sub">Cargando…</p></div>
+    </section>
+  </div>
+
+  <div id="pestana-reportes" class="pestana oculto">
+    <section class="card">
+      <div class="fila">
+        <div><label for="r-periodo">Periodo</label>
+          <select id="r-periodo">
+            <option value="mes">Este mes</option><option value="mes-anterior">Mes anterior</option>
+            <option value="3meses">Últimos 3 meses</option><option value="anio">Este año</option>
+            <option value="todo">Todo</option><option value="otro">Otro…</option>
+          </select></div>
+        <div class="oculto r-otro"><label for="r-desde">Desde</label><input id="r-desde" type="date"></div>
+        <div class="oculto r-otro"><label for="r-hasta">Hasta</label><input id="r-hasta" type="date"></div>
+      </div>
+      <div class="barra-acciones" style="margin:12px 0 0">
+        <div class="segmentado" role="group" aria-label="Ordenar por">
+          <button type="button" data-metrica="total" aria-pressed="true">Por dinero</button>
+          <button type="button" data-metrica="cirugias" aria-pressed="false">Por cirugías</button>
+        </div>
+        <a class="boton" id="r-excel" href="/api/cirugias.xlsx" style="flex:0 0 auto">⬇ Excel</a>
+      </div>
+    </section>
+    <div id="reporte"><p class="sub">Cargando…</p></div>
+  </div>
 
   <form class="card oculto" id="paso-revisar" novalidate>
-    <h2>2. Revisa y confirma</h2>
+    <h2 id="titulo-form">Revisa y confirma</h2>
+    <p id="ver-original" class="oculto"><a href="#" target="_blank" rel="noopener">📄 Ver la orden original</a></p>
     <div id="avisos"></div>
 
     <fieldset>
@@ -133,6 +236,26 @@
       <input id="fecha_procedimiento" type="date" required>
       <div id="procedimientos" style="margin-top:12px"></div>
       <button type="button" id="agregar-proc">+ Agregar procedimiento</button>
+      <label for="cirujano">Cirujano</label>
+      <input id="cirujano" list="lista-cirujanos" placeholder="Nombre del cirujano" autocomplete="off">
+      <datalist id="lista-cirujanos"></datalist>
+    </fieldset>
+
+    <fieldset>
+      <legend>Estado y cobro</legend>
+      <div class="fila">
+        <div><label for="estado">Estado</label>
+          <select id="estado"><option>PROGRAMADA</option><option>REALIZADA</option><option>FACTURADA</option>
+            <option>PAGADA</option><option>CANCELADA</option></select></div>
+        <div><label for="valor_honorarios">Valor honorarios ($)</label>
+          <input id="valor_honorarios" inputmode="numeric" placeholder="Ej: 850.000"></div>
+      </div>
+      <div class="fila">
+        <div><label for="fecha_pago">Fecha de pago</label><input id="fecha_pago" type="date"></div>
+        <div></div>
+      </div>
+      <label for="observaciones">Observaciones</label>
+      <textarea id="observaciones" maxlength="1000"></textarea>
     </fieldset>
 
     <div id="error-guardar"></div>
@@ -142,17 +265,16 @@
     </div>
   </form>
 
-  <section class="card">
-    <h2>Cirugías registradas</h2>
-    <ul class="lista" id="cirugias"><li class="sub">Cargando…</li></ul>
-  </section>
   <p class="sub" id="version" style="text-align:center"></p>
 </main>
 
 <script>
 const $ = (sel) => document.querySelector(sel);
 const campo = (id) => document.getElementById(id);
-let documentoId = null;  // null = registro manual sin foto
+// Qué guarda el formulario: orden leída de un documento, registro a mano o corrección
+let modo = { tipo: "manual" };  // {tipo: "documento", id} | {tipo: "manual"} | {tipo: "editar", id}
+const PESOS = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
+const pesos = (v) => v === null || v === undefined ? "—" : PESOS.format(v);
 
 // Si la sesión venció, cualquier llamada a la API devuelve 401: volver al inicio de sesión
 const fetchOriginal = window.fetch.bind(window);
@@ -232,18 +354,36 @@ function llenarFormulario(datos) {
     lista.appendChild(filaProcedimiento(p, dudososFila));
   });
 
+  campo("cirujano").value = datos.cirujano || "";
+  campo("cirujano").classList.toggle("dudoso", dudosos.includes("cirujano"));
+  campo("estado").value = datos.estado || "PROGRAMADA";
+  campo("valor_honorarios").value = datos.valor_honorarios != null ? formatoMiles(datos.valor_honorarios) : "";
+  campo("fecha_pago").value = datos.fecha_pago || "";
+  campo("observaciones").value = modo.tipo === "editar" ? (datos.observaciones || "") : "";
+  $("#titulo-form").textContent = modo.tipo === "editar" ? "Cirugía" : "Revisa y confirma";
+  const docId = modo.tipo === "documento" ? modo.id : datos.documento_id;
+  $("#ver-original").classList.toggle("oculto", !docId);
+  if (docId) $("#ver-original a").href = `/api/documentos/${docId}/archivo`;
+
   const avisos = [];
   if (datos.confianza !== undefined && datos.confianza < 0.8)
     avisos.push(`<div class="aviso warn">La lectura no es del todo segura (${Math.round(datos.confianza * 100)} %). Revisa todos los datos.</div>`);
   if (dudosos.length)
     avisos.push(`<div class="aviso warn">Los campos en amarillo pueden estar mal leídos.</div>`);
-  if (datos.observaciones)
+  if (datos.observaciones && modo.tipo === "documento")
     avisos.push(`<div class="aviso warn">${escapar(datos.observaciones)}</div>`);
   $("#avisos").innerHTML = avisos.join("");
   aviso($("#error-guardar"), "", "");
+  document.querySelectorAll(".pestana").forEach((el) => el.classList.add("oculto"));
   $("#paso-revisar").classList.remove("oculto");
-  $("#paso-revisar").scrollIntoView({ behavior: "smooth" });
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
+
+const formatoMiles = (n) => new Intl.NumberFormat("es-CO", { maximumFractionDigits: 0 }).format(Number(n));
+campo("valor_honorarios").addEventListener("blur", (e) => {
+  const digitos = e.target.value.replace(/\D/g, "");
+  e.target.value = digitos ? formatoMiles(digitos) : "";
+});
 
 function leerFormulario() {
   const v = (id) => campo(id).value.trim() || null;
@@ -259,6 +399,11 @@ function leerFormulario() {
     } : null,
     clinica: { nombre: v("clinica.nombre"), ciudad: v("clinica.ciudad") },
     fecha_procedimiento: v("fecha_procedimiento"),
+    cirujano: v("cirujano"),
+    estado: v("estado"),
+    valor_honorarios: v("valor_honorarios"),
+    fecha_pago: v("fecha_pago"),
+    observaciones: v("observaciones"),
     procedimientos: [...document.querySelectorAll("#procedimientos .proc")].map((d) => ({
       codigo: d.querySelector(".codigo").value.trim(), nombre: d.querySelector(".nombre").value.trim(),
       es_principal: d.querySelector(".es-principal").checked,
@@ -268,16 +413,25 @@ function leerFormulario() {
 
 function cerrarFormulario() {
   $("#paso-revisar").classList.add("oculto");
-  documentoId = null;
+  const volverA = modo.tipo === "editar" ? "cirugias" : pestanaActual;
+  modo = { tipo: "manual" };
+  mostrarPestana(volverA);
 }
 
 $("#cancelar").onclick = cerrarFormulario;
 
 $("#manual").onclick = () => {
-  documentoId = null;
+  modo = { tipo: "manual" };
   aviso($("#estado-subida"), "", "");
   llenarFormulario({});
 };
+
+async function abrirCirugia(id) {
+  const r = await fetch(`/api/cirugias/${id}`);
+  if (!r.ok) return alert("No se pudo abrir la cirugía.");
+  modo = { tipo: "editar", id };
+  llenarFormulario(await r.json());
+}
 
 $("#paso-revisar").onsubmit = async (ev) => {
   ev.preventDefault();
@@ -286,14 +440,18 @@ $("#paso-revisar").onsubmit = async (ev) => {
     return aviso($("#error-guardar"), "err", "Escribe el nombre de la aseguradora o elige «Particular».");
   if (!datos.procedimientos.length)
     return aviso($("#error-guardar"), "err", "Agrega al menos un procedimiento.");
-  const url = documentoId ? `/api/documentos/${documentoId}/confirmar` : "/api/cirugias";
+  const [url, metodo] = modo.tipo === "documento" ? [`/api/documentos/${modo.id}/confirmar`, "POST"]
+                      : modo.tipo === "editar" ? [`/api/cirugias/${modo.id}`, "PUT"]
+                      : ["/api/cirugias", "POST"];
   const boton = ev.submitter; boton.disabled = true;
   try {
-    const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(datos) });
+    const r = await fetch(url, { method: metodo, headers: { "Content-Type": "application/json" }, body: JSON.stringify(datos) });
     const cuerpo = await r.json().catch(() => null);
     if (!r.ok) return aviso($("#error-guardar"), "err", mensajeError(cuerpo, "No se pudo guardar."));
+    const eraEdicion = modo.tipo === "editar";
     cerrarFormulario();
-    aviso($("#estado-subida"), "ok", "Cirugía guardada.");
+    if (!eraEdicion) aviso($("#estado-subida"), "ok", "Cirugía guardada. La encuentras en la pestaña «Cirugías».");
+    cargarOpciones();
     cargarCirugias();
   } catch {
     aviso($("#error-guardar"), "err", "Sin conexión. Intenta de nuevo.");
@@ -327,7 +485,7 @@ async function subirArchivo(archivo) {
     const r = await fetch("/api/documentos", { method: "POST", body: form });
     const cuerpo = await r.json().catch(() => null);
     if (!r.ok) return aviso(estado, "err", `Paso 3 (error ${r.status}): ${mensajeError(cuerpo, "No se pudo leer la orden.")}`);
-    documentoId = cuerpo.documento_id;
+    modo = { tipo: "documento", id: cuerpo.documento_id };
     aviso(estado, "", "");
     llenarFormulario(cuerpo.datos);
   } catch (e) {
@@ -368,31 +526,163 @@ zona.addEventListener("drop", (e) => subirArchivo(e.dataTransfer.files[0]));
 window.addEventListener("dragover", (e) => e.preventDefault());
 window.addEventListener("drop", (e) => e.preventDefault());
 
+// ---------------------------------------------------------------- pestañas
+let pestanaActual = "nueva";
+function mostrarPestana(nombre) {
+  pestanaActual = nombre;
+  $("#paso-revisar").classList.add("oculto");
+  document.querySelectorAll(".pestana").forEach((el) => el.classList.toggle("oculto", el.id !== `pestana-${nombre}`));
+  document.querySelectorAll("[data-pestana]").forEach((b) => b.setAttribute("aria-selected", b.dataset.pestana === nombre));
+  if (nombre === "cirugias") cargarCirugias();
+  if (nombre === "reportes") cargarReporte();
+}
+document.querySelectorAll("[data-pestana]").forEach((b) => b.onclick = () => {
+  if (modo.tipo === "editar") modo = { tipo: "manual" };
+  mostrarPestana(b.dataset.pestana);
+});
+
+// ---------------------------------------------------------------- filtros
+async function cargarOpciones() {
+  const r = await fetch("/api/opciones");
+  if (!r.ok) return;
+  const o = await r.json();
+  const llenar = (sel, items, primera, extra = "") => {
+    const actual = $(sel).value;
+    $(sel).innerHTML = `<option value="">${primera}</option>${extra}` +
+      items.map((i) => `<option value="${i.id}">${escapar(i.nombre)}</option>`).join("");
+    $(sel).value = actual;
+  };
+  llenar("#f-cirujano", o.cirujanos, "Todos");
+  llenar("#f-clinica", o.clinicas, "Todas");
+  llenar("#f-aseguradora", o.aseguradoras, "Todas", `<option value="PARTICULAR">Particular</option>`);
+  $("#lista-cirujanos").innerHTML = o.cirujanos.map((c) => `<option value="${escapar(c.nombre)}">`).join("");
+}
+
+function filtrosLista() {
+  const f = { q: $("#f-q").value.trim(), desde: $("#f-desde").value, hasta: $("#f-hasta").value,
+              cirujano_id: $("#f-cirujano").value, clinica_id: $("#f-clinica").value,
+              aseguradora_id: $("#f-aseguradora").value, estado: $("#f-estado").value };
+  return Object.fromEntries(Object.entries(f).filter(([, v]) => v));
+}
+const consulta = (f) => new URLSearchParams(f).toString();
+
+let esperaBusqueda;
+$("#f-q").addEventListener("input", () => { clearTimeout(esperaBusqueda); esperaBusqueda = setTimeout(cargarCirugias, 300); });
+["#f-desde", "#f-hasta", "#f-cirujano", "#f-clinica", "#f-aseguradora", "#f-estado"]
+  .forEach((id) => $(id).addEventListener("change", cargarCirugias));
+$("#limpiar-filtros").onclick = () => {
+  ["#f-q", "#f-desde", "#f-hasta", "#f-cirujano", "#f-clinica", "#f-aseguradora", "#f-estado"].forEach((id) => $(id).value = "");
+  cargarCirugias();
+};
+
 // ---------------------------------------------------------------- lista
 async function cargarCirugias() {
-  const ul = $("#cirugias");
+  const cont = $("#cirugias");
+  const f = filtrosLista();
+  const n = Object.keys(f).filter((k) => k !== "q").length;
+  $("#filtros-activos").textContent = n ? `(${n} activo${n > 1 ? "s" : ""})` : "";
+  $("#excel").href = `/api/cirugias.xlsx?${consulta(f)}`;
   try {
-    const r = await fetch("/api/cirugias");
+    const r = await fetch(`/api/cirugias?${consulta(f)}`);
     const filas = await r.json();
     if (!r.ok) throw new Error(mensajeError(filas, "error"));
-    if (!filas.length) { ul.innerHTML = `<li class="sub">Aún no hay cirugías registradas.</li>`; return; }
-    ul.innerHTML = filas.map((c) => {
+    $("#titulo-lista").textContent = `Cirugías (${filas.length})`;
+    if (!filas.length) {
+      cont.innerHTML = `<p class="sub">${Object.keys(f).length ? "Ninguna cirugía coincide con los filtros." : "Aún no hay cirugías registradas."}</p>`;
+      return;
+    }
+    cont.innerHTML = filas.map((c) => {
       const procs = (c.procedimientos || []).map((p) => `${escapar(p.codigo)} ${escapar(p.nombre)}`).join("<br>");
-      return `<li><strong>${escapar(c.fecha_procedimiento)}</strong> · ${escapar(c.paciente)}
-        <span class="sub">(${escapar(c.tipo_documento)} ${escapar(c.numero_documento)})</span><br>
-        <span class="sub">${escapar(c.clinica)} · ${escapar(c.aseguradora)}</span><br>${procs}</li>`;
+      return `<button type="button" class="item" data-id="${c.cirugia_id}">
+        <div class="item-cab"><strong>${escapar(c.fecha_procedimiento)} · ${escapar(c.paciente)}</strong>
+          <span class="valor">${c.valor_honorarios != null ? pesos(c.valor_honorarios) : ""}</span></div>
+        <div class="sub">${escapar(c.tipo_documento)} ${escapar(c.numero_documento)} · ${escapar(c.clinica)} · ${escapar(c.aseguradora)}</div>
+        <div class="sub">🩺 ${c.cirujano ? escapar(c.cirujano) : "<em>Sin cirujano</em>"}</div>
+        <div style="margin-top:4px">${procs}</div>
+        <div style="margin-top:6px"><span class="chip ${escapar(c.estado)}">${escapar(c.estado)}</span>
+          ${c.documento_id ? '<span class="sub"> · 📄 con orden original</span>' : ""}</div>
+      </button>`;
     }).join("");
+    cont.querySelectorAll(".item").forEach((b) => b.onclick = () => abrirCirugia(b.dataset.id));
   } catch (e) {
-    ul.innerHTML = `<li class="aviso err">No se pudo cargar la lista: ${escapar(e.message)}</li>`;
+    cont.innerHTML = `<p class="aviso err">No se pudo cargar la lista: ${escapar(e.message)}</p>`;
   }
 }
+
+// ---------------------------------------------------------------- reportes
+let metrica = "total";
+const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+function periodo() {
+  const hoy = new Date(), a = hoy.getFullYear(), m = hoy.getMonth();
+  switch ($("#r-periodo").value) {
+    case "mes": return { desde: iso(new Date(a, m, 1)), hasta: iso(new Date(a, m + 1, 0)) };
+    case "mes-anterior": return { desde: iso(new Date(a, m - 1, 1)), hasta: iso(new Date(a, m, 0)) };
+    case "3meses": return { desde: iso(new Date(a, m - 2, 1)), hasta: iso(new Date(a, m + 1, 0)) };
+    case "anio": return { desde: `${a}-01-01`, hasta: `${a}-12-31` };
+    case "otro": return Object.fromEntries([["desde", $("#r-desde").value], ["hasta", $("#r-hasta").value]].filter(([, v]) => v));
+    default: return {};
+  }
+}
+$("#r-periodo").addEventListener("change", () => {
+  document.querySelectorAll(".r-otro").forEach((el) => el.classList.toggle("oculto", $("#r-periodo").value !== "otro"));
+  cargarReporte();
+});
+["#r-desde", "#r-hasta"].forEach((id) => $(id).addEventListener("change", cargarReporte));
+document.querySelectorAll("[data-metrica]").forEach((b) => b.onclick = () => {
+  metrica = b.dataset.metrica;
+  document.querySelectorAll("[data-metrica]").forEach((x) => x.setAttribute("aria-pressed", x === b));
+  cargarReporte();
+});
+
+function ranking(titulo, filas) {
+  if (!filas.length) return "";
+  const valor = (f) => Number(f[metrica]);
+  const ordenadas = titulo === "Por mes" ? filas : [...filas].sort((x, y) => valor(y) - valor(x) || y.cirugias - x.cirugias);
+  const max = Math.max(...ordenadas.map(valor), 1);
+  const texto = (f) => metrica === "total" ? pesos(f.total) : `${f.cirugias} cirugía${f.cirugias === 1 ? "" : "s"}`;
+  return `<section class="card"><h2>${titulo}</h2><ul class="ranking">${ordenadas.map((f) => `
+    <li title="${escapar(f.nombre)}: ${f.cirugias} cirugías · total ${pesos(f.total)} · pagado ${pesos(f.pagado)} · por cobrar ${pesos(f.por_cobrar)}">
+      <div class="nombre"><span>${escapar(f.nombre)}</span><span class="valor">${texto(f)}</span></div>
+      <div class="pista"><div class="barra" style="width:${Math.max(valor(f) / max * 100, 0.5)}%"></div></div>
+      <div class="detalle">${metrica === "total" ? `${f.cirugias} cirugía${f.cirugias === 1 ? "" : "s"} · ` : `${pesos(f.total)} · `}pagado ${pesos(f.pagado)} · por cobrar ${pesos(f.por_cobrar)}${f.sin_valor ? ` · ${f.sin_valor} sin valor` : ""}</div>
+    </li>`).join("")}</ul></section>`;
+}
+
+async function cargarReporte() {
+  const cont = $("#reporte");
+  const p = periodo();
+  $("#r-excel").href = `/api/cirugias.xlsx?${consulta(p)}`;
+  try {
+    const r = await fetch(`/api/reportes?${consulta(p)}`);
+    const d = await r.json();
+    if (!r.ok) throw new Error(mensajeError(d, "error"));
+    const t = d.totales;
+    if (!t.cirugias && !t.canceladas) { cont.innerHTML = `<section class="card"><p class="sub">No hay cirugías en este periodo.</p></section>`; return; }
+    cont.innerHTML = `
+      <div class="kpis">
+        <div class="kpi destacado"><div class="etiqueta">Total generado</div><div class="cifra">${pesos(t.total)}</div></div>
+        <div class="kpi"><div class="etiqueta">Cirugías</div><div class="cifra">${t.cirugias}</div></div>
+        <div class="kpi"><div class="etiqueta">Pagado</div><div class="cifra">${pesos(t.pagado)}</div></div>
+        <div class="kpi"><div class="etiqueta">Por cobrar</div><div class="cifra">${pesos(t.por_cobrar)}</div></div>
+        <div class="kpi"><div class="etiqueta">Canceladas</div><div class="cifra">${t.canceladas}</div></div>
+      </div>
+      ${t.sin_valor ? `<div class="aviso warn">${t.sin_valor} cirugía${t.sin_valor > 1 ? "s no tienen" : " no tiene"} valor de honorarios: ábrela${t.sin_valor > 1 ? "s" : ""} en «Cirugías» y agrégalo para que los totales estén completos.</div>` : ""}
+      ${ranking("Por cirujano", d.por_cirujano)}
+      ${ranking("Por clínica", d.por_clinica)}
+      ${ranking("Por aseguradora", d.por_aseguradora)}
+      ${ranking("Por mes", d.por_mes)}`;
+  } catch (e) {
+    cont.innerHTML = `<p class="aviso err">No se pudo cargar el reporte: ${escapar(e.message)}</p>`;
+  }
+}
+
 fetch("/api/yo").then((r) => r.ok ? r.json() : null).then((u) => {
   if (!u) return;
   $("#nombre-usuario").textContent = u.nombre;
   $("#version").textContent = `Versión ${u.version}`;
 });
 $("#salir").onclick = async () => { await fetch("/api/logout", { method: "POST" }); location.href = "/login"; };
-cargarCirugias();
+cargarOpciones();
 </script>
 </body>
 </html>

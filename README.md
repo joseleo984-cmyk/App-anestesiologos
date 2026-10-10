@@ -30,7 +30,7 @@ export ADMIN_EMAIL=tu@correo.com ADMIN_PASSWORD='una-clave-de-10-o-mas'
 .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-Al arrancar, la app crea las tablas si la base está vacía y deja listo el usuario
+Al arrancar, la app crea las tablas si la base está vacía, aplica `db/migraciones.sql` a las bases existentes y deja listo el usuario
 `ADMIN_EMAIL` con la contraseña `ADMIN_PASSWORD` (cambiar la variable y reiniciar cambia la contraseña).
 Abrir `http://localhost:8000` (desde el celular, con la IP del computador en la misma red).
 
@@ -71,7 +71,11 @@ la API pública de Supabase no ve ningún dato; solo la app, que se conecta como
 | `GET` | `/api/documentos/{id}` | Estado del documento y datos extraídos |
 | `POST` | `/api/documentos/{id}/confirmar` | Guarda la cirugía con los datos revisados |
 | `POST` | `/api/cirugias` | Registra una cirugía escrita a mano |
-| `GET` | `/api/cirugias` | Lista las cirugías del anestesiólogo |
+| `GET` | `/api/cirugias` | Lista con filtros: `desde`, `hasta`, `cirujano_id`, `clinica_id`, `aseguradora_id` (o `PARTICULAR`), `estado`, `q` |
+| `GET` · `PUT` | `/api/cirugias/{id}` | Detalle y corrección de una cirugía (cirujano, estado, valor, fecha de pago…) |
+| `GET` | `/api/documentos/{id}/archivo` | Foto o PDF original de la orden |
+| `GET` | `/api/reportes` | Totales y ranking por cirujano, clínica, aseguradora y mes (mismos filtros) |
+| `GET` | `/api/cirugias.xlsx` | Excel con las cirugías y los resúmenes (mismos filtros) |
 
 ## Pruebas
 

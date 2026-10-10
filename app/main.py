@@ -11,14 +11,16 @@ import logging
 import time
 import uuid
 from contextlib import asynccontextmanager
+from datetime import date
 from pathlib import Path
+from typing import Literal, Optional
 
-from fastapi import Cookie, Depends, FastAPI, HTTPException, Response, UploadFile
+from fastapi import Cookie, Depends, FastAPI, HTTPException, Query, Response, UploadFile
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from app import almacenamiento, auth, config, extraccion, inicio, repositorio
+from app import almacenamiento, auth, config, exportar, extraccion, inicio, repositorio
 from app.modelos import OrdenConfirmada
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -193,6 +195,33 @@ def confirmar_documento(documento_id: int, orden: OrdenConfirmada,
     return {"cirugia_id": cirugia_id}
 
 
+@app.get("/api/documentos/{documento_id}/archivo")
+def ver_archivo_original(documento_id: int, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+    """La foto o el PDF original de la orden (solo para su dueño)."""
+    doc = repositorio.obtener_archivo(conn, documento_id, anestesiologo_id)
+    if doc is None:
+        raise HTTPException(404, "Documento no encontrado.")
+    try:
+        datos = almacenamiento.leer(doc["url_archivo"])
+    except almacenamiento.AlmacenamientoError as e:
+        raise HTTPException(502, str(e))
+    tipo = _tipo_real(datos) or "application/octet-stream"
+    return Response(datos, media_type=tipo,
+                    headers={"Content-Disposition": f'inline; filename="orden-{documento_id}{EXTENSIONES.get(tipo, "")}"',
+                             "Cache-Control": "private, no-store"})
+
+
+class Filtros:
+    """Filtros comunes de la lista, el Excel y los reportes (query string)."""
+    def __init__(self, desde: Optional[date] = None, hasta: Optional[date] = None,
+                 clinica_id: Optional[int] = None, cirujano_id: Optional[int] = None,
+                 aseguradora_id: Optional[str] = Query(default=None, pattern=r"^(\d+|PARTICULAR)$"),
+                 estado: Optional[Literal["PROGRAMADA", "REALIZADA", "CANCELADA", "FACTURADA", "PAGADA"]] = None,
+                 q: Optional[str] = Query(default=None, max_length=100)):
+        self.valores = {"desde": desde, "hasta": hasta, "clinica_id": clinica_id, "cirujano_id": cirujano_id,
+                        "aseguradora_id": aseguradora_id, "estado": estado, "q": (q or "").strip() or None}
+
+
 @app.post("/api/cirugias", status_code=201)
 def crear_cirugia_manual(orden: OrdenConfirmada, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
     """Registro sin foto, escribiendo los datos a mano."""
@@ -202,5 +231,43 @@ def crear_cirugia_manual(orden: OrdenConfirmada, conn=Depends(get_conn), anestes
 
 
 @app.get("/api/cirugias")
-def listar_cirugias(limite: int = 50, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
-    return repositorio.listar_cirugias(conn, anestesiologo_id, min(max(limite, 1), 200))
+def listar_cirugias(limite: int = 100, filtros: Filtros = Depends(),
+                    conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+    return repositorio.listar_cirugias(conn, anestesiologo_id, min(max(limite, 1), 500), filtros.valores)
+
+
+@app.get("/api/cirugias.xlsx")
+def exportar_excel(filtros: Filtros = Depends(), conn=Depends(get_conn),
+                   anestesiologo_id=Depends(anestesiologo_actual)):
+    cirugias = repositorio.listar_cirugias(conn, anestesiologo_id, 100_000, filtros.valores)
+    libro = exportar.libro_cirugias(cirugias, repositorio.reporte(conn, anestesiologo_id, filtros.valores))
+    return Response(libro, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f'attachment; filename="cirugias-{date.today()}.xlsx"'})
+
+
+@app.get("/api/opciones")
+def opciones_de_filtro(conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+    return repositorio.opciones_filtro(conn, anestesiologo_id)
+
+
+@app.get("/api/reportes")
+def reportes(filtros: Filtros = Depends(), conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+    return repositorio.reporte(conn, anestesiologo_id, filtros.valores)
+
+
+@app.get("/api/cirugias/{cirugia_id}")
+def ver_cirugia(cirugia_id: int, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+    cirugia = repositorio.obtener_cirugia(conn, anestesiologo_id, cirugia_id)
+    if cirugia is None:
+        raise HTTPException(404, "Cirugía no encontrada.")
+    return cirugia
+
+
+@app.put("/api/cirugias/{cirugia_id}")
+def corregir_cirugia(cirugia_id: int, orden: OrdenConfirmada,
+                     conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+    if not repositorio.actualizar_orden(conn, anestesiologo_id, cirugia_id, orden):
+        conn.rollback()
+        raise HTTPException(404, "Cirugía no encontrada.")
+    conn.commit()
+    return {"cirugia_id": cirugia_id}

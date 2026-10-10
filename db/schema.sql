@@ -91,6 +91,15 @@ CREATE TABLE documento_fuente (
 );
 
 -- ---------------------------------------------------------------------
+-- 7b. Cirujano (para saber con quién opera más y cuánto genera cada uno)
+-- ---------------------------------------------------------------------
+CREATE TABLE cirujano (
+    cirujano_id        BIGSERIAL PRIMARY KEY,
+    nombre             VARCHAR(150) NOT NULL UNIQUE,   -- en mayúsculas, sin espacios dobles
+    especialidad       VARCHAR(100)
+);
+
+-- ---------------------------------------------------------------------
 -- 8. Cirugía / evento quirúrgico  (TABLA CENTRAL)
 --    Une paciente + cobertura + clínica + anestesiólogo + documento
 -- ---------------------------------------------------------------------
@@ -101,9 +110,14 @@ CREATE TABLE cirugia (
     clinica_id         BIGINT NOT NULL REFERENCES clinica(clinica_id),
     anestesiologo_id   BIGINT NOT NULL REFERENCES anestesiologo(anestesiologo_id),
     documento_id       BIGINT          REFERENCES documento_fuente(documento_id),
+    cirujano_id        BIGINT          REFERENCES cirujano(cirujano_id),
     fecha_procedimiento DATE   NOT NULL,
     estado             VARCHAR(15) NOT NULL DEFAULT 'PROGRAMADA'
-                       CHECK (estado IN ('PROGRAMADA','REALIZADA','CANCELADA','FACTURADA')),
+                       CONSTRAINT cirugia_estado_check
+                       CHECK (estado IN ('PROGRAMADA','REALIZADA','CANCELADA','FACTURADA','PAGADA')),
+    valor_honorarios   NUMERIC(14,2)   CHECK (valor_honorarios >= 0),   -- lo que se cobra al anestesiólogo
+    fecha_pago         DATE,
+    observaciones      TEXT,
     creado_en          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -121,5 +135,6 @@ CREATE TABLE cirugia_procedimiento (
 CREATE INDEX idx_cirugia_fecha        ON cirugia (anestesiologo_id, fecha_procedimiento);
 CREATE INDEX idx_cirugia_paciente     ON cirugia (paciente_id);
 CREATE INDEX idx_cirugia_clinica      ON cirugia (clinica_id);
+CREATE INDEX idx_cirugia_cirujano     ON cirugia (cirujano_id);
 CREATE INDEX idx_cobertura_paciente   ON cobertura (paciente_id);
 CREATE INDEX idx_procedimiento_nombre ON procedimiento (nombre);

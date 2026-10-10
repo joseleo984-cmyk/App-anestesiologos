@@ -4,6 +4,7 @@ Con SUPABASE_URL y SUPABASE_SERVICE_KEY van a un bucket privado de Supabase
 Storage; sin ellas, a la carpeta UPLOAD_DIR (desarrollo local).
 """
 import logging
+from pathlib import Path
 from typing import Optional
 
 import httpx
@@ -66,3 +67,24 @@ def guardar(nombre: str, datos: bytes, content_type: str, cliente: Optional[http
         log.error("Supabase Storage respondió %s: %s", r.status_code, r.text[:200])
         raise AlmacenamientoError("No se pudo guardar el archivo, intenta de nuevo.")
     return f"supabase://{config.SUPABASE_BUCKET}/{nombre}"
+
+
+def leer(ubicacion: str, cliente: Optional[httpx.Client] = None) -> bytes:
+    """Devuelve el contenido de un archivo guardado con guardar()."""
+    if ubicacion.startswith("supabase://"):
+        if not usa_supabase():
+            raise AlmacenamientoError("Supabase Storage no está configurado.")
+        ruta = ubicacion.removeprefix("supabase://")
+        try:
+            with _cliente(cliente) as c:
+                r = c.get(f"/object/{ruta}")
+        except httpx.HTTPError as e:
+            raise AlmacenamientoError("No se pudo abrir el archivo, intenta de nuevo.") from e
+        if not r.is_success:
+            log.error("Supabase Storage respondió %s al leer %s: %s", r.status_code, ruta, r.text[:200])
+            raise AlmacenamientoError("No se pudo abrir el archivo, intenta de nuevo.")
+        return r.content
+    try:
+        return Path(ubicacion).read_bytes()
+    except OSError as e:
+        raise AlmacenamientoError("El archivo original ya no está disponible.") from e

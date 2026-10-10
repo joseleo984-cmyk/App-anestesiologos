@@ -12,6 +12,7 @@ from app import auth, config, repositorio
 
 log = logging.getLogger(__name__)
 ESQUEMA = Path(__file__).resolve().parent.parent / "db" / "schema.sql"
+MIGRACIONES = ESQUEMA.with_name("migraciones.sql")
 
 
 def preparar_base_de_datos() -> None:
@@ -21,8 +22,8 @@ def preparar_base_de_datos() -> None:
         if conn.execute("SELECT to_regclass('public.anestesiologo') AS t").fetchone()["t"] is None:
             log.info("Base de datos vacía: creando tablas")
             conn.execute(ESQUEMA.read_text())
-        # Bases creadas antes de existir el inicio de sesión
-        conn.execute("ALTER TABLE anestesiologo ADD COLUMN IF NOT EXISTS password_hash TEXT")
+        # Lleva las bases creadas con versiones anteriores al esquema actual
+        conn.execute(MIGRACIONES.read_text())
 
         # Supabase publica las tablas de "public" en su API REST. Con RLS activo y sin
         # políticas, esa API no ve ninguna fila; la app entra como dueña de las tablas
