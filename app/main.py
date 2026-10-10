@@ -8,18 +8,29 @@ Flujo:
 """
 import hashlib
 import logging
+import time
 import uuid
+from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi import Cookie, Depends, FastAPI, HTTPException, Response, UploadFile
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
-from app import config, extraccion, repositorio
+from app import auth, config, extraccion, inicio, repositorio
 from app.modelos import OrdenConfirmada
 
 log = logging.getLogger(__name__)
-app = FastAPI(title="App Anestesiólogos")
+
+
+@asynccontextmanager
+async def ciclo_de_vida(_app):
+    inicio.preparar_base_de_datos()
+    yield
+
+
+app = FastAPI(title="App Anestesiólogos", lifespan=ciclo_de_vida)
 STATIC = Path(__file__).parent / "static"
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
@@ -32,11 +43,11 @@ def get_conn():
         yield conn
 
 
-def anestesiologo_actual(conn=Depends(get_conn)) -> int:
-    # Pendiente: inicio de sesión. Por ahora se usa el anestesiólogo configurado.
-    if not repositorio.existe_anestesiologo(conn, config.ANESTESIOLOGO_ID):
-        raise HTTPException(500, f"No existe el anestesiólogo {config.ANESTESIOLOGO_ID}; ejecuta db/seeds/demo.sql")
-    return config.ANESTESIOLOGO_ID
+def anestesiologo_actual(sesion: str | None = Cookie(default=None), conn=Depends(get_conn)) -> int:
+    anestesiologo_id = auth.leer_sesion(sesion)
+    if anestesiologo_id is None or not repositorio.existe_anestesiologo(conn, anestesiologo_id):
+        raise HTTPException(401, "Inicia sesión para continuar.")
+    return anestesiologo_id
 
 
 def _tipo_real(datos: bytes) -> str | None:
@@ -52,8 +63,50 @@ def _tipo_real(datos: bytes) -> str | None:
 
 
 @app.get("/", include_in_schema=False)
-def inicio():
-    return FileResponse(STATIC / "index.html")
+def pagina_principal(sesion: str | None = Cookie(default=None)):
+    # no-store: que el navegador no muestre una copia guardada después de cerrar sesión
+    if auth.leer_sesion(sesion) is None:
+        return RedirectResponse("/login", status_code=303, headers={"Cache-Control": "no-store"})
+    return FileResponse(STATIC / "index.html", headers={"Cache-Control": "no-store"})
+
+
+@app.get("/login", include_in_schema=False)
+def pagina_login():
+    return FileResponse(STATIC / "login.html")
+
+
+@app.get("/salud", include_in_schema=False)
+def salud(conn=Depends(get_conn)):
+    conn.execute("SELECT 1")
+    return {"estado": "ok"}
+
+
+class Credenciales(BaseModel):
+    email: str
+    password: str
+
+
+@app.post("/api/login")
+def iniciar_sesion(datos: Credenciales, response: Response, conn=Depends(get_conn)):
+    usuario = repositorio.buscar_anestesiologo_por_email(conn, datos.email)
+    if not usuario or not auth.verificar_password(datos.password, usuario["password_hash"]):
+        time.sleep(1)  # frena los intentos de adivinar contraseñas
+        raise HTTPException(401, "Correo o contraseña incorrectos.")
+    response.set_cookie(auth.COOKIE, auth.crear_sesion(usuario["anestesiologo_id"]),
+                        max_age=auth.DURACION_SESION, httponly=True, samesite="lax",
+                        secure=config.COOKIE_SEGURA)
+    return {"nombre": usuario["nombre"]}
+
+
+@app.post("/api/logout")
+def cerrar_sesion(response: Response):
+    response.delete_cookie(auth.COOKIE, httponly=True, samesite="lax", secure=config.COOKIE_SEGURA)
+    return {"ok": True}
+
+
+@app.get("/api/yo")
+def usuario_actual(conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+    return repositorio.obtener_anestesiologo(conn, anestesiologo_id)
 
 
 @app.post("/api/documentos", status_code=201)

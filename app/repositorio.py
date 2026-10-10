@@ -203,3 +203,17 @@ def existe_anestesiologo(conn, anestesiologo_id: int) -> bool:
     return conn.execute(
         "SELECT 1 FROM anestesiologo WHERE anestesiologo_id = %s", (anestesiologo_id,)
     ).fetchone() is not None
+
+
+def buscar_anestesiologo_por_email(conn, email: str) -> Optional[dict]:
+    return conn.execute(
+        "SELECT anestesiologo_id, nombre, password_hash FROM anestesiologo WHERE email = %s",
+        (email.strip().lower(),),
+    ).fetchone()
+
+
+def obtener_anestesiologo(conn, anestesiologo_id: int) -> Optional[dict]:
+    return conn.execute(
+        "SELECT anestesiologo_id, nombre, email FROM anestesiologo WHERE anestesiologo_id = %s",
+        (anestesiologo_id,),
+    ).fetchone()

@@ -11,6 +11,7 @@ CREATE TABLE anestesiologo (
     nombre             VARCHAR(150) NOT NULL,
     registro_medico    VARCHAR(30)  UNIQUE,
     email              VARCHAR(150) NOT NULL UNIQUE,
+    password_hash      TEXT,                       -- scrypt; NULL = no puede iniciar sesión
     creado_en          TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
 

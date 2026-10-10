@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from app import extraccion, main
+from app import auth, extraccion, main
 from app.modelos import OrdenExtraida
 from tests.test_extraccion import RESPUESTA, foto
 
@@ -24,6 +24,7 @@ def cliente(db_url, monkeypatch):
 
     monkeypatch.setattr(extraccion, "extraer_orden", extraer_falso)
     c = TestClient(main.app)
+    c.cookies.set(auth.COOKIE, auth.crear_sesion(1))
     c.llamadas = llamadas
     return c
 

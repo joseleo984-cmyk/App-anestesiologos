@@ -50,12 +50,18 @@
   ul.lista li { border-top: 1px solid var(--line); padding: 10px 0; }
   ul.lista li:first-child { border-top: 0; }
   .sub { color: var(--muted); font-size: .9rem; }
+  .encabezado { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .usuario { color: var(--muted); font-size: .9rem; display: flex; align-items: center; gap: 8px; }
+  .usuario button { padding: 6px 10px; }
   .cargando { text-align: center; padding: 24px 0; color: var(--muted); }
 </style>
 </head>
 <body>
 <main>
-  <h1>Órdenes de cirugía</h1>
+  <header class="encabezado">
+    <h1>Órdenes de cirugía</h1>
+    <div class="usuario"><span id="nombre-usuario"></span> <button type="button" id="salir">Salir</button></div>
+  </header>
 
   <section class="card" id="paso-subir">
     <h2>1. Sube la orden</h2>
@@ -136,6 +142,14 @@
 const $ = (sel) => document.querySelector(sel);
 const campo = (id) => document.getElementById(id);
 let documentoId = null;  // null = registro manual sin foto
+
+// Si la sesión venció, cualquier llamada a la API devuelve 401: volver al inicio de sesión
+const fetchOriginal = window.fetch.bind(window);
+window.fetch = async (...args) => {
+  const r = await fetchOriginal(...args);
+  if (r.status === 401) location.href = "/login";
+  return r;
+};
 
 function escapar(t) {
   return String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -316,6 +330,8 @@ async function cargarCirugias() {
     ul.innerHTML = `<li class="aviso err">No se pudo cargar la lista: ${escapar(e.message)}</li>`;
   }
 }
+fetch("/api/yo").then((r) => r.ok ? r.json() : null).then((u) => { if (u) $("#nombre-usuario").textContent = u.nombre; });
+$("#salir").onclick = async () => { await fetch("/api/logout", { method: "POST" }); location.href = "/login"; };
 cargarCirugias();
 </script>
 </body>
