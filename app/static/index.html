@@ -310,27 +310,31 @@ async function subirArchivo(archivo) {
   if (!archivo) return;
   cerrarFormulario();
   const estado = $("#estado-subida");
-  estado.innerHTML = `<div class="cargando">Leyendo «${escapar(archivo.name)}»… puede tardar unos segundos.</div>`;
+  // Detalle visible del archivo elegido: si algo falla, una captura muestra en qué paso
+  const detalle = `${escapar(archivo.name || "sin nombre")} · ${Math.round((archivo.size || 0) / 1024)} KB · ${escapar(archivo.type || "tipo desconocido")}`;
+  const paso = (texto) => { estado.innerHTML = `<div class="cargando">${texto}<br><span class="sub">${detalle}</span></div>`; };
+  paso("1/3 Archivo elegido, preparándolo…");
   // Se lee el archivo completo antes de enviarlo: Safari puede invalidar el archivo
   // si el campo se limpia mientras se envía.
   let contenido;
   try {
     contenido = new Blob([await archivo.arrayBuffer()], { type: archivo.type || "application/octet-stream" });
   } catch (e) {
-    return aviso(estado, "err", `No se pudo abrir el archivo en este equipo (${e.name || e}). Prueba arrastrándolo.`);
+    return aviso(estado, "err", `Paso 1: no se pudo abrir el archivo en este equipo (${e.name || e}). ${archivo.name || ""}`);
   }
-  if (!contenido.size) return aviso(estado, "err", "El archivo está vacío o no se pudo leer. Prueba arrastrándolo.");
+  if (!contenido.size) return aviso(estado, "err", `Paso 1: el archivo llegó vacío (${archivo.name || "sin nombre"}).`);
+  paso("2/3 Enviando el archivo y leyéndolo con la IA… puede tardar hasta un minuto.");
   const form = new FormData();
   form.append("archivo", contenido, archivo.name || "orden");
   try {
     const r = await fetch("/api/documentos", { method: "POST", body: form });
     const cuerpo = await r.json().catch(() => null);
-    if (!r.ok) return aviso(estado, "err", mensajeError(cuerpo, `No se pudo leer la orden (error ${r.status}).`));
+    if (!r.ok) return aviso(estado, "err", `Paso 3 (error ${r.status}): ${mensajeError(cuerpo, "No se pudo leer la orden.")}`);
     documentoId = cuerpo.documento_id;
     aviso(estado, "", "");
     llenarFormulario(cuerpo.datos);
   } catch (e) {
-    aviso(estado, "err", `No se pudo enviar el archivo (${e.name || "error"}: ${e.message || e}). Revisa la conexión e intenta de nuevo.`);
+    aviso(estado, "err", `Paso 2: no se pudo enviar (${e.name || "error"}: ${e.message || e}). Revisa la conexión e intenta de nuevo.`);
   }
 }
 

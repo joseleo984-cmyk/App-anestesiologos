@@ -21,6 +21,7 @@ from pydantic import BaseModel
 from app import almacenamiento, auth, config, extraccion, inicio, repositorio
 from app.modelos import OrdenConfirmada
 
+logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 log = logging.getLogger(__name__)
 
 
@@ -123,6 +124,8 @@ def subir_documento(archivo: UploadFile, conn=Depends(get_conn), anestesiologo_i
     if len(datos) > config.MAX_ARCHIVO_MB * 1024 * 1024:
         raise HTTPException(413, f"El archivo supera {config.MAX_ARCHIVO_MB} MB.")
     tipo = _tipo_real(datos)
+    log.info("Archivo recibido: %s, %d bytes, tipo declarado %s, tipo real %s",
+             archivo.filename, len(datos), archivo.content_type, tipo)
     if tipo is None:
         raise HTTPException(415, "Solo se aceptan fotos (JPG, PNG, WEBP, HEIC) o PDF.")
 
@@ -145,6 +148,7 @@ def subir_documento(archivo: UploadFile, conn=Depends(get_conn), anestesiologo_i
     try:
         orden = extraccion.extraer_orden(datos, tipo)
     except extraccion.ExtraccionError as e:
+        log.warning("No se pudo leer el documento %s: %s (causa: %r)", documento_id, e, e.__cause__)
         repositorio.marcar_error(conn, documento_id, str(e))
         conn.commit()
         raise HTTPException(422, {"mensaje": str(e), "documento_id": documento_id})
