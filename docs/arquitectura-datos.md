@@ -212,14 +212,26 @@ SELECT * FROM v_honorarios
  WHERE anestesiologo_id = 1 AND mes = '2026-10-01';
 ```
 
-### Cargar la tabla UVR
+### Tabla UVR del ISS 2001 (Acuerdo 256 de 2001)
 
-La tabla del manual (ej. ISS 2001) se carga desde un CSV `codigo,codigo_manual,uvr`:
+[`db/seeds/iss2001_uvr.csv`](../db/seeds/iss2001_uvr.csv) trae **2.868 procedimientos**
+de los artículos 1 a 16 del manual (todas las especialidades quirúrgicas), con su
+código CUPS, código ISS, descripción y UVR. El propio manual trae ambos códigos en
+cada fila, así que la homologación CUPS ↔ ISS ya viene incluida.
 
-```sql
-INSERT INTO manual_tarifario (nombre, valor_uvr_anestesia) VALUES ('ISS 2001', <valor>);
-\copy tarifa_uvr (manual_id, codigo, codigo_manual, uvr) FROM 'iss2001.csv' CSV HEADER
+```bash
+psql -d <base> -f db/schema.sql -f db/honorarios.sql -f db/seeds/cargar_iss2001.sql
 ```
 
-> Los manuales ISS usan códigos propios, distintos a los CUPS que traen las
-> órdenes; por eso `tarifa_uvr` guarda ambos (`codigo` CUPS y `codigo_manual`).
+La carga puede ejecutarse varias veces sin duplicar datos. El CSV se generó con
+[`scripts/extraer_iss2001.py`](../scripts/extraer_iss2001.py) a partir del texto del PDF.
+
+**Pendiente:**
+- `manual_tarifario.valor_uvr_anestesia` (valor en pesos por UVR del anestesiólogo)
+  queda vacío: ese artículo está en la parte del manual que aún no se ha extraído.
+  Mientras tanto, cada convenio puede fijar su propio `valor_uvr`.
+- Los códigos CUPS del manual son los de 2001 (Resolución 2333 de 2000). Si una
+  orden trae un CUPS más reciente que cambió de código, no se encontrará su UVR
+  y la cirugía aparecerá como `sin_tarifa` para revisarla.
+- Unas 20 descripciones quedaron cortadas al final por el formato del PDF; el
+  código y la UVR están completos.
