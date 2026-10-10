@@ -70,9 +70,14 @@ def test_ciudad_de_la_clinica_ya_conocida(orden_sin_ciudad):
     assert c.post("/api/documentos", files=varios(foto(302, 200))).json()["datos"]["clinica"]["ciudad"] == "Santa Marta"
 
 
-def test_clinica_nueva_sin_ciudad_queda_vacia(orden_sin_ciudad):
+def test_clinica_nueva_sin_ciudad_usa_la_de_por_defecto(orden_sin_ciudad, monkeypatch):
+    from app import config
     orden_sin_ciudad.lectura(None)
-    assert orden_sin_ciudad.post("/api/documentos", files=varios(foto())).json()["datos"]["clinica"]["ciudad"] is None
+    monkeypatch.setattr(config, "CIUDAD_POR_DEFECTO", "Barranquilla")
+    assert orden_sin_ciudad.post("/api/documentos", files=varios(foto(303, 200))).json()["datos"]["clinica"]["ciudad"] == "Barranquilla"
+    assert orden_sin_ciudad.get("/api/yo").json()["ciudad_por_defecto"] == "Barranquilla"
+    monkeypatch.setattr(config, "CIUDAD_POR_DEFECTO", None)  # sin ciudad por defecto queda vacía
+    assert orden_sin_ciudad.post("/api/documentos", files=varios(foto(304, 200))).json()["datos"]["clinica"]["ciudad"] is None
 
 
 def test_instruccion_de_no_deducir_la_ciudad():

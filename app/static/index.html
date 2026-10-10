@@ -367,7 +367,8 @@
 const $ = (sel) => document.querySelector(sel);
 const campo = (id) => document.getElementById(id);
 // Qué guarda el formulario: orden leída de un documento, registro a mano o corrección
-let modo = { tipo: "manual" };  // {tipo: "documento", id} | {tipo: "manual"} | {tipo: "editar", id}
+let modo = { tipo: "manual" };
+let ciudadPorDefecto = null;  // viene de /api/yo  // {tipo: "documento", id} | {tipo: "manual"} | {tipo: "editar", id}
 const PESOS = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
 const pesos = (v) => v === null || v === undefined ? "—" : PESOS.format(v);
 
@@ -453,6 +454,8 @@ function llenarFormulario(datos) {
     lista.appendChild(filaProcedimiento(p, dudososFila));
   });
 
+  // Orden nueva sin ciudad (escrita a mano): la ciudad por defecto
+  if (modo.tipo !== "editar" && !campo("clinica.ciudad").value && ciudadPorDefecto) campo("clinica.ciudad").value = ciudadPorDefecto;
   campo("cirujano").value = datos.cirujano || "";
   campo("cirujano").classList.toggle("dudoso", dudosos.includes("cirujano"));
   campo("estado").value = datos.estado || "PROGRAMADA";
@@ -1065,6 +1068,7 @@ $("#form-usuario").onsubmit = async (ev) => {
 fetch("/api/yo").then((r) => r.ok ? r.json() : null).then((u) => {
   if (!u) return;
   $("#nombre-usuario").textContent = u.nombre;
+  ciudadPorDefecto = u.ciudad_por_defecto;
   $("#version").textContent = `Versión ${u.version}`;
   $("#ir-usuarios").classList.toggle("oculto", !u.es_admin);
   if (u.debe_cambiar_clave) exigirCambioClave(); else cargarOpciones();

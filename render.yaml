@@ -17,6 +17,8 @@ services:
         generateValue: true
       - key: SUPABASE_BUCKET
         value: ordenes
+      - key: CIUDAD_POR_DEFECTO      # cuando la orden no trae la ciudad
+        value: Barranquilla
       # Render los pide al crear el Blueprint (no se guardan en el repositorio)
       - key: DATABASE_URL          # Supabase > Connect > Session pooler (se puede pegar con [YOUR-PASSWORD])
         sync: false

@@ -156,7 +156,7 @@ def cerrar_sesion(response: Response):
 def usuario_actual(cuenta: dict = Depends(cuenta_sesion)):
     return {"anestesiologo_id": cuenta["anestesiologo_id"], "nombre": cuenta["nombre"], "email": cuenta["email"],
             "es_admin": cuenta["es_admin"], "debe_cambiar_clave": cuenta["debe_cambiar_clave"],
-            "version": config.VERSION}
+            "ciudad_por_defecto": config.CIUDAD_POR_DEFECTO, "version": config.VERSION}
 
 
 class CambioClave(BaseModel):
@@ -281,9 +281,11 @@ def subir_documento(archivos: list[UploadFile] = File(default=[]), archivo: Opti
         raise HTTPException(502, {"mensaje": "No se pudo leer el documento, intenta de nuevo.",
                                   "documento_id": documento_id})
 
-    # Sin ciudad en la orden: la que el anestesiólogo ya usó para esa clínica
-    if orden.clinica.nombre and not orden.clinica.ciudad:
-        orden.clinica.ciudad = repositorio.ciudad_conocida(conn, anestesiologo_id, orden.clinica.nombre)
+    # Sin ciudad en la orden: la que el anestesiólogo ya usó para esa clínica o, si no, la de por defecto
+    if not orden.clinica.ciudad:
+        conocida = (repositorio.ciudad_conocida(conn, anestesiologo_id, orden.clinica.nombre)
+                    if orden.clinica.nombre else None)
+        orden.clinica.ciudad = conocida or config.CIUDAD_POR_DEFECTO
 
     repositorio.guardar_extraccion(conn, documento_id, orden)
     conn.commit()

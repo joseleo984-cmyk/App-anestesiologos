@@ -61,6 +61,7 @@ la API pública de Supabase no ve ningún dato; solo la app, que se conecta como
 | `ADMIN_NOMBRE` | `Anestesiólogo` | Nombre que se muestra del usuario inicial |
 | `SESSION_SECRET` | aleatorio | Firma de las sesiones; fijarlo para que no se cierren al reiniciar |
 | `COOKIE_SEGURA` | `false` | `true` en producción (solo HTTPS) |
+| `CIUDAD_POR_DEFECTO` | `Barranquilla` | Ciudad cuando la orden no la trae y la clínica no tiene una conocida (vacío = ninguna) |
 | `MAX_ARCHIVO_MB` | `20` | Tamaño máximo del archivo |
 
 ## API
