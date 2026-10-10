@@ -29,9 +29,13 @@ for i, m in enumerate(ms):
     tail = body[u.end():].strip()
     rows.append(dict(articulo=art[1], especialidad=art[2], codigo_iss=m.group(1), codigo_cups=m.group(2),
                      descripcion=desc, uvr=int(u.group(1).replace('.','')), resto=tail))
-w = csv.DictWriter(open(sys.argv[2],'w',newline='',encoding='utf-8'), fieldnames=['articulo','especialidad','codigo_iss','codigo_cups','descripcion','uvr'])
+# Un mismo CUPS puede aparecer en dos artículos con la misma UVR: se deja el primero
+unicos = {}
+for r in rows: unicos.setdefault(r['codigo_cups'], r)
+campos = ['codigo_cups','codigo_iss','descripcion','uvr','articulo','especialidad']
+w = csv.DictWriter(open(sys.argv[2],'w',newline='',encoding='utf-8'), fieldnames=campos)
 w.writeheader()
-for r in rows: w.writerow({k:r[k] for k in w.fieldnames})
+for r in unicos.values(): w.writerow({k:r[k] for k in campos})
 print('filas', len(rows), 'sin UVR', len(bad))
 print('por articulo', collections.Counter(r['articulo'] for r in rows))
 uv = sorted(r['uvr'] for r in rows); print('uvr min/max', uv[0], uv[-1])
