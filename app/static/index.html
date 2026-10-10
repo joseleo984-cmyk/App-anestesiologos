@@ -72,13 +72,10 @@
   <section class="card" id="paso-subir">
     <h2>1. Sube la orden</h2>
     <div id="zona" class="zona">
-      <label class="boton primario grande" for="foto">📷 Tomar foto o elegir archivo</label>
+      <button type="button" class="boton primario grande" id="elegir">📷 Tomar foto o elegir archivo</button>
       <p class="sub">También puedes <strong>arrastrar el archivo aquí</strong>. Foto de la orden, autorización
         o programación, o el PDF. La IA llenará los datos y tú los revisas.</p>
     </div>
-    <!-- Sin "accept": con ese filtro Safari (Mac y iPhone) dejaba los PDF sin poder elegirse.
-         El servidor valida el tipo real del archivo y rechaza lo que no sea foto o PDF. -->
-    <input id="foto" type="file" class="invisible">
     <p class="sub" style="margin-bottom:4px">¿El botón no funciona? Usa este selector:</p>
     <input id="foto-libre" type="file" class="selector-simple">
     <button type="button" id="manual">Escribir los datos a mano</button>
@@ -338,15 +335,29 @@ async function subirArchivo(archivo) {
   }
 }
 
-for (const id of ["#foto", "#foto-libre"]) {
-  $(id).addEventListener("change", async (ev) => {
-    const campo = ev.target;
+// Botón principal: crea un selector nuevo en cada clic y lo abre desde el propio clic,
+// igual que Google Drive. Así funciona en Safari de Mac, que no abría bien el selector
+// escondido detrás de una etiqueta.
+$("#elegir").addEventListener("click", () => {
+  const campo = document.createElement("input");
+  campo.type = "file";
+  campo.className = "invisible";
+  document.body.appendChild(campo);
+  campo.addEventListener("change", async () => {
     const archivo = campo.files && campo.files[0];
-    if (!archivo) return;
-    await subirArchivo(archivo);
-    campo.value = "";  // solo al final, para poder volver a elegir el mismo archivo
+    if (archivo) await subirArchivo(archivo);
+    campo.remove();
   });
-}
+  campo.click();
+});
+
+$("#foto-libre").addEventListener("change", async (ev) => {
+  const campo = ev.target;
+  const archivo = campo.files && campo.files[0];
+  if (!archivo) return;
+  await subirArchivo(archivo);
+  campo.value = "";  // solo al final, para poder volver a elegir el mismo archivo
+});
 
 // Arrastrar y soltar el archivo sobre la zona
 const zona = $("#zona");
