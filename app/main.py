@@ -19,6 +19,7 @@ from fastapi import Cookie, Depends, FastAPI, File, HTTPException, Query, Respon
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+from rapidfuzz import fuzz
 
 from app import almacenamiento, auth, catalogo, config, exportar, extraccion, inicio, repositorio
 from app.modelos import OrdenConfirmada, Sugerencia
@@ -234,6 +235,39 @@ def restablecer_clave(usuario_id: int, conn=Depends(get_conn), admin=Depends(adm
 MAX_PAGINAS = 8
 
 
+# Palabras que traen casi todos los nombres de clínicas y no ayudan a distinguirlas
+_GENERICAS = {"CLINICA", "IPS", "SAS", "SA", "S", "A", "LTDA", "ESE", "E", "ORGANIZACION", "DE", "DEL", "LA", "EL", "LAS", "LOS"}
+
+
+def _parecido_clinica(a: str, b: str) -> float:
+    a = " ".join(p for p in a.split() if p not in _GENERICAS)
+    b = " ".join(p for p in b.split() if p not in _GENERICAS)
+    if not a or not b:
+        return 0
+    # "PORTO AZUL" = "PORTOAZUL"; "BONNADONA PREVENIR" ~ "BONNADONA"
+    return max(fuzz.token_set_ratio(a, b), fuzz.ratio(a.replace(" ", ""), b.replace(" ", "")))
+
+
+def ajustar_clinica(conn, orden) -> None:
+    """Si la clínica leída se parece mucho a una ya registrada, se usa el nombre registrado
+    (así 'Clinica del Caribe S.A.S' y 'CLÍNICA DEL CARIBE' no quedan como dos clínicas)."""
+    if not orden.clinica.nombre:
+        return
+    clinicas = repositorio.listar_clinicas(conn)
+    if orden.clinica.ciudad:
+        ciudad = repositorio.clave_nombre(orden.clinica.ciudad)
+        clinicas = [c for c in clinicas if repositorio.clave_nombre(c["ciudad"]) == ciudad]
+    leida = repositorio.clave_nombre(orden.clinica.nombre)
+    parecidas = [c for c in clinicas if _parecido_clinica(leida, repositorio.clave_nombre(c["nombre"])) >= 90]
+    if len(parecidas) != 1:
+        return  # clínica nueva, o se parece a varias: que el anestesiólogo elija
+    elegida = parecidas[0]
+    if repositorio.clave_nombre(elegida["nombre"]) != leida and "clinica.nombre" not in orden.campos_dudosos:
+        orden.campos_dudosos.append("clinica.nombre")
+    orden.clinica.nombre = elegida["nombre"]
+    orden.clinica.ciudad = orden.clinica.ciudad or elegida["ciudad"]
+
+
 def completar_codigos(orden) -> None:
     """Procedimientos sin código CUPS: se busca su nombre en el catálogo CUPS. Si la coincidencia es
     clara se pone el código (marcado para revisar); si no, quedan las opciones para elegir."""
@@ -296,6 +330,7 @@ def subir_documento(archivos: list[UploadFile] = File(default=[]), archivo: Opti
         raise HTTPException(502, {"mensaje": "No se pudo leer el documento, intenta de nuevo.",
                                   "documento_id": documento_id})
 
+    ajustar_clinica(conn, orden)
     # Sin ciudad en la orden: la que el anestesiólogo ya usó para esa clínica o, si no, la de por defecto
     if not orden.clinica.ciudad:
         conocida = (repositorio.ciudad_conocida(conn, anestesiologo_id, orden.clinica.nombre)
@@ -383,6 +418,11 @@ def exportar_excel(filtros: Filtros = Depends(), conn=Depends(get_conn),
     libro = exportar.libro_cirugias(cirugias, repositorio.reporte(conn, anestesiologo_id, filtros.valores), glosas)
     return Response(libro, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     headers={"Content-Disposition": f'attachment; filename="cirugias-{date.today()}.xlsx"'})
+
+
+@app.get("/api/clinicas")
+def clinicas_registradas(conn=Depends(get_conn), _=Depends(anestesiologo_actual)):
+    return repositorio.listar_clinicas(conn)
 
 
 @app.get("/api/opciones")

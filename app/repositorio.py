@@ -4,6 +4,8 @@ Guardar una orden confirmada reutiliza los registros que ya existen
 (paciente por documento, aseguradora por nombre y tipo, clínica por nombre y
 ciudad) para no duplicar información cuando llega una nueva orden.
 """
+import re
+import unicodedata
 from typing import Optional
 
 import psycopg
@@ -31,6 +33,13 @@ def conectar() -> psycopg.Connection:
 def _nombre_catalogo(nombre: str) -> str:
     """Las aseguradoras y clínicas se guardan en mayúsculas para que 'Sura' y 'SURA' sean la misma."""
     return " ".join(nombre.split()).upper()
+
+
+def clave_nombre(nombre: Optional[str]) -> str:
+    """Para comparar nombres sin importar tildes, mayúsculas ni puntuación: 'Clínica  del Caribe.' = 'CLINICA DEL CARIBE'."""
+    t = unicodedata.normalize("NFKD", nombre or "")
+    t = "".join(ch for ch in t if not unicodedata.combining(ch)).upper()
+    return " ".join(re.sub(r"[^A-Z0-9]", " ", t).split())
 
 
 # ------------------------------------------------------------ documentos
@@ -125,15 +134,19 @@ def _obtener_o_crear_cobertura(conn, paciente_id: int, aseguradora_id: int, a) -
     ).fetchone()["cobertura_id"]
 
 
+def listar_clinicas(conn) -> list[dict]:
+    """Todas las clínicas registradas (son las mismas para todos los anestesiólogos)."""
+    return conn.execute("SELECT clinica_id AS id, nombre, ciudad FROM clinica ORDER BY nombre, ciudad").fetchall()
+
+
 def _obtener_o_crear_clinica(conn, c) -> int:
     nombre = _nombre_catalogo(c.nombre)
     ciudad = _nombre_catalogo(c.ciudad) if c.ciudad else None
-    fila = conn.execute(
-        "SELECT clinica_id FROM clinica WHERE nombre = %s AND ciudad IS NOT DISTINCT FROM %s",
-        (nombre, ciudad),
-    ).fetchone()
-    if fila:
-        return fila["clinica_id"]
+    # La misma clínica escrita con o sin tildes ("CLÍNICA" / "CLINICA") no se duplica
+    clave, clave_ciudad = clave_nombre(nombre), clave_nombre(ciudad)
+    for fila in listar_clinicas(conn):
+        if clave_nombre(fila["nombre"]) == clave and clave_nombre(fila["ciudad"]) == clave_ciudad:
+            return fila["id"]
     return conn.execute(
         "INSERT INTO clinica (nombre, ciudad) VALUES (%s, %s) RETURNING clinica_id", (nombre, ciudad)
     ).fetchone()["clinica_id"]

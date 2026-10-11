@@ -322,9 +322,10 @@
     <fieldset>
       <legend>Clínica</legend>
       <div class="fila">
-        <div><label for="clinica.nombre">Nombre</label><input id="clinica.nombre" required></div>
+        <div><label for="clinica.nombre">Nombre</label><input id="clinica.nombre" required autocomplete="off"></div>
         <div><label for="clinica.ciudad">Ciudad</label><input id="clinica.ciudad"></div>
       </div>
+      <div class="sugerencias" id="sug-clinica"></div>
     </fieldset>
 
     <fieldset>
@@ -470,6 +471,7 @@ const CAMPOS = ["paciente.tipo_documento", "paciente.numero_documento", "pacient
 
 function llenarFormulario(datos) {
   const dudosos = datos.campos_dudosos || [];
+  $("#sug-clinica").innerHTML = "";
   for (const id of CAMPOS) {
     const [grupo, nombre] = id.split(".");
     const valor = nombre ? (datos[grupo] || {})[nombre] : datos[grupo];
@@ -744,7 +746,39 @@ async function cargarOpciones() {
   llenar("#f-clinica", o.clinicas, "Todas");
   llenar("#f-aseguradora", o.aseguradoras, "Todas", `<option value="PARTICULAR">Particular</option>`);
   $("#lista-cirujanos").innerHTML = o.cirujanos.map((c) => `<option value="${escapar(c.nombre)}">`).join("");
+  cargarClinicas();
 }
+
+// ---------------------------------------------------------------- clínicas predictivas
+let clinicas = [];
+const sinTildes = (t) => (t || "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toUpperCase()
+  .replace(/[^A-Z0-9]+/g, " ").trim();
+async function cargarClinicas() {
+  const r = await fetch("/api/clinicas");
+  if (r.ok) clinicas = await r.json();
+}
+function sugerirClinicas() {
+  const caja = $("#sug-clinica"), texto = sinTildes(campo("clinica.nombre").value);
+  if (texto.length < 2) { caja.innerHTML = ""; return; }
+  // cada palabra escrita debe estar en el nombre: "caribe" encuentra "CLÍNICA DEL CARIBE"
+  const palabras = texto.split(" ");
+  const encontradas = clinicas.filter((c) => palabras.every((p) => sinTildes(c.nombre).includes(p))).slice(0, 6);
+  if (encontradas.some((c) => sinTildes(c.nombre) === texto)) { caja.innerHTML = ""; return; }
+  if (!encontradas.length) {
+    caja.innerHTML = `<p class="sub" style="margin:6px 0 4px">Clínica nueva: se guardará con este nombre. Revisa que esté bien escrito.</p>`;
+    return;
+  }
+  caja.innerHTML = `<p class="sub" style="margin:6px 0 4px">Clínicas registradas:</p>` + encontradas.map((c, i) =>
+    `<button type="button" class="opcion" data-i="${i}"><strong>${escapar(c.nombre)}</strong>${c.ciudad ? ` <span class="sub">· ${escapar(c.ciudad)}</span>` : ""}</button>`).join("");
+  caja.querySelectorAll(".opcion").forEach((b) => b.onclick = () => {
+    const c = encontradas[Number(b.dataset.i)];
+    campo("clinica.nombre").value = c.nombre;
+    if (c.ciudad) campo("clinica.ciudad").value = c.ciudad;
+    campo("clinica.nombre").classList.remove("dudoso");
+    caja.innerHTML = "";
+  });
+}
+campo("clinica.nombre").addEventListener("input", sugerirClinicas);
 
 function filtrosLista() {
   const f = { q: $("#f-q").value.trim(), desde: $("#f-desde").value, hasta: $("#f-hasta").value,

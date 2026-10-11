@@ -73,6 +73,7 @@ la API pública de Supabase no ve ningún dato; solo la app, que se conecta como
 | `GET` · `POST` | `/api/usuarios` | Administrador: lista y crea cuentas (devuelve la clave temporal) |
 | `PUT` · `POST` | `/api/usuarios/{id}` · `/restablecer` | Administrador: activa/desactiva · nueva clave temporal |
 | `POST` | `/api/documentos` | Sube la orden en una o varias fotos/PDF (`archivos`, máx. 8) y devuelve los datos leídos |
+| `GET` | `/api/clinicas` | Clínicas registradas (para sugerirlas al escribir) |
 | `GET` | `/api/procedimientos?q=` | Busca en el catálogo CUPS por nombre o por inicio del código (autocompletar) |
 | `GET` | `/api/documentos/{id}` | Estado del documento y datos extraídos |
 | `POST` | `/api/documentos/{id}/confirmar` | Guarda la cirugía con los datos revisados |
