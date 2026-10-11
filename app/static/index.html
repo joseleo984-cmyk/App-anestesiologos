@@ -879,11 +879,11 @@ function recalcularRelacion() {
     tr.querySelector(".num").textContent = incluida ? ++numero : "";
   });
   const elegidas = filasElegidas();
-  $("#rel-total").textContent = pesos(elegidas.reduce((s, f) => s + Number(f.valor || 0), 0));
-  const sinValor = elegidas.filter((f) => f.valor == null).length;
-  // El nº de orden puede ir en blanco: la autorización la tramita la asociación
-  $("#rel-resumen").textContent = `${elegidas.length} de ${relFilas.length} órdenes elegidas.` +
-    (sinValor ? ` ${sinValor} sin valor.` : "");
+  // El valor y el nº de orden pueden ir en blanco: la asociación (AP) tramita la autorización y liquida.
+  // Sin ningún valor, el total también queda en blanco para que lo llenen allá.
+  const conValor = elegidas.filter((f) => f.valor != null);
+  $("#rel-total").textContent = conValor.length ? pesos(conValor.reduce((s, f) => s + Number(f.valor), 0)) : "";
+  $("#rel-resumen").textContent = `${elegidas.length} de ${relFilas.length} órdenes elegidas.`;
   $("#rel-todas").checked = relFilas.length > 0 && elegidas.length === relFilas.length;
 }
 $("#rel-todas").onchange = (e) => {
