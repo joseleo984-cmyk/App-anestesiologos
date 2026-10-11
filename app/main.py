@@ -239,9 +239,12 @@ MAX_PAGINAS = 8
 _GENERICAS = {"CLINICA", "IPS", "SAS", "SA", "S", "A", "LTDA", "ESE", "E", "ORGANIZACION", "DE", "DEL", "LA", "EL", "LAS", "LOS"}
 
 
+def _sin_genericas(nombre: str) -> str:
+    return " ".join(p for p in nombre.split() if p not in _GENERICAS)
+
+
 def _parecido_clinica(a: str, b: str) -> float:
-    a = " ".join(p for p in a.split() if p not in _GENERICAS)
-    b = " ".join(p for p in b.split() if p not in _GENERICAS)
+    a, b = _sin_genericas(a), _sin_genericas(b)
     if not a or not b:
         return 0
     # "PORTO AZUL" = "PORTOAZUL"; "BONNADONA PREVENIR" ~ "BONNADONA"
@@ -259,8 +262,16 @@ def ajustar_clinica(conn, orden) -> None:
         clinicas = [c for c in clinicas if repositorio.clave_nombre(c["ciudad"]) == ciudad]
     leida = repositorio.clave_nombre(orden.clinica.nombre)
     parecidas = [c for c in clinicas if _parecido_clinica(leida, repositorio.clave_nombre(c["nombre"])) >= 90]
-    if len(parecidas) != 1:
-        return  # clínica nueva, o se parece a varias: que el anestesiólogo elija
+    if len(parecidas) > 1:
+        # Desempate por parecido del nombre completo: "PORTOAZUL" se queda con "PORTOAZUL (AUNA)"
+        # y no con "SABBAG RADIÓLOGOS - SEDE PORTOAZUL", siempre que la ventaja sea clara
+        def completo(c):
+            return fuzz.token_sort_ratio(_sin_genericas(leida), _sin_genericas(repositorio.clave_nombre(c["nombre"])))
+        parecidas.sort(key=completo, reverse=True)
+        if completo(parecidas[0]) - completo(parecidas[1]) < 15:
+            return  # se parece a varias por igual: que el anestesiólogo elija
+    if not parecidas:
+        return  # clínica nueva
     elegida = parecidas[0]
     if repositorio.clave_nombre(elegida["nombre"]) != leida and "clinica.nombre" not in orden.campos_dudosos:
         orden.campos_dudosos.append("clinica.nombre")

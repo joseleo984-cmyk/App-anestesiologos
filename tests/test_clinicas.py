@@ -38,3 +38,15 @@ def test_clinica_leida_toma_el_nombre_registrado(cliente, monkeypatch):
     # Nada parecido, o demasiado genérico: se deja como la leyó la IA
     assert leer(cliente, monkeypatch, "Clínica La Merced", n=3)["clinica"]["nombre"] == "Clínica La Merced"
     assert leer(cliente, monkeypatch, "Clínica", n=4)["clinica"]["nombre"] == "Clínica"
+
+
+def test_desempate_entre_clinicas_parecidas(cliente, monkeypatch):
+    guardar(cliente, "Clínica Portoazul (Auna)")
+    guardar(cliente, "Sabbag Radiólogos - Sede Portoazul Torre Sabbag")
+    guardar(cliente, "Clínica del Norte Sede 1")
+    guardar(cliente, "Clínica del Norte Sede 2")
+    assert leer(cliente, monkeypatch, "Clínica Portoazul", n=1)["clinica"]["nombre"] == "CLÍNICA PORTOAZUL (AUNA)"
+    assert leer(cliente, monkeypatch, "Sabbag Radiologos", n=2)["clinica"]["nombre"] == \
+        "SABBAG RADIÓLOGOS - SEDE PORTOAZUL TORRE SABBAG"
+    # Ventaja poco clara: se deja como la leyó la IA
+    assert leer(cliente, monkeypatch, "Norte", n=3)["clinica"]["nombre"] == "Norte"
