@@ -83,3 +83,8 @@ CREATE TABLE IF NOT EXISTS documento_pagina (
     tipo_archivo       VARCHAR(10) NOT NULL CHECK (tipo_archivo IN ('IMAGEN','PDF')),
     PRIMARY KEY (documento_id, numero)
 );
+
+-- ---------------------------------------------------------------------
+-- 12. Número de la orden o autorización (para la relación de órdenes)
+-- ---------------------------------------------------------------------
+ALTER TABLE cirugia ADD COLUMN IF NOT EXISTS numero_orden VARCHAR(100);

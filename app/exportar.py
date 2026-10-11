@@ -67,3 +67,43 @@ def libro_cirugias(cirugias: list[dict], reporte: dict, glosas: dict | None = No
     salida = io.BytesIO()
     wb.save(salida)
     return salida.getvalue()
+
+
+def libro_relacion(filas: list[dict], anestesiologo: str, mes: str, fecha) -> bytes:
+    """Relación de órdenes con la misma estructura del formato en papel."""
+    from openpyxl.styles import Alignment, Border, Side
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Relación de órdenes"
+    linea = Side(style="thin", color="000000")
+    borde = Border(left=linea, right=linea, top=linea, bottom=linea)
+    ws.append(["RELACIÓN DE ÓRDENES"])
+    ws["A1"].font = Font(bold=True, size=14)
+    ws.append([f"ANESTESIÓLOGO: {anestesiologo}", None, None, f"FECHA: {fecha:%d/%m/%Y}", None,
+               f"MES A FACTURAR: {mes}"])
+    ws.append(["VERIFICADO POR:"])
+    ws.append([])
+    titulos = ["#", "ENTIDAD", "PACIENTE", "CÉDULA", "PROCEDIMIENTO", "Nº ORDEN", "VALOR"]
+    ws.append(titulos)
+    for celda in ws[5]:
+        celda.font, celda.fill, celda.border = ENCABEZADO, FONDO, borde
+    for i, f in enumerate(filas, start=1):
+        ws.append([i, f["entidad"], f["paciente"], f["cedula"], f["procedimiento"], f["numero_orden"],
+                   float(f["valor"]) if f["valor"] is not None else None])
+    total = len(filas) + 6
+    ws.append([None] * 5 + ["TOTAL", f"=SUM(G6:G{total - 1})" if filas else 0])
+    for fila in ws.iter_rows(min_row=6, max_row=total):
+        for celda in fila:
+            celda.border = borde
+            celda.alignment = Alignment(vertical="center", wrap_text=celda.column == 5)
+        fila[6].number_format = PESOS
+    ws.cell(total, 6).font = ws.cell(total, 7).font = Font(bold=True)
+    for letra, ancho in zip("ABCDEFG", [5, 18, 32, 14, 48, 24, 14]):
+        ws.column_dimensions[letra].width = ancho
+    ws.page_setup.orientation = "landscape"
+    ws.page_setup.fitToWidth, ws.page_setup.fitToHeight = 1, 0
+    ws.sheet_properties.pageSetUpPr.fitToPage = True
+    ws.print_title_rows = "5:5"
+    salida = io.BytesIO()
+    wb.save(salida)
+    return salida.getvalue()

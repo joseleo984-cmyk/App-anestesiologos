@@ -123,6 +123,7 @@ CREATE TABLE cirugia (
     valor_honorarios   NUMERIC(14,2)   CHECK (valor_honorarios >= 0),   -- lo que se cobra al anestesiólogo
     fecha_pago         DATE,
     observaciones      TEXT,
+    numero_orden       VARCHAR(100),                     -- nº de orden / autorización de la aseguradora
     creado_en          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

@@ -221,11 +221,11 @@ def guardar_orden(conn, anestesiologo_id: int, orden: OrdenConfirmada, documento
     cirugia_id = conn.execute(
         """INSERT INTO cirugia (paciente_id, cobertura_id, clinica_id, cirujano_id, anestesiologo_id,
                                 documento_id, fecha_procedimiento, estado, valor_honorarios,
-                                fecha_pago, observaciones)
-           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING cirugia_id""",
+                                fecha_pago, observaciones, numero_orden)
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING cirugia_id""",
         (r["paciente_id"], r["cobertura_id"], r["clinica_id"], r["cirujano_id"], anestesiologo_id,
          documento_id, orden.fecha_procedimiento, orden.estado, orden.valor_honorarios,
-         orden.fecha_pago, orden.observaciones),
+         orden.fecha_pago, orden.observaciones, orden.numero_orden),
     ).fetchone()["cirugia_id"]
     _guardar_procedimientos(conn, cirugia_id, orden)
 
@@ -247,11 +247,11 @@ def actualizar_orden(conn, anestesiologo_id: int, cirugia_id: int, orden: OrdenC
         """UPDATE cirugia
               SET paciente_id = %s, cobertura_id = %s, clinica_id = %s, cirujano_id = %s,
                   fecha_procedimiento = %s, estado = %s, valor_honorarios = %s,
-                  fecha_pago = %s, observaciones = %s
+                  fecha_pago = %s, observaciones = %s, numero_orden = %s
             WHERE cirugia_id = %s""",
         (r["paciente_id"], r["cobertura_id"], r["clinica_id"], r["cirujano_id"],
          orden.fecha_procedimiento, orden.estado, orden.valor_honorarios,
-         orden.fecha_pago, orden.observaciones, cirugia_id),
+         orden.fecha_pago, orden.observaciones, orden.numero_orden, cirugia_id),
     )
     _guardar_procedimientos(conn, cirugia_id, orden)
     return True
@@ -261,7 +261,7 @@ def obtener_cirugia(conn, anestesiologo_id: int, cirugia_id: int) -> Optional[di
     """Detalle completo, con la misma forma que el formulario de la página."""
     c = conn.execute(
         """SELECT c.cirugia_id, c.fecha_procedimiento, c.estado, c.valor_honorarios, c.fecha_pago,
-                  c.observaciones, c.documento_id, d.tipo_archivo,
+                  c.observaciones, c.numero_orden, c.documento_id, d.tipo_archivo,
                   CASE WHEN d.documento_id IS NULL THEN 0
                        ELSE GREATEST((SELECT COUNT(*) FROM documento_pagina x WHERE x.documento_id = d.documento_id), 1)
                   END AS paginas,
@@ -305,6 +305,7 @@ def obtener_cirugia(conn, anestesiologo_id: int, cirugia_id: int) -> Optional[di
         "valor_honorarios": c["valor_honorarios"],
         "fecha_pago": c["fecha_pago"],
         "observaciones": c["observaciones"],
+        "numero_orden": c["numero_orden"],
     }
 
 
@@ -346,7 +347,7 @@ def listar_cirugias(conn, anestesiologo_id: int, limite: int = 50, filtros: Opti
     where, params = _filtros(anestesiologo_id, filtros or {})
     return conn.execute(
         f"""SELECT c.cirugia_id, c.fecha_procedimiento, c.estado, c.valor_honorarios, c.fecha_pago,
-                  c.documento_id,
+                  c.documento_id, c.numero_orden,
                   p.tipo_documento, p.numero_documento, p.nombres || ' ' || p.apellidos AS paciente,
                   cl.nombre AS clinica,
                   COALESCE(a.nombre, 'PARTICULAR') AS aseguradora, a.tipo AS tipo_aseguradora,
@@ -361,6 +362,53 @@ def listar_cirugias(conn, anestesiologo_id: int, limite: int = 50, filtros: Opti
             ORDER BY c.fecha_procedimiento DESC, c.cirugia_id DESC
             LIMIT %s""",
         params + [limite],
+    ).fetchall()
+
+
+def relacion_ordenes(conn, anestesiologo_id: int, tipos: list[str], aseguradoras: list[str],
+                     clinicas: list[int], desde=None, hasta=None, estado: Optional[str] = None,
+                     ids: Optional[list[int]] = None) -> list[dict]:
+    """Relación de órdenes para entregar a facturación: una fila por cirugía con entidad, paciente,
+    cédula, procedimiento, nº de orden y valor. Los filtros de listas son de selección múltiple
+    (vacío = todos). Las canceladas nunca entran."""
+    condiciones, params = ["c.anestesiologo_id = %s", "c.estado <> 'CANCELADA'"], [anestesiologo_id]
+    if tipos:
+        partes = []
+        if "PARTICULAR" in tipos:
+            partes.append("c.cobertura_id IS NULL")
+        if [t for t in tipos if t != "PARTICULAR"]:
+            partes.append("a.tipo = ANY(%s)"); params.append([t for t in tipos if t != "PARTICULAR"])
+        condiciones.append("(" + " OR ".join(partes) + ")")
+    if aseguradoras:
+        partes = ["c.cobertura_id IS NULL"] if "PARTICULAR" in aseguradoras else []
+        numeros = [int(x) for x in aseguradoras if x != "PARTICULAR"]
+        if numeros:
+            partes.append("cb.aseguradora_id = ANY(%s)"); params.append(numeros)
+        condiciones.append("(" + " OR ".join(partes) + ")")
+    if clinicas:
+        condiciones.append("c.clinica_id = ANY(%s)"); params.append(clinicas)
+    if desde:
+        condiciones.append("c.fecha_procedimiento >= %s"); params.append(desde)
+    if hasta:
+        condiciones.append("c.fecha_procedimiento <= %s"); params.append(hasta)
+    if estado == "PENDIENTE":
+        condiciones.append("c.estado <> 'PAGADA'")
+    elif estado:
+        condiciones.append("c.estado = %s"); params.append(estado)
+    if ids is not None:
+        condiciones.append("c.cirugia_id = ANY(%s)"); params.append(ids)
+    return conn.execute(
+        f"""SELECT c.cirugia_id, c.fecha_procedimiento, c.estado, c.numero_orden, c.valor_honorarios AS valor,
+                  COALESCE(a.nombre, 'PARTICULAR') AS entidad, a.tipo AS tipo_aseguradora,
+                  p.nombres || ' ' || p.apellidos AS paciente, p.numero_documento AS cedula,
+                  cl.nombre AS clinica,
+                  (SELECT string_agg(pr.nombre, ' + ' ORDER BY cp.es_principal DESC, pr.codigo)
+                     FROM cirugia_procedimiento cp JOIN procedimiento pr USING (codigo)
+                    WHERE cp.cirugia_id = c.cirugia_id) AS procedimiento
+            {_DESDE}
+            WHERE {" AND ".join(condiciones)}
+            ORDER BY c.fecha_procedimiento, c.cirugia_id""",
+        params,
     ).fetchall()
 
 

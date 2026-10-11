@@ -70,6 +70,7 @@ class OrdenExtraida(_Base):
     procedimientos: list[ProcedimientoExtraido] = []
     fecha_procedimiento: Optional[date] = None
     cirujano: Optional[str] = None
+    numero_orden: Optional[str] = None
     confianza: float = Field(default=0, ge=0, le=1)
     campos_dudosos: list[str] = []
     observaciones: Optional[str] = None
@@ -141,6 +142,7 @@ class OrdenConfirmada(_Base):
     procedimientos: list[ProcedimientoConfirmado] = Field(min_length=1)
     fecha_procedimiento: date
     cirujano: Optional[str] = Field(default=None, max_length=150)
+    numero_orden: Optional[str] = Field(default=None, max_length=100)
     estado: EstadoCirugia = "PROGRAMADA"
     valor_honorarios: Optional[Decimal] = Field(default=None, ge=0, max_digits=14, decimal_places=2)
     fecha_pago: Optional[date] = None

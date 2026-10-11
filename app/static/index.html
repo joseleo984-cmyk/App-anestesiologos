@@ -87,6 +87,36 @@
   .pestanas button { flex: 1; border: 0; background: transparent; padding: 9px 4px; font-weight: 600; color: var(--muted);
                      font-size: .95rem; }
   .pestanas button[aria-selected="true"] { background: var(--accent); color: var(--accent-text); }
+  @media (max-width: 430px) { .pestanas button { font-size: .8rem; padding: 9px 2px; } }
+  /* Relación de órdenes */
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .opcion-filtro { display: inline-flex; align-items: center; gap: 8px; margin: 0; padding: 8px 12px;
+                   border: 1px solid var(--line); border-radius: 999px; color: var(--text); font-size: .9rem;
+                   cursor: pointer; background: var(--bg); }
+  .opcion-filtro input { width: auto; margin: 0; accent-color: var(--accent-text); }
+  .opcion-filtro:has(input:checked) { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  .atajos { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 4px; }
+  .tabla-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table.relacion { border-collapse: collapse; width: 100%; font-size: .85rem; min-width: 640px; }
+  table.relacion th, table.relacion td { border: 1px solid var(--line); padding: 6px; text-align: left; vertical-align: top; }
+  table.relacion th { background: var(--bg); font-size: .75rem; text-transform: uppercase; }
+  table.relacion td.valor, table.relacion th.valor { text-align: right; white-space: nowrap; }
+  table.relacion tr.excluida td { opacity: .45; }
+  table.relacion tfoot td { font-weight: 700; }
+  .cab-relacion { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; font-size: .9rem; margin-bottom: 10px; }
+  .cab-relacion input { padding: 4px 6px; }
+  .cab-relacion label { color: inherit; }
+  @media (max-width: 600px) { .cab-relacion { grid-template-columns: 1fr; } }
+  #impresion { display: none; }
+  @media print {
+    @page { size: landscape; margin: 10mm; }
+    body > *:not(#impresion) { display: none !important; }
+    #impresion { display: block !important; color: #000; background: #fff; font-size: 11pt; }
+    #impresion h1 { font-size: 15pt; margin: 0 0 8px; }
+    #impresion .cab-relacion { grid-template-columns: 2fr 1fr 1fr; }
+    #impresion table.relacion { min-width: 0; font-size: 9.5pt; }
+    #impresion table.relacion th, #impresion table.relacion td { border: 1px solid #000; color: #000; background: #fff; }
+  }
   /* Lista de cirugías */
   .item { display: block; width: 100%; text-align: left; border: 0; border-top: 1px solid var(--line);
           border-radius: 0; background: transparent; padding: 12px 2px; }
@@ -148,6 +178,7 @@
     <button type="button" role="tab" data-pestana="cirugias" aria-selected="false">Cirugías</button>
     <button type="button" role="tab" data-pestana="pagos" aria-selected="false">Pagos</button>
     <button type="button" role="tab" data-pestana="reportes" aria-selected="false">Reportes</button>
+    <button type="button" role="tab" data-pestana="relacion" aria-selected="false">Relación</button>
   </nav>
 
   <div id="pestana-nueva" class="pestana">
@@ -220,6 +251,55 @@
       <div class="item-cab"><h2>Reportes subidos</h2>
         <button type="button" id="ver-pendientes" style="flex:0 0 auto">Ver pendientes de pago</button></div>
       <div id="lista-pagos"><p class="sub">Cargando…</p></div>
+    </section>
+  </div>
+
+  <div id="pestana-relacion" class="pestana oculto">
+    <section class="card">
+      <h2>Relación de órdenes</h2>
+      <p class="sub">Para entregar a facturación. En cada filtro puedes elegir uno o varios; si no eliges ninguno, salen todos.</p>
+      <div class="atajos">
+        <button type="button" id="rel-prepagadas">Solo prepagadas</button>
+        <button type="button" id="rel-santa-ana">Clínica Santa Ana de Dios</button>
+        <button type="button" id="rel-todo">Quitar filtros</button>
+      </div>
+      <label>Tipo de aseguradora</label><div class="chips" id="rel-tipos"></div>
+      <label>Aseguradora</label><div class="chips" id="rel-aseguradoras"></div>
+      <label>Clínica</label><div class="chips" id="rel-clinicas"></div>
+      <div class="fila">
+        <div><label for="rel-desde">Cirugías desde</label><input id="rel-desde" type="date"></div>
+        <div><label for="rel-hasta">Hasta</label><input id="rel-hasta" type="date"></div>
+        <div><label for="rel-estado">Estado</label>
+          <select id="rel-estado"><option value="PENDIENTE">Sin pagar</option><option value="">Todas</option>
+            <option>REALIZADA</option><option>FACTURADA</option><option>PAGADA</option></select></div>
+      </div>
+      <div id="rel-aviso"></div>
+    </section>
+    <section class="card">
+      <div id="hoja-relacion">
+        <h2>RELACIÓN DE ÓRDENES</h2>
+        <div class="cab-relacion">
+          <div><b>ANESTESIÓLOGO:</b> <span id="rel-anest"></span></div>
+          <div><b>FECHA:</b> <span id="rel-fecha"></span></div>
+          <div><label for="rel-mes" style="display:inline;margin:0"><b>MES A FACTURAR:</b></label>
+            <input id="rel-mes" style="width:auto"></div>
+          <div><b>VERIFICADO POR:</b> ______________________</div>
+        </div>
+        <div class="tabla-scroll">
+          <table class="relacion">
+            <thead><tr><th class="sel"><input type="checkbox" id="rel-todas" checked aria-label="Elegir todas"></th>
+              <th>#</th><th>Entidad</th><th>Paciente</th><th>Cédula</th><th>Procedimiento</th><th>Nº orden</th>
+              <th class="valor">Valor</th></tr></thead>
+            <tbody id="rel-filas"></tbody>
+            <tfoot><tr><td class="sel"></td><td colspan="6">TOTAL</td><td class="valor" id="rel-total"></td></tr></tfoot>
+          </table>
+        </div>
+      </div>
+      <p class="sub" id="rel-resumen"></p>
+      <div class="atajos">
+        <button type="button" class="primario" id="rel-imprimir">🖨 Imprimir / PDF</button>
+        <button type="button" id="rel-excel">⬇ Excel</button>
+      </div>
     </section>
   </div>
 
@@ -337,6 +417,8 @@
       <label for="cirujano">Cirujano</label>
       <input id="cirujano" list="lista-cirujanos" placeholder="Nombre del cirujano" autocomplete="off">
       <datalist id="lista-cirujanos"></datalist>
+      <label for="numero_orden">Nº de orden / autorización</label>
+      <input id="numero_orden" autocomplete="off" placeholder="Como aparece en la orden">
     </fieldset>
 
     <fieldset>
@@ -492,6 +574,8 @@ function llenarFormulario(datos) {
   if (modo.tipo !== "editar" && !campo("clinica.ciudad").value && ciudadPorDefecto) campo("clinica.ciudad").value = ciudadPorDefecto;
   campo("cirujano").value = datos.cirujano || "";
   campo("cirujano").classList.toggle("dudoso", dudosos.includes("cirujano"));
+  campo("numero_orden").value = datos.numero_orden || "";
+  campo("numero_orden").classList.toggle("dudoso", dudosos.includes("numero_orden"));
   campo("estado").value = datos.estado || "PROGRAMADA";
   campo("valor_honorarios").value = datos.valor_honorarios != null ? formatoMiles(datos.valor_honorarios) : "";
   campo("fecha_pago").value = datos.fecha_pago || "";
@@ -540,6 +624,7 @@ function leerFormulario() {
     clinica: { nombre: v("clinica.nombre"), ciudad: v("clinica.ciudad") },
     fecha_procedimiento: v("fecha_procedimiento"),
     cirujano: v("cirujano"),
+    numero_orden: v("numero_orden"),
     estado: v("estado"),
     valor_honorarios: v("valor_honorarios"),
     fecha_pago: v("fecha_pago"),
@@ -725,11 +810,130 @@ function mostrarPestana(nombre) {
   if (nombre === "reportes") cargarReporte();
   if (nombre === "pagos") cargarReportesPago();
   if (nombre === "usuarios") cargarUsuarios();
+  if (nombre === "relacion") abrirRelacion();
 }
 document.querySelectorAll("[data-pestana]").forEach((b) => b.onclick = () => {
   if (modo.tipo === "editar") modo = { tipo: "manual" };
   mostrarPestana(b.dataset.pestana);
 });
+
+// ---------------------------------------------------------------- relación de órdenes
+const TIPOS = [["EPS", "EPS"], ["PREPAGADA", "Prepagada"], ["POLIZA", "Póliza"], ["PARTICULAR", "Particular"]];
+let relOpciones = { aseguradoras: [], clinicas: [] }, relFilas = [], relConsulta = 0;
+const elegidos = (id) => [...document.querySelectorAll(`#${id} input:checked`)].map((i) => i.value);
+const chips = (id, items, marcados = []) => {
+  $(`#${id}`).innerHTML = items.length ? items.map(([valor, texto]) =>
+    `<label class="opcion-filtro"><input type="checkbox" value="${escapar(valor)}"${marcados.includes(String(valor)) ? " checked" : ""}>${escapar(texto)}</label>`).join("")
+    : `<span class="sub">Ninguna todavía</span>`;
+};
+function pintarAseguradoras() {
+  // Si se eligió un tipo, solo se muestran las aseguradoras de ese tipo
+  const tipos = elegidos("rel-tipos"), antes = elegidos("rel-aseguradoras");
+  const visibles = relOpciones.aseguradoras.filter((a) => !tipos.length || tipos.includes(a.tipo));
+  chips("rel-aseguradoras", visibles.map((a) => [String(a.id), a.nombre]), antes);
+}
+async function abrirRelacion() {
+  const r = await fetch("/api/opciones");
+  if (r.ok) relOpciones = await r.json();
+  if (!$("#rel-tipos").children.length) chips("rel-tipos", TIPOS);
+  const clinicasAntes = elegidos("rel-clinicas");
+  chips("rel-clinicas", relOpciones.clinicas.map((c) => [String(c.id), c.nombre]), clinicasAntes);
+  pintarAseguradoras();
+  const hoy = new Date();
+  $("#rel-fecha").textContent = hoy.toLocaleDateString("es-CO");
+  if (!$("#rel-mes").value) $("#rel-mes").value = hoy.toLocaleDateString("es-CO", { month: "long", year: "numeric" }).toUpperCase();
+  cargarRelacion();
+}
+function consultaRelacion() {
+  const p = new URLSearchParams();
+  elegidos("rel-tipos").forEach((v) => p.append("tipo", v));
+  elegidos("rel-aseguradoras").forEach((v) => p.append("aseguradora_id", v));
+  elegidos("rel-clinicas").forEach((v) => p.append("clinica_id", v));
+  ["desde", "hasta", "estado"].forEach((k) => { const v = $(`#rel-${k}`).value; if (v) p.append(k, v); });
+  return p;
+}
+async function cargarRelacion() {
+  const n = ++relConsulta;
+  const r = await fetch(`/api/relacion?${consultaRelacion()}`);
+  if (n !== relConsulta) return;  // llegó una respuesta vieja
+  relFilas = r.ok ? await r.json() : [];
+  $("#rel-filas").innerHTML = relFilas.length ? relFilas.map((f, i) => `
+    <tr data-i="${i}"><td class="sel"><input type="checkbox" checked aria-label="Incluir"></td><td class="num"></td>
+      <td>${escapar(f.entidad)}</td><td>${escapar(f.paciente)}</td><td>${escapar(f.cedula)}</td>
+      <td>${escapar(f.procedimiento || "")}</td><td>${escapar(f.numero_orden || "")}</td>
+      <td class="valor">${f.valor != null ? pesos(f.valor) : ""}</td></tr>`).join("")
+    : `<tr><td colspan="8" class="sub">No hay órdenes con estos filtros.</td></tr>`;
+  $("#rel-todas").checked = true;
+  $("#rel-filas").querySelectorAll("input").forEach((c) => c.onchange = recalcularRelacion);
+  recalcularRelacion();
+}
+function filasElegidas() {
+  return [...$("#rel-filas").querySelectorAll("tr[data-i]")].filter((tr) => tr.querySelector("input").checked)
+    .map((tr) => relFilas[Number(tr.dataset.i)]);
+}
+function recalcularRelacion() {
+  let numero = 0;
+  $("#rel-filas").querySelectorAll("tr[data-i]").forEach((tr) => {
+    const incluida = tr.querySelector("input").checked;
+    tr.classList.toggle("excluida", !incluida);
+    tr.querySelector(".num").textContent = incluida ? ++numero : "";
+  });
+  const elegidas = filasElegidas();
+  $("#rel-total").textContent = pesos(elegidas.reduce((s, f) => s + Number(f.valor || 0), 0));
+  const sinValor = elegidas.filter((f) => f.valor == null).length, sinOrden = elegidas.filter((f) => !f.numero_orden).length;
+  $("#rel-resumen").textContent = `${elegidas.length} de ${relFilas.length} órdenes elegidas.` +
+    (sinValor ? ` ${sinValor} sin valor.` : "") + (sinOrden ? ` ${sinOrden} sin nº de orden (puedes completarlo en Cirugías).` : "");
+  $("#rel-todas").checked = relFilas.length > 0 && elegidas.length === relFilas.length;
+}
+$("#rel-todas").onchange = (e) => {
+  $("#rel-filas").querySelectorAll("tr[data-i] input").forEach((c) => c.checked = e.target.checked);
+  recalcularRelacion();
+};
+$("#rel-tipos").addEventListener("change", () => { pintarAseguradoras(); cargarRelacion(); });
+["#rel-aseguradoras", "#rel-clinicas"].forEach((id) => $(id).addEventListener("change", cargarRelacion));
+["#rel-desde", "#rel-hasta", "#rel-estado"].forEach((id) => $(id).addEventListener("change", cargarRelacion));
+function marcarSolo(id, valores) {
+  document.querySelectorAll(`#${id} input`).forEach((c) => c.checked = valores.includes(c.value));
+}
+$("#rel-prepagadas").onclick = () => {
+  marcarSolo("rel-tipos", ["PREPAGADA"]); marcarSolo("rel-clinicas", []);
+  pintarAseguradoras(); marcarSolo("rel-aseguradoras", []); $("#rel-aviso").innerHTML = ""; cargarRelacion();
+};
+$("#rel-santa-ana").onclick = () => {
+  const ids = relOpciones.clinicas.filter((c) => sinTildes(c.nombre).includes("SANTA ANA DE DIOS")).map((c) => String(c.id));
+  $("#rel-aviso").innerHTML = ids.length ? "" :
+    `<div class="aviso warn">Todavía no tienes cirugías en la Clínica Santa Ana de Dios.</div>`;
+  marcarSolo("rel-tipos", []); pintarAseguradoras(); marcarSolo("rel-aseguradoras", []);
+  marcarSolo("rel-clinicas", ids);
+  if (ids.length) cargarRelacion(); else { relFilas = []; $("#rel-filas").innerHTML = ""; recalcularRelacion(); }
+};
+$("#rel-todo").onclick = () => {
+  ["rel-tipos", "rel-aseguradoras", "rel-clinicas"].forEach((id) => marcarSolo(id, []));
+  $("#rel-desde").value = $("#rel-hasta").value = ""; $("#rel-aviso").innerHTML = "";
+  pintarAseguradoras(); cargarRelacion();
+};
+$("#rel-imprimir").onclick = () => {
+  if (!filasElegidas().length) return aviso($("#rel-aviso"), "warn", "Elige al menos una orden para imprimir.");
+  // Copia limpia de la hoja: solo las filas elegidas, sin casillas, y el mes como texto
+  const copia = $("#hoja-relacion").cloneNode(true);
+  copia.querySelectorAll("tr.excluida, .sel").forEach((el) => el.remove());
+  copia.querySelector("#rel-mes").replaceWith(document.createTextNode(" " + $("#rel-mes").value));
+  copia.querySelector("tfoot td").colSpan = 6;
+  copia.querySelectorAll("[id]").forEach((el) => el.removeAttribute("id"));
+  copia.querySelector("h2").outerHTML = "<h1>RELACIÓN DE ÓRDENES</h1>";
+  let zona = $("#impresion");
+  if (!zona) { zona = document.createElement("div"); zona.id = "impresion"; document.body.appendChild(zona); }
+  zona.replaceChildren(copia);
+  window.print();
+};
+$("#rel-excel").onclick = () => {
+  const elegidas = filasElegidas();
+  if (!elegidas.length) return aviso($("#rel-aviso"), "warn", "Elige al menos una orden para el Excel.");
+  const p = consultaRelacion();
+  elegidas.forEach((f) => p.append("ids", f.cirugia_id));
+  p.append("mes", $("#rel-mes").value);
+  window.location.href = `/api/relacion.xlsx?${p}`;
+};
 
 // ---------------------------------------------------------------- filtros
 async function cargarOpciones() {
@@ -1134,6 +1338,7 @@ $("#form-usuario").onsubmit = async (ev) => {
 fetch("/api/yo").then((r) => r.ok ? r.json() : null).then((u) => {
   if (!u) return;
   $("#nombre-usuario").textContent = u.nombre;
+  $("#rel-anest").textContent = u.nombre.toUpperCase();
   ciudadPorDefecto = u.ciudad_por_defecto;
   $("#version").textContent = `Versión ${u.version}`;
   $("#ir-usuarios").classList.toggle("oculto", !u.es_admin);

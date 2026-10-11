@@ -75,13 +75,14 @@ ESQUEMA = {
         },
         "fecha_procedimiento": _nullable(_TEXTO),
         "cirujano": _nullable(_TEXTO),
+        "numero_orden": _nullable(_TEXTO),
         "confianza": {"type": "number"},
         "campos_dudosos": {"type": "array", "items": _TEXTO},
         "observaciones": _nullable(_TEXTO),
     },
     "required": [
         "paciente", "aseguradora", "clinica", "procedimientos",
-        "fecha_procedimiento", "cirujano", "confianza", "campos_dudosos", "observaciones",
+        "fecha_procedimiento", "cirujano", "numero_orden", "confianza", "campos_dudosos", "observaciones",
     ],
     "additionalProperties": False,
 }
@@ -103,6 +104,8 @@ membrete o la dirección y no es claro que sea donde se opera, incluye "clinica.
 es_principal=true solo en el procedimiento principal (si no se distingue, el primero).
 - cirujano: nombre completo del cirujano que realiza el procedimiento (o del médico que ordena la \
 cirugía si es el cirujano tratante), sin títulos como "Dr." ni el registro médico. null si no aparece.
+- numero_orden: número de la orden o de la autorización de la aseguradora tal como aparece. Si hay \
+varios (por ejemplo número de orden y número de autorización), júntalos separados por "/". null si no aparece.
 - fecha_procedimiento: fecha programada de la cirugía en formato AAAA-MM-DD. No uses la fecha de \
 expedición de la orden ni la de autorización; si la fecha de cirugía no aparece, devuelve null.
 

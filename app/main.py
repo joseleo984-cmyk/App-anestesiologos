@@ -420,6 +420,36 @@ def exportar_excel(filtros: Filtros = Depends(), conn=Depends(get_conn),
                     headers={"Content-Disposition": f'attachment; filename="cirugias-{date.today()}.xlsx"'})
 
 
+class FiltrosRelacion:
+    """Filtros de la relación de órdenes: tipo, aseguradora y clínica admiten varios valores."""
+    def __init__(self, tipo: list[Literal["EPS", "PREPAGADA", "POLIZA", "PARTICULAR"]] = Query(default=[]),
+                 aseguradora_id: list[str] = Query(default=[]), clinica_id: list[int] = Query(default=[]),
+                 desde: Optional[date] = None, hasta: Optional[date] = None,
+                 estado: Optional[Literal["PENDIENTE", "PROGRAMADA", "REALIZADA", "FACTURADA", "PAGADA"]] = None):
+        if any(not (a.isdigit() or a == "PARTICULAR") for a in aseguradora_id):
+            raise HTTPException(422, "aseguradora_id inválida")
+        self.valores = {"tipos": tipo, "aseguradoras": aseguradora_id, "clinicas": clinica_id,
+                        "desde": desde, "hasta": hasta, "estado": estado}
+
+
+@app.get("/api/relacion")
+def relacion_de_ordenes(filtros: FiltrosRelacion = Depends(), conn=Depends(get_conn),
+                        anestesiologo_id=Depends(anestesiologo_actual)):
+    return repositorio.relacion_ordenes(conn, anestesiologo_id, **filtros.valores)
+
+
+@app.get("/api/relacion.xlsx")
+def relacion_en_excel(filtros: FiltrosRelacion = Depends(), ids: list[int] = Query(default=[]),
+                      mes: str = Query(default="", max_length=40), conn=Depends(get_conn),
+                      anestesiologo_id=Depends(anestesiologo_actual)):
+    """Excel de la relación; con ids solo salen las filas seleccionadas en pantalla."""
+    filas = repositorio.relacion_ordenes(conn, anestesiologo_id, **filtros.valores, ids=ids or None)
+    cuenta = repositorio.obtener_cuenta(conn, anestesiologo_id)
+    libro = exportar.libro_relacion(filas, cuenta["nombre"], mes.strip(), date.today())
+    return Response(libro, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f'attachment; filename="relacion-ordenes-{date.today()}.xlsx"'})
+
+
 @app.get("/api/clinicas")
 def clinicas_registradas(conn=Depends(get_conn), _=Depends(anestesiologo_actual)):
     return repositorio.listar_clinicas(conn)
