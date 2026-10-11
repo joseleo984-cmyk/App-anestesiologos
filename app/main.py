@@ -235,13 +235,13 @@ MAX_PAGINAS = 8
 
 
 def completar_codigos(orden) -> None:
-    """Procedimientos sin código CUPS: se busca su nombre en el manual ISS. Si la coincidencia es
+    """Procedimientos sin código CUPS: se busca su nombre en el catálogo CUPS. Si la coincidencia es
     clara se pone el código (marcado para revisar); si no, quedan las opciones para elegir."""
     for i, p in enumerate(orden.procedimientos):
         if p.codigo or not p.nombre:
             continue
         elegido, sugerencias = catalogo.codigo_probable(p.nombre)
-        p.sugerencias = [Sugerencia(codigo=s["codigo"], descripcion=s["descripcion"], uvr=s["uvr"]) for s in sugerencias]
+        p.sugerencias = [Sugerencia(codigo=s["codigo"], descripcion=s["descripcion"]) for s in sugerencias]
         if elegido:
             p.codigo, p.codigo_sugerido = elegido["codigo"], True
         marca = f"procedimientos[{i}].codigo"
@@ -397,9 +397,9 @@ def reportes(filtros: Filtros = Depends(), conn=Depends(get_conn), anestesiologo
 
 @app.get("/api/procedimientos")
 def buscar_procedimientos(q: str = Query(min_length=2, max_length=120), _=Depends(anestesiologo_actual)):
-    """Busca en el manual ISS por código exacto o por nombre (para autocompletar)."""
+    """Busca en el catálogo CUPS por inicio del código o por nombre (para autocompletar)."""
     resultados = catalogo.por_prefijo(q) if any(ch.isdigit() for ch in q) else catalogo.buscar(q, limite=8)
-    return [{"codigo": r["codigo"], "descripcion": r["descripcion"], "uvr": r["uvr"]} for r in resultados]
+    return [{"codigo": r["codigo"], "descripcion": r["descripcion"]} for r in resultados]
 
 
 @app.get("/api/glosas")

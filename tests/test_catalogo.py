@@ -1,4 +1,4 @@
-"""Código CUPS sugerido desde el Manual ISS cuando la orden trae solo el nombre del procedimiento."""
+"""Código CUPS sugerido desde el catálogo CUPS (Resolución 2706 de 2025) cuando la orden trae solo el nombre del procedimiento."""
 from app import catalogo, extraccion
 from app.modelos import OrdenExtraida
 from tests.test_api import cliente  # noqa: F401  (fixture)
@@ -6,21 +6,28 @@ from tests.test_extraccion import RESPUESTA, foto
 
 
 def test_coincidencia_clara_pone_el_codigo():
-    elegido, sugerencias = catalogo.codigo_probable("Apendicectomía")
-    assert elegido["codigo"] == "471100"
-    assert sugerencias[0]["codigo"] == "471100"
+    elegido, sugerencias = catalogo.codigo_probable("Apendicectomía laparoscópica")
+    assert elegido["codigo"] == "471110"
+    assert sugerencias[0]["codigo"] == "471110"
     assert catalogo.codigo_probable("colecistectomia laparoscopica")[0]["codigo"] == "512104"
+    assert catalogo.codigo_probable("Histerectomía abdominal total")[0]["codigo"] == "684003"
 
 
 def test_nombre_ambiguo_solo_muestra_opciones():
     elegido, sugerencias = catalogo.codigo_probable("CESAREA")
-    assert elegido is None and len(sugerencias) >= 2
+    assert elegido is None and {"740001", "740002", "740003"} <= {s["codigo"] for s in sugerencias}
+    elegido, sugerencias = catalogo.codigo_probable("Apendicectomía")  # ¿abierta o laparoscópica?
+    assert elegido is None and {"471102", "471110"} <= {s["codigo"] for s in sugerencias}
 
 
-def test_no_sugiere_paquetes_ni_servicios():
-    for nombre in ("anestesiologia", "apendicectomia", "cesarea"):
+def test_nombres_de_uso_diario():
+    assert catalogo.buscar("Endoscopia digestiva alta")[0]["codigo"].startswith("4413")
+
+
+def test_no_sugiere_laboratorio():
+    for nombre in ("urea", "apendicectomia", "cesarea"):
         assert not any(s["codigo"].startswith(catalogo.NO_PROCEDIMIENTOS) for s in catalogo.buscar(nombre))
-    assert catalogo.por_codigo("S41201")["descripcion"] == "ESPECIALISTAS EN ANESTESIOLOGÍA"  # pero sí lo conoce
+    assert catalogo.por_codigo("903856")  # pero sí lo encuentra por código
 
 
 def test_descarta_parecidos_lejanos():
@@ -33,7 +40,7 @@ def test_texto_corto_no_busca():
 
 
 def test_orden_sin_codigo_recibe_sugerencia(cliente, monkeypatch):
-    datos = {**RESPUESTA, "procedimientos": [{"nombre": "Apendicectomía", "es_principal": True},
+    datos = {**RESPUESTA, "procedimientos": [{"nombre": "Apendicectomía laparoscópica", "es_principal": True},
                                              {"nombre": "Cesárea"},
                                              {"codigo": "999999", "nombre": "Apendicectomía"}]}
     monkeypatch.setattr(extraccion, "extraer_orden", lambda archivos: OrdenExtraida.model_validate(datos))
@@ -41,7 +48,7 @@ def test_orden_sin_codigo_recibe_sugerencia(cliente, monkeypatch):
     assert r.status_code == 201, r.text
     orden = r.json()["datos"]
     apendice, cesarea, con_codigo = orden["procedimientos"]
-    assert apendice["codigo"] == "471100" and apendice["codigo_sugerido"]
+    assert apendice["codigo"] == "471110" and apendice["codigo_sugerido"]
     assert cesarea["codigo"] is None and not cesarea["codigo_sugerido"] and cesarea["sugerencias"]
     assert con_codigo["codigo"] == "999999" and not con_codigo["codigo_sugerido"]  # el de la orden no se toca
     assert {"procedimientos[0].codigo", "procedimientos[1].codigo"} <= set(orden["campos_dudosos"])
@@ -50,7 +57,7 @@ def test_orden_sin_codigo_recibe_sugerencia(cliente, monkeypatch):
 
 def test_buscar_procedimientos(cliente):
     por_nombre = cliente.get("/api/procedimientos", params={"q": "apendicectomia"}).json()
-    assert por_nombre[0]["codigo"] == "471100"
+    assert {p["codigo"] for p in por_nombre[:2]} == {"471102", "471110"}
     por_codigo = cliente.get("/api/procedimientos", params={"q": "4711"}).json()
-    assert any(p["codigo"] == "471100" for p in por_codigo)
+    assert [p["codigo"] for p in por_codigo] == ["471102", "471110"]
     assert cliente.get("/api/procedimientos", params={"q": "a"}).status_code == 422

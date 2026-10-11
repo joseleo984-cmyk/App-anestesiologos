@@ -53,15 +53,14 @@ class ClinicaExtraida(_Base):
 class Sugerencia(BaseModel):
     codigo: str
     descripcion: str
-    uvr: Optional[int] = None
 
 
 class ProcedimientoExtraido(_Base):
     codigo: Optional[str] = None
     nombre: Optional[str] = None
     es_principal: bool = False
-    codigo_sugerido: bool = False          # el código lo puso la app desde el manual ISS, no venía en la orden
-    sugerencias: list[Sugerencia] = []     # opciones del manual ISS para elegir el código
+    codigo_sugerido: bool = False          # el código lo puso la app desde el catálogo CUPS, no venía en la orden
+    sugerencias: list[Sugerencia] = []     # opciones del catálogo CUPS para elegir el código
 
 
 class OrdenExtraida(_Base):

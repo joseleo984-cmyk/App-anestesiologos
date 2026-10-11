@@ -73,7 +73,7 @@ la API pública de Supabase no ve ningún dato; solo la app, que se conecta como
 | `GET` · `POST` | `/api/usuarios` | Administrador: lista y crea cuentas (devuelve la clave temporal) |
 | `PUT` · `POST` | `/api/usuarios/{id}` · `/restablecer` | Administrador: activa/desactiva · nueva clave temporal |
 | `POST` | `/api/documentos` | Sube la orden en una o varias fotos/PDF (`archivos`, máx. 8) y devuelve los datos leídos |
-| `GET` | `/api/procedimientos?q=` | Busca en el manual ISS por nombre o por inicio del código (autocompletar) |
+| `GET` | `/api/procedimientos?q=` | Busca en el catálogo CUPS por nombre o por inicio del código (autocompletar) |
 | `GET` | `/api/documentos/{id}` | Estado del documento y datos extraídos |
 | `POST` | `/api/documentos/{id}/confirmar` | Guarda la cirugía con los datos revisados |
 | `POST` | `/api/cirugias` | Registra una cirugía escrita a mano |
@@ -104,19 +104,21 @@ y generar claves temporales nuevas; ambas acciones cierran las sesiones abiertas
 propia contraseña cierra las de los demás dispositivos. Cada anestesiólogo ve solo sus cirugías, órdenes, pagos y
 reportes, y puede subir su propia copia de un archivo que otro también tenga.
 
-## Código CUPS desde el manual ISS
+## Código CUPS sugerido
 
-Si la orden trae el nombre del procedimiento pero no el código, la app lo busca en el catálogo
-del Manual Tarifario ISS 2001 (`db/seeds/catalogo_cups.csv`, 5.264 procedimientos con sus UVR):
+Si la orden trae el nombre del procedimiento pero no el código, la app lo busca en la CUPS vigente
+(Resolución 2706 de 2025 del Ministerio de Salud, `db/seeds/cups.csv`, 9.459 procedimientos):
 
-- Si el nombre coincide claramente con uno solo, pone el código y lo marca en amarillo para revisarlo.
-- Si hay varias opciones parecidas (p. ej. "Cesárea": corporal, segmentaria, extraperitoneal), deja
+- Si el nombre coincide claramente con uno solo ("Colecistectomía laparoscópica" → 512104), pone el
+  código y lo marca en amarillo para revisarlo.
+- Si hay varias opciones (p. ej. "Apendicectomía": vía abierta 471102 o laparoscópica 471110), deja
   el código vacío y muestra las opciones para tocar la correcta.
-- Al escribir un nombre o un código a mano también aparecen opciones del manual.
+- Al escribir un nombre o un código a mano también aparecen opciones del catálogo.
 
-No se sugieren paquetes (C), servicios (S), consultas (I) ni análisis de aguas (A). Los códigos son
-los del manual ISS 2001; si la aseguradora usa la versión nueva de CUPS, pueden cambiar.
-El catálogo se regenera desde el Excel con `python3 scripts/construir_catalogo.py tablas.xlsx`.
+Cuando salga la resolución CUPS del año siguiente, se regenera con
+`python3 scripts/construir_cups.py Resolucion.pdf` (necesita `pip install pdfplumber`).
+El catálogo del manual ISS 2001 con sus UVR queda en `db/seeds/iss2001_catalogo.csv` para el
+módulo de honorarios.
 
 ## Pagos: depurar pendientes
 

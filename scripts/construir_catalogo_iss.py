@@ -1,10 +1,10 @@
-"""Construye db/seeds/catalogo_cups.csv: el catálogo de procedimientos del Manual ISS 2001.
+"""Construye db/seeds/iss2001_catalogo.csv: el catálogo de procedimientos del Manual ISS 2001.
 
 Une dos fuentes:
   - db/seeds/iss2001_uvr.csv (procedimientos quirúrgicos con UVR, extraídos del PDF)
   - el Excel consolidado de las tablas del manual (todos los capítulos)
 
-Uso: python3 scripts/construir_catalogo.py <tablas_consolidadas.xlsx>
+Uso: python3 scripts/construir_catalogo_iss.py <tablas_consolidadas.xlsx>
 """
 import csv
 import re
@@ -42,7 +42,7 @@ def main(ruta_excel: str) -> None:
             catalogo[codigo] = {"codigo": codigo, "descripcion": descripcion, "uvr": "", "especialidad": ""}
         elif len(descripcion) > len(actual["descripcion"]) and actual["descripcion"] in descripcion:
             actual["descripcion"] = descripcion  # la del PDF pudo quedar cortada por el formato
-    salida = RAIZ / "db/seeds/catalogo_cups.csv"
+    salida = RAIZ / "db/seeds/iss2001_catalogo.csv"
     with open(salida, "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=["codigo", "descripcion", "uvr", "especialidad"])
         w.writeheader()

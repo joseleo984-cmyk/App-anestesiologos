@@ -430,11 +430,11 @@ function filaProcedimiento(p = {}, dudosos = []) {
   if (dudosos.includes("nombre")) nom.classList.add("dudoso");
   div.querySelector(".quitar").onclick = () => div.remove();
 
-  // Opciones del manual ISS: al leer la orden (si no traía código) y mientras se escribe
+  // Opciones del catálogo CUPS: al leer la orden (si no traía código) y mientras se escribe
   const mostrar = (titulo, opciones, ponerNombre) => {
     if (!opciones.length) { sug.innerHTML = ""; return; }
     sug.innerHTML = `<p class="sub" style="margin:6px 0 4px">${titulo}</p>` + opciones.map((o, i) =>
-      `<button type="button" class="opcion" data-i="${i}"><strong>${escapar(o.codigo)}</strong> ${escapar(o.descripcion)}${o.uvr ? ` <span class="sub">· ${o.uvr} UVR</span>` : ""}</button>`).join("");
+      `<button type="button" class="opcion" data-i="${i}"><strong>${escapar(o.codigo)}</strong> ${escapar(o.descripcion)}</button>`).join("");
     sug.querySelectorAll(".opcion").forEach((b) => b.onclick = () => {
       const o = opciones[Number(b.dataset.i)];
       cod.value = o.codigo;
@@ -444,8 +444,8 @@ function filaProcedimiento(p = {}, dudosos = []) {
     });
   };
   if (p.sugerencias && p.sugerencias.length && (!p.codigo || p.codigo_sugerido))
-    mostrar(p.codigo_sugerido ? "El código lo tomé del manual ISS: revísalo. Otras opciones:"
-                              : "La orden no trae el código. Elige del manual ISS:", p.sugerencias, false);
+    mostrar(p.codigo_sugerido ? "El código lo tomé del catálogo CUPS: revísalo. Otras opciones:"
+                              : "La orden no trae el código. Elige del catálogo CUPS:", p.sugerencias, false);
 
   let espera;
   const consultar = (texto, ponerNombre) => {
@@ -453,7 +453,7 @@ function filaProcedimiento(p = {}, dudosos = []) {
     if (texto.trim().length < 4) return;
     espera = setTimeout(async () => {
       const r = await fetch(`/api/procedimientos?q=${encodeURIComponent(texto.trim())}`);
-      if (r.ok) mostrar("Del manual ISS:", await r.json(), ponerNombre);
+      if (r.ok) mostrar("Del catálogo CUPS:", await r.json(), ponerNombre);
     }, 350);
   };
   nom.addEventListener("input", () => consultar(nom.value, false));
