@@ -418,7 +418,7 @@
       <input id="cirujano" list="lista-cirujanos" placeholder="Nombre del cirujano" autocomplete="off">
       <datalist id="lista-cirujanos"></datalist>
       <label for="numero_orden">Nº de orden / autorización</label>
-      <input id="numero_orden" autocomplete="off" placeholder="Como aparece en la orden">
+      <input id="numero_orden" autocomplete="off" placeholder="Opcional: puede quedar en blanco">
     </fieldset>
 
     <fieldset>
@@ -880,9 +880,10 @@ function recalcularRelacion() {
   });
   const elegidas = filasElegidas();
   $("#rel-total").textContent = pesos(elegidas.reduce((s, f) => s + Number(f.valor || 0), 0));
-  const sinValor = elegidas.filter((f) => f.valor == null).length, sinOrden = elegidas.filter((f) => !f.numero_orden).length;
+  const sinValor = elegidas.filter((f) => f.valor == null).length;
+  // El nº de orden puede ir en blanco: la autorización la tramita la asociación
   $("#rel-resumen").textContent = `${elegidas.length} de ${relFilas.length} órdenes elegidas.` +
-    (sinValor ? ` ${sinValor} sin valor.` : "") + (sinOrden ? ` ${sinOrden} sin nº de orden (puedes completarlo en Cirugías).` : "");
+    (sinValor ? ` ${sinValor} sin valor.` : "");
   $("#rel-todas").checked = relFilas.length > 0 && elegidas.length === relFilas.length;
 }
 $("#rel-todas").onchange = (e) => {
