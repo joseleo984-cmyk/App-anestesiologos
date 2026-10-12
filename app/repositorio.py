@@ -134,6 +134,31 @@ def _obtener_o_crear_cobertura(conn, paciente_id: int, aseguradora_id: int, a) -
     ).fetchone()["cobertura_id"]
 
 
+# Palabras que traen casi todos los nombres de clínicas y no ayudan a distinguirlas
+_GENERICAS = {"CLINICA", "IPS", "SAS", "SA", "S", "A", "LTDA", "ESE", "E", "ORGANIZACION", "DE", "DEL", "LA", "EL", "LAS", "LOS"}
+
+
+def sin_genericas(clave: str) -> str:
+    """'CLINICA DEL CARIBE S A S' -> 'CARIBE' (recibe un nombre ya pasado por clave_nombre)."""
+    return " ".join(p for p in clave.split() if p not in _GENERICAS)
+
+
+def cargar_clinicas_base(conn, filas: list[dict]) -> int:
+    """Agrega las clínicas del listado base que aún no existan en su ciudad (sin importar tildes,
+    mayúsculas, puntuación ni palabras como 'Clínica' o 'S.A.S.'). Devuelve cuántas agregó."""
+    existentes = {(sin_genericas(clave_nombre(c["nombre"])), clave_nombre(c["ciudad"])) for c in listar_clinicas(conn)}
+    nuevas = 0
+    for f in filas:
+        clave = (sin_genericas(clave_nombre(f["nombre"])), clave_nombre(f["ciudad"]))
+        if clave in existentes:
+            continue
+        conn.execute("INSERT INTO clinica (nombre, ciudad) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+                     (_nombre_catalogo(f["nombre"]), _nombre_catalogo(f["ciudad"])))
+        existentes.add(clave)
+        nuevas += 1
+    return nuevas
+
+
 def listar_clinicas(conn) -> list[dict]:
     """Todas las clínicas registradas (son las mismas para todos los anestesiólogos)."""
     return conn.execute("SELECT clinica_id AS id, nombre, ciudad FROM clinica ORDER BY nombre, ciudad").fetchall()

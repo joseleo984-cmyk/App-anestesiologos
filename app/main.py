@@ -235,12 +235,7 @@ def restablecer_clave(usuario_id: int, conn=Depends(get_conn), admin=Depends(adm
 MAX_PAGINAS = 8
 
 
-# Palabras que traen casi todos los nombres de clínicas y no ayudan a distinguirlas
-_GENERICAS = {"CLINICA", "IPS", "SAS", "SA", "S", "A", "LTDA", "ESE", "E", "ORGANIZACION", "DE", "DEL", "LA", "EL", "LAS", "LOS"}
-
-
-def _sin_genericas(nombre: str) -> str:
-    return " ".join(p for p in nombre.split() if p not in _GENERICAS)
+_sin_genericas = repositorio.sin_genericas
 
 
 def _parecido_clinica(a: str, b: str) -> float:

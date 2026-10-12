@@ -61,3 +61,24 @@ def test_corregir_clinica_no_deja_el_nombre_viejo(cliente):
     assert cliente.put(f"/api/cirugias/{cid}", json=datos).status_code == 200
     nombres = [c["nombre"] for c in cliente.get("/api/clinicas").json()]
     assert nombres == ["CLÍNICA DEL CARIBE", "CLÍNICA SANTA ANA DE DIOS S.A.S."]
+
+
+def test_listado_base_sin_duplicar_las_existentes(cliente, monkeypatch):
+    import csv
+    from app import inicio, repositorio
+    guardar(cliente, "Clínica Portoazul (Auna)")
+    guardar(cliente, "Clínica Santa Ana de Dios S.A.S.")
+    with open(inicio.CLINICAS_BASE, encoding="utf-8") as archivo:
+        base = list(csv.DictReader(archivo))
+    with repositorio.conectar() as conn:
+        agregadas = repositorio.cargar_clinicas_base(conn, base)
+        assert repositorio.cargar_clinicas_base(conn, base) == 0          # al reiniciar no repite
+        conn.commit()
+    nombres = [c["nombre"] for c in cliente.get("/api/clinicas").json()]
+    assert agregadas == len(base) - 2 and len(nombres) == len(base)
+    assert nombres.count("CLÍNICA PORTOAZUL (AUNA)") == 1 and "CLÍNICA LA MERCED" in nombres
+    # Con el listado completo, la clínica leída de la orden se asigna a la correcta
+    assert leer(cliente, monkeypatch, "Clínica del Caribe S.A.", n=1)["clinica"]["nombre"] == "CLÍNICA DEL CARIBE"
+    assert leer(cliente, monkeypatch, "Clinica La Asuncion", n=2)["clinica"]["nombre"] == "CLÍNICA LA ASUNCIÓN"
+    assert leer(cliente, monkeypatch, "Clínica Portoazul", n=3)["clinica"]["nombre"] == "CLÍNICA PORTOAZUL (AUNA)"
+    assert leer(cliente, monkeypatch, "CECAC", n=4)["clinica"]["nombre"] == "CENTRO CANCEROLÓGICO DEL CARIBE (CECAC)"

@@ -3,6 +3,7 @@
 Crea las tablas si la base está vacía (primer despliegue) y deja listo el
 usuario inicial con ADMIN_EMAIL / ADMIN_PASSWORD.
 """
+import csv
 import hashlib
 import logging
 from pathlib import Path
@@ -14,6 +15,7 @@ from app import auth, config, repositorio
 log = logging.getLogger(__name__)
 ESQUEMA = Path(__file__).resolve().parent.parent / "db" / "schema.sql"
 MIGRACIONES = ESQUEMA.with_name("migraciones.sql")
+CLINICAS_BASE = ESQUEMA.parent / "seeds" / "clinicas.csv"
 
 
 def preparar_base_de_datos() -> None:
@@ -34,6 +36,12 @@ def preparar_base_de_datos() -> None:
         ).fetchall()
         for t in tablas:
             conn.execute(sql.SQL("ALTER TABLE {} ENABLE ROW LEVEL SECURITY").format(sql.Identifier(t["tablename"])))
+
+        # Clínicas conocidas, para que el nombre se sugiera desde la primera cirugía
+        with open(CLINICAS_BASE, encoding="utf-8") as archivo:
+            nuevas = repositorio.cargar_clinicas_base(conn, list(csv.DictReader(archivo)))
+        if nuevas:
+            log.info("Clínicas del listado base agregadas: %s", nuevas)
 
         if config.ADMIN_EMAIL and config.ADMIN_PASSWORD:
             if len(config.ADMIN_PASSWORD) < 10:
