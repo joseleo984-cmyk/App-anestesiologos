@@ -237,3 +237,34 @@ class ReportePagoExtraido(_Base):
         if self.total_neto is None:
             return None
         return abs(self.suma_neto - self.total_neto) <= 1
+
+
+# ---------------------------------------------------------------- volante de AP
+class OtroConcepto(_Base):
+    concepto: Optional[str] = None
+    devengado: Optional[Decimal] = None
+    deducido: Optional[Decimal] = None
+
+    _p = field_validator("devengado", "deducido", mode="before")(_pesos_o_nulo)
+
+
+class VolanteExtraido(_Base):
+    """Valores del volante de liquidación que entrega la asociación (para compararlo con el calculado)."""
+    fecha_proceso: Optional[date] = None
+    periodo_desde: Optional[date] = None
+    periodo_hasta: Optional[date] = None
+    probienestar: Optional[Decimal] = None
+    compensacion_ordinaria: Optional[Decimal] = None
+    compensacion_extraordinaria: Optional[Decimal] = None
+    auxilio_sindical: Optional[Decimal] = None
+    cuatro_por_mil: Optional[Decimal] = None
+    cuota_sostenimiento: Optional[Decimal] = None
+    salud: Optional[Decimal] = None
+    pension: Optional[Decimal] = None
+    neto: Optional[Decimal] = None
+    otros: list[OtroConcepto] = []
+
+    _f = field_validator("fecha_proceso", "periodo_desde", "periodo_hasta", mode="before")(_fecha_o_nulo)
+    _p = field_validator("probienestar", "compensacion_ordinaria", "compensacion_extraordinaria", "auxilio_sindical",
+                         "cuatro_por_mil", "cuota_sostenimiento", "salud", "pension", "neto",
+                         mode="before")(_pesos_o_nulo)

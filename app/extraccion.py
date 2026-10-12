@@ -10,7 +10,7 @@ from pillow_heif import register_heif_opener
 register_heif_opener()  # permite abrir fotos HEIC de iPhone/Mac
 
 from app import config
-from app.modelos import OrdenExtraida, ReportePagoExtraido
+from app.modelos import VolanteExtraido, OrdenExtraida, ReportePagoExtraido
 
 TIPOS_IMAGEN = {"image/jpeg", "image/png", "image/webp", "image/gif", "image/heic"}
 TIPO_PDF = "application/pdf"
@@ -266,3 +266,48 @@ def extraer_reporte_pago(datos: bytes, media_type: str, client: anthropic.Anthro
     return ReportePagoExtraido.model_validate(_llamar_claude(
         [(datos, media_type)], INSTRUCCIONES_PAGO, ESQUEMA_PAGO, "Extrae todas las líneas de este reporte de pagos.",
         "medium", client))
+
+
+_VALORES_VOLANTE = ["probienestar", "compensacion_ordinaria", "compensacion_extraordinaria", "auxilio_sindical",
+                    "cuatro_por_mil", "cuota_sostenimiento", "salud", "pension", "neto"]
+ESQUEMA_VOLANTE = {
+    "type": "object",
+    "properties": {
+        "fecha_proceso": _nullable(_TEXTO),
+        "periodo_desde": _nullable(_TEXTO),
+        "periodo_hasta": _nullable(_TEXTO),
+        **{k: _nullable(_NUMERO) for k in _VALORES_VOLANTE},
+        "otros": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"concepto": _nullable(_TEXTO), "devengado": _nullable(_NUMERO),
+                               "deducido": _nullable(_NUMERO)},
+                "required": ["concepto", "devengado", "deducido"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    "required": ["fecha_proceso", "periodo_desde", "periodo_hasta", *_VALORES_VOLANTE, "otros"],
+    "additionalProperties": False,
+}
+
+INSTRUCCIONES_VOLANTE = """Lees el volante de liquidación (volante de pago) que una asociación de anestesiólogos \
+de Colombia entrega a cada afiliado. Extrae los valores en pesos como números enteros (1,750,905 -> 1750905):
+
+- probienestar: devengado del FONDO PROBIENESTAR.
+- compensacion_ordinaria, compensacion_extraordinaria, auxilio_sindical: devengados con esos nombres.
+- cuatro_por_mil (4 X MIL), cuota_sostenimiento (CUOTA DE SOSTENIMIENTO), salud, pension: deducidos.
+- neto: el NETO del volante de compensaciones y auxilios (el de los asociados, sin el fondo probienestar).
+- otros: cualquier otro concepto devengado o deducido que no sea de los anteriores. No incluyas totales \
+ni los "acumulados de aportes".
+- fecha_proceso, periodo_desde (INICIO), periodo_hasta (FIN) en formato AAAA-MM-DD; el documento usa \
+día/mes/año.
+
+Si un concepto no aparece, devuelve null. Nunca inventes valores."""
+
+
+def extraer_volante(datos: bytes, media_type: str, client: anthropic.Anthropic | None = None) -> VolanteExtraido:
+    return VolanteExtraido.model_validate(_llamar_claude(
+        [(datos, media_type)], INSTRUCCIONES_VOLANTE, ESQUEMA_VOLANTE, "Extrae los valores de este volante.",
+        "low", client))

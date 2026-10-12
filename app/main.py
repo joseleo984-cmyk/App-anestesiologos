@@ -21,7 +21,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from rapidfuzz import fuzz
 
-from app import almacenamiento, auth, catalogo, config, exportar, extraccion, inicio, repositorio
+from app import almacenamiento, auth, catalogo, config, exportar, extraccion, inicio, liquidacion, repositorio
 from app.modelos import OrdenConfirmada, Sugerencia
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -538,6 +538,50 @@ def ver_reporte_pago(reporte_id: int, conn=Depends(get_conn), anestesiologo_id=D
     if reporte is None:
         raise HTTPException(404, "Reporte no encontrado.")
     return reporte
+
+
+def _liquidacion_de(reporte: dict) -> dict:
+    """Volante calculado con el recaudo neto del reporte (el total del documento o, si no trae, la suma)."""
+    recaudo = reporte["total_neto"] if reporte["total_neto"] is not None else reporte["suma_neto"]
+    fecha = reporte["periodo_hasta"] or reporte["fecha_proceso"]
+    return liquidacion.liquidar(recaudo, fecha.year if fecha else None)
+
+
+@app.get("/api/pagos/{reporte_id}/liquidacion")
+def liquidacion_del_reporte(reporte_id: int, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+    reporte = repositorio.obtener_reporte(conn, anestesiologo_id, reporte_id)
+    if reporte is None:
+        raise HTTPException(404, "Reporte no encontrado.")
+    return _liquidacion_de(reporte)
+
+
+@app.post("/api/pagos/{reporte_id}/volante")
+def comparar_volante(reporte_id: int, archivo: UploadFile, conn=Depends(get_conn),
+                     anestesiologo_id=Depends(anestesiologo_actual)):
+    """Lee el volante que entregó AP y lo compara con la liquidación calculada (no se guarda)."""
+    reporte = repositorio.obtener_reporte(conn, anestesiologo_id, reporte_id)
+    if reporte is None:
+        raise HTTPException(404, "Reporte no encontrado.")
+    datos, tipo = _leer_subida(archivo)
+    try:
+        volante = extraccion.extraer_volante(datos, tipo)
+    except extraccion.ExtraccionError as e:
+        log.warning("No se pudo leer el volante: %s (causa: %r)", e, e.__cause__)
+        raise HTTPException(422, {"mensaje": str(e)})
+    leidos = volante.model_dump()
+    if all(leidos[k] is None for k in ("compensacion_ordinaria", "auxilio_sindical", "neto")):
+        raise HTTPException(422, {"mensaje": "No se encontraron los valores de un volante de pago en el documento."})
+    calculada = _liquidacion_de(reporte)
+    avisos = []
+    if volante.periodo_hasta and reporte["periodo_hasta"] and \
+            (volante.periodo_hasta.year, volante.periodo_hasta.month) != (reporte["periodo_hasta"].year, reporte["periodo_hasta"].month):
+        avisos.append(f"El volante es del periodo que termina el {volante.periodo_hasta:%d/%m/%Y} y el reporte de pagos "
+                      f"del que termina el {reporte['periodo_hasta']:%d/%m/%Y}: revisa que sean del mismo mes.")
+    if volante.otros:
+        avisos.append("El volante trae otros conceptos que la fórmula no calcula: " +
+                      ", ".join(o.concepto or "sin nombre" for o in volante.otros) + ".")
+    return {"liquidacion": calculada, "volante": leidos,
+            "comparacion": liquidacion.comparar(calculada, leidos), "avisos": avisos}
 
 
 @app.post("/api/pagos/{reporte_id}/aplicar")

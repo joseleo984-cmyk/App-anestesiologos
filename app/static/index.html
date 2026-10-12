@@ -115,6 +115,15 @@
   .cab-relacion label { color: inherit; }
   @media (max-width: 600px) { .cab-relacion { grid-template-columns: 1fr; } }
   #impresion { display: none; }
+  /* Liquidación del volante */
+  table.liq { border-collapse: collapse; width: 100%; font-size: .9rem; }
+  table.liq td, table.liq th { padding: 6px 4px; border-bottom: 1px solid var(--line); text-align: left; }
+  table.liq td.v, table.liq th.v { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  table.liq tr.sub-total td { font-weight: 700; }
+  table.liq tr.grupo td { padding-top: 14px; color: var(--muted); font-size: .8rem; text-transform: uppercase; border-bottom: 0; }
+  table.liq.comparacion { font-size: .8rem; }
+  table.liq tr.DIFERENTE td { background: var(--err-bg); color: var(--err-text); }
+  table.liq tr.NO_APARECE td { background: var(--warn-bg); }
   @media print {
     @page { size: landscape; margin: 10mm; }
     body > *:not(#impresion) { display: none !important; }
@@ -254,6 +263,7 @@
       <div id="estado-pago"></div>
     </section>
     <div id="detalle-pago"></div>
+    <div id="liquidacion-pago"></div>
     <section class="card">
       <div class="item-cab"><h2>Reportes subidos</h2>
         <button type="button" id="ver-pendientes" style="flex:0 0 auto">Ver pendientes de pago</button></div>
@@ -1054,7 +1064,7 @@ const etiquetaResultado = (f) => f.resultado === "COINCIDE"
 
 async function subirReportePago(archivo) {
   const estado = $("#estado-pago");
-  $("#detalle-pago").innerHTML = "";
+  $("#detalle-pago").innerHTML = $("#liquidacion-pago").innerHTML = "";
   estado.innerHTML = `<div class="cargando">Leyendo el reporte con la IA y cruzándolo con tus cirugías… puede tardar hasta un minuto.<br><span class="sub">${escapar(archivo.name || "")}</span></div>`;
   const form = new FormData();
   try {
@@ -1084,7 +1094,70 @@ async function mostrarReportePago(id) {
   if (r.ok) pintarReportePago(await r.json());
 }
 
+// ---------------------------------------------------------------- liquidación del volante
+async function mostrarLiquidacion(reporteId) {
+  const cont = $("#liquidacion-pago");
+  const r = await fetch(`/api/pagos/${reporteId}/liquidacion`);
+  if (!r.ok) { cont.innerHTML = ""; return; }
+  const l = await r.json();
+  const fila = (nombre, valor, clase = "") => `<tr class="${clase}"><td>${nombre}</td><td class="v">${pesos(valor)}</td></tr>`;
+  const grupo = (nombre) => `<tr class="grupo"><td colspan="2">${nombre}</td></tr>`;
+  const a = l.apropiaciones, d = l.devengados, x = l.deducciones;
+  cont.innerHTML = `<section class="card">
+    <h2>Liquidación del volante</h2>
+    <p class="sub">Calculada con la fórmula de AP sobre el recaudo neto de este reporte. SMLMV: ${pesos(l.smlmv)}.</p>
+    ${l.alertas.map((t) => `<div class="aviso warn">⚠ ${escapar(t)}</div>`).join("")}
+    <table class="liq">
+      ${fila("Recaudo del mes", l.recaudo, "sub-total")}
+      ${grupo("Apropiaciones")}
+      ${fila("Fondo probienestar (20 %)", a.probienestar)}${fila("Gastos de administración (5 %)", a.administracion)}
+      ${fila("Compensación semestral (2,85 %)", a.semestral)}${fila("Compensación anual (2,85 %)", a.anual)}
+      ${fila("Vacaciones (1 %)", a.vacaciones)}
+      ${fila("Base del contrato sindical", l.base_contrato, "sub-total")}
+      ${fila("Seguridad social (12,1 % de la base)", l.seguridad_social)}
+      ${fila("Valor a distribuir en el volante", l.distribuir, "sub-total")}
+      ${grupo("Devengados")}
+      ${fila("Compensación ordinaria", d.compensacion_ordinaria)}${fila("Compensación extraordinaria", d.compensacion_extraordinaria)}
+      ${fila("Auxilio sindical", d.auxilio_sindical)}
+      ${grupo("Deducciones")}
+      ${fila("Salud (4 %)", x.salud)}${fila("Pensión (4 %)", x.pension)}
+      ${fila("4 x mil", x.cuatro_por_mil)}${fila("Cuota de sostenimiento (5 % del SMLMV)", x.cuota_sostenimiento)}
+      ${fila("Neto a pagar", l.neto, "sub-total")}
+      ${fila("Tarjeta probienestar", d.probienestar)}
+    </table>
+    <div class="acciones-pago"><button type="button" id="comparar-volante">📄 Comparar con el volante de AP</button></div>
+    <div id="resultado-volante"></div>
+  </section>`;
+  $("#comparar-volante").onclick = () => elegirArchivo((archivo) => compararVolante(reporteId, archivo));
+}
+
+async function compararVolante(reporteId, archivo) {
+  const cont = $("#resultado-volante");
+  cont.innerHTML = `<div class="cargando">Leyendo el volante con la IA…<br><span class="sub">${escapar(archivo.name || "")}</span></div>`;
+  const form = new FormData();
+  try {
+    form.append("archivo", new Blob([await archivo.arrayBuffer()], { type: archivo.type || "application/octet-stream" }), archivo.name || "volante");
+    const r = await fetch(`/api/pagos/${reporteId}/volante`, { method: "POST", body: form });
+    const cuerpo = await r.json().catch(() => null);
+    if (!r.ok) return aviso(cont, "err", mensajeError(cuerpo, `No se pudo leer el volante (error ${r.status}).`));
+    const filas = cuerpo.comparacion, malas = filas.filter((f) => f.estado !== "COINCIDE");
+    const icono = { COINCIDE: "✓", DIFERENTE: "✗", NO_APARECE: "?" };
+    cont.innerHTML = `${malas.length
+        ? `<div class="aviso err">⚠ ${malas.length} concepto${malas.length === 1 ? "" : "s"} no coincide${malas.length === 1 ? "" : "n"} con el cálculo.</div>`
+        : `<div class="aviso ok">✓ El volante coincide con el cálculo en todos los conceptos.</div>`}
+      ${cuerpo.avisos.map((t) => `<div class="aviso warn">${escapar(t)}</div>`).join("")}
+      <div class="tabla-scroll"><table class="liq comparacion"><tr><th></th><th>Concepto</th><th class="v">Calculado</th><th class="v">Volante</th></tr>
+      ${filas.map((f) => `<tr class="${f.estado}"><td>${icono[f.estado]}</td><td>${escapar(f.concepto)}</td>
+        <td class="v">${pesos(f.calculado)}</td><td class="v">${f.volante == null ? "—" : pesos(f.volante)}${
+          f.diferencia == null || Number(f.diferencia) === 0 ? "" : `<br><small>dif. ${pesos(f.diferencia)}</small>`}</td></tr>`).join("")}
+      </table></div>`;
+  } catch {
+    aviso(cont, "err", "No se pudo leer el archivo. Intenta de nuevo.");
+  }
+}
+
 function pintarReportePago(rep) {
+  mostrarLiquidacion(rep.reporte_id);
   const cuenta = (res) => rep.filas.filter((f) => f.resultado === res).length;
   const porAplicar = rep.filas.filter((f) => f.resultado === "COINCIDE" && f.estado_cirugia !== "PAGADA").length;
   const plural = (n, uno, varios) => `<strong>${n}</strong> ${n === 1 ? uno : varios}`;
@@ -1138,7 +1211,7 @@ function pintarReportePago(rep) {
   if (descartar) descartar.onclick = async () => {
     if (!confirm("¿Descartar este reporte? No se marcará ninguna cirugía.")) return;
     await fetch(`/api/pagos/${rep.reporte_id}`, { method: "DELETE" });
-    $("#detalle-pago").innerHTML = "";
+    $("#detalle-pago").innerHTML = $("#liquidacion-pago").innerHTML = "";
     aviso($("#estado-pago"), "", "");
     cargarReportesPago();
   };

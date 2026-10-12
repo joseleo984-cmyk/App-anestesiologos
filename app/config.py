@@ -19,6 +19,7 @@ CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-opus-5-5")
 MAX_ARCHIVO_MB = int(os.environ.get("MAX_ARCHIVO_MB", "20"))
 # Ciudad que se usa cuando la orden no la trae y la clínica no tiene una conocida (vacío = ninguna)
 CIUDAD_POR_DEFECTO = os.environ.get("CIUDAD_POR_DEFECTO", "Barranquilla").strip() or None
+SMLMV = os.environ.get("SMLMV", "").replace(".", "").strip() or None  # salario mínimo para la liquidación
 
 # Firma de las cookies de sesión. En producción debe venir del entorno;
 # sin ella se genera una al azar y las sesiones se pierden al reiniciar.

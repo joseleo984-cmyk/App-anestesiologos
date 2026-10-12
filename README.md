@@ -74,6 +74,8 @@ la API pública de Supabase no ve ningún dato; solo la app, que se conecta como
 | `PUT` · `POST` | `/api/usuarios/{id}` · `/restablecer` | Administrador: activa/desactiva · nueva clave temporal |
 | `POST` | `/api/documentos` | Sube la orden en una o varias fotos/PDF (`archivos`, máx. 8) y devuelve los datos leídos |
 | `GET` | `/api/relacion` · `/api/relacion.xlsx` | Relación de órdenes para facturación; `tipo`, `aseguradora_id` y `clinica_id` admiten varios valores; el Excel recibe `ids` (filas elegidas) y `mes` |
+| `GET` | `/api/pagos/{id}/liquidacion` | Volante calculado con la fórmula de AP sobre el recaudo neto del reporte |
+| `POST` | `/api/pagos/{id}/volante` | Lee el volante que entregó AP (IA) y lo compara concepto por concepto (no se guarda) |
 | `GET` | `/api/clinicas` | Clínicas registradas (para sugerirlas al escribir) |
 | `GET` | `/api/procedimientos?q=` | Busca en el catálogo CUPS por nombre o por inicio del código (autocompletar) |
 | `GET` | `/api/documentos/{id}` | Estado del documento y datos extraídos |
@@ -121,6 +123,20 @@ Cuando salga la resolución CUPS del año siguiente, se regenera con
 `python3 scripts/construir_cups.py Resolucion.pdf` (necesita `pip install pdfplumber`).
 El catálogo del manual ISS 2001 con sus UVR queda en `db/seeds/iss2001_catalogo.csv` para el
 módulo de honorarios.
+
+## Liquidación del volante (AP)
+
+`app/liquidacion.py` calcula el volante a partir del recaudo neto del reporte de pagos, con la fórmula de
+la propuesta de AP (verificada al peso contra el volante de octubre de 2026):
+
+- Del recaudo se apartan probienestar 20 %, administración 5 %, semestral 2,85 %, anual 2,85 % y
+  vacaciones 1 %; queda la base del contrato. De ella, 12,1 % para seguridad social.
+- Lo que queda se reparte 60 % compensaciones (ordinaria = 1 SMLMV, el resto extraordinaria) y 40 %
+  auxilio sindical. Si el 60 % no alcanza al SMLMV, la ordinaria se completa y el auxilio baja (con aviso).
+- Deducciones: salud 4 % y pensión 4 % de las compensaciones, 4 x mil y cuota de sostenimiento (5 % del SMLMV).
+
+El SMLMV está en `SMLMV` dentro de `app/liquidacion.py` (2026: $1.750.905); la variable de entorno
+`SMLMV` lo reemplaza sin tocar el código.
 
 ## Pagos: depurar pendientes
 
