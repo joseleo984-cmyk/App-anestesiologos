@@ -1120,8 +1120,9 @@ async function mostrarLiquidacion(reporteId) {
       ${fila("Compensación ordinaria", d.compensacion_ordinaria)}${fila("Compensación extraordinaria", d.compensacion_extraordinaria)}
       ${fila("Auxilio sindical", d.auxilio_sindical)}
       ${grupo("Deducciones")}
-      ${fila("Salud (4 %)", x.salud)}${fila("Pensión (4 %)", x.pension)}
+      ${fila(Number(d.auxilio_sindical) ? "Salud (4 %)" : "Salud (4 % de 1 SMLMV)", x.salud)}${fila(Number(d.auxilio_sindical) ? "Pensión (4 %)" : "Pensión (4 % de 1 SMLMV)", x.pension)}
       ${fila("4 x mil", x.cuatro_por_mil)}${fila("Cuota de sostenimiento (5 % del SMLMV)", x.cuota_sostenimiento)}
+      ${Number(x.ajuste_sindical) ? fila("Ajuste sindical (completa la seguridad social)", x.ajuste_sindical) : ""}
       ${fila("Neto a pagar", l.neto, "sub-total")}
       ${fila("Tarjeta probienestar", d.probienestar)}
     </table>
@@ -1140,16 +1141,16 @@ async function compararVolante(reporteId, archivo) {
     const r = await fetch(`/api/pagos/${reporteId}/volante`, { method: "POST", body: form });
     const cuerpo = await r.json().catch(() => null);
     if (!r.ok) return aviso(cont, "err", mensajeError(cuerpo, `No se pudo leer el volante (error ${r.status}).`));
-    const filas = cuerpo.comparacion, malas = filas.filter((f) => f.estado !== "COINCIDE");
-    const icono = { COINCIDE: "✓", DIFERENTE: "✗", NO_APARECE: "?" };
+    const filas = cuerpo.comparacion, malas = filas.filter((f) => !["COINCIDE", "OTRO"].includes(f.estado));
+    const icono = { COINCIDE: "✓", DIFERENTE: "✗", NO_APARECE: "?", OTRO: "•" };
     cont.innerHTML = `${malas.length
         ? `<div class="aviso err">⚠ ${malas.length} concepto${malas.length === 1 ? "" : "s"} no coincide${malas.length === 1 ? "" : "n"} con el cálculo.</div>`
         : `<div class="aviso ok">✓ El volante coincide con el cálculo en todos los conceptos.</div>`}
       ${cuerpo.avisos.map((t) => `<div class="aviso warn">${escapar(t)}</div>`).join("")}
       <div class="tabla-scroll"><table class="liq comparacion"><tr><th></th><th>Concepto</th><th class="v">Calculado</th><th class="v">Volante</th></tr>
-      ${filas.map((f) => `<tr class="${f.estado}"><td>${icono[f.estado]}</td><td>${escapar(f.concepto)}</td>
-        <td class="v">${pesos(f.calculado)}</td><td class="v">${f.volante == null ? "—" : pesos(f.volante)}${
-          f.diferencia == null || Number(f.diferencia) === 0 ? "" : `<br><small>dif. ${pesos(f.diferencia)}</small>`}</td></tr>`).join("")}
+      ${filas.filter((f) => !(Number(f.calculado) === 0 && f.calculado != null && f.volante == null)).map((f) => `<tr class="${f.estado}"><td>${icono[f.estado]}</td><td>${escapar(f.concepto)}</td>
+        <td class="v">${f.calculado == null ? "—" : pesos(f.calculado)}</td><td class="v">${f.volante == null ? "—" : pesos(f.volante)}${
+          f.estado !== "DIFERENTE" ? "" : `<br><small>dif. ${pesos(f.diferencia)}</small>`}</td></tr>`).join("")}
       </table></div>`;
   } catch {
     aviso(cont, "err", "No se pudo leer el archivo. Intenta de nuevo.");

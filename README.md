@@ -127,13 +127,18 @@ módulo de honorarios.
 ## Liquidación del volante (AP)
 
 `app/liquidacion.py` calcula el volante a partir del recaudo neto del reporte de pagos, con la fórmula de
-la propuesta de AP (verificada al peso contra el volante de octubre de 2026):
+la propuesta de AP:
 
 - Del recaudo se apartan probienestar 20 %, administración 5 %, semestral 2,85 %, anual 2,85 % y
   vacaciones 1 %; queda la base del contrato. De ella, 12,1 % para seguridad social.
 - Lo que queda se reparte 60 % compensaciones (ordinaria = 1 SMLMV, el resto extraordinaria) y 40 %
   auxilio sindical. Si el 60 % no alcanza al SMLMV, la ordinaria se completa y el auxilio baja (con aviso).
 - Deducciones: salud 4 % y pensión 4 % de las compensaciones, 4 x mil y cuota de sostenimiento (5 % del SMLMV).
+- Recaudo bajo (el 60 % no alcanza a 1 SMLMV): todo es compensación, sin auxilio; salud y pensión sobre
+  1 SMLMV y un "ajuste sindical" = 22,936 % del SMLMV − 8,3 % del recaudo (deducido de mayo y septiembre).
+- La retención en la fuente no se calcula: al comparar se toma del volante y se descuenta del neto.
+
+Verificada contra los volantes reales de abril a octubre de 2026 (`tests/test_liquidacion.py`).
 
 El SMLMV está en `SMLMV` dentro de `app/liquidacion.py` (2026: $1.750.905); la variable de entorno
 `SMLMV` lo reemplaza sin tocar el código.

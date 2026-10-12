@@ -269,7 +269,7 @@ def extraer_reporte_pago(datos: bytes, media_type: str, client: anthropic.Anthro
 
 
 _VALORES_VOLANTE = ["probienestar", "compensacion_ordinaria", "compensacion_extraordinaria", "auxilio_sindical",
-                    "cuatro_por_mil", "cuota_sostenimiento", "salud", "pension", "neto"]
+                    "cuatro_por_mil", "cuota_sostenimiento", "salud", "pension", "ajuste_sindical", "neto"]
 ESQUEMA_VOLANTE = {
     "type": "object",
     "properties": {
@@ -297,10 +297,11 @@ de Colombia entrega a cada afiliado. Extrae los valores en pesos como números e
 
 - probienestar: devengado del FONDO PROBIENESTAR.
 - compensacion_ordinaria, compensacion_extraordinaria, auxilio_sindical: devengados con esos nombres.
-- cuatro_por_mil (4 X MIL), cuota_sostenimiento (CUOTA DE SOSTENIMIENTO), salud, pension: deducidos.
+- cuatro_por_mil (4 X MIL), cuota_sostenimiento (CUOTA DE SOSTENIMIENTO), salud, pension, \
+ajuste_sindical (AJUSTE SINDICAL): deducidos.
 - neto: el NETO del volante de compensaciones y auxilios (el de los asociados, sin el fondo probienestar).
-- otros: cualquier otro concepto devengado o deducido que no sea de los anteriores. No incluyas totales \
-ni los "acumulados de aportes".
+- otros: cualquier otro concepto devengado o deducido que no sea de los anteriores (por ejemplo \
+RETENCION EN LA FUENTE). No incluyas totales ni los "acumulados de aportes".
 - fecha_proceso, periodo_desde (INICIO), periodo_hasta (FIN) en formato AAAA-MM-DD; el documento usa \
 día/mes/año.
 

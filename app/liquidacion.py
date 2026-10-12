@@ -8,9 +8,11 @@ peso contra el volante de octubre de 2026:
       compensación anual 2,85 %, vacaciones 1 %                    -> base del contrato sindical
     - seguridad social 12,1 % de la base                           -> valor a distribuir en el volante
     reparto: 60 % compensaciones (ordinaria = 1 SMLMV, el resto extraordinaria) y 40 % auxilio sindical.
-    Si el 60 % no alcanza a 1 SMLMV, la compensación ordinaria se completa al SMLMV y el auxilio baja.
     deducciones: salud 4 % y pensión 4 % de las compensaciones, 4 x mil del valor distribuido y cuota de
     sostenimiento del 5 % del SMLMV.
+    Recaudo bajo (el 60 % no alcanza a 1 SMLMV): todo es compensación, sin auxilio; salud y pensión sobre
+    1 SMLMV y una deducción de "ajuste sindical" para completar la seguridad social.
+    La retención en la fuente (meses altos) no se calcula: se toma del volante al comparar.
 """
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Optional
@@ -30,6 +32,9 @@ PORCENTAJES = {
     "cuatro_por_mil": Decimal("0.004"),
     "cuota_sostenimiento": Decimal("0.05"),   # del SMLMV
     "ss_asociacion": Decimal("0.22936"),      # lo que la asociación paga de salud, pensión y riesgos (S,P,A)
+    # En recaudo bajo el ajuste sindical es 22,936 % del SMLMV menos 8,3 % del recaudo
+    # (deducido de los volantes de mayo y septiembre de 2026; cuadra con 1 a 3 pesos de diferencia)
+    "ss_recaudo_bajo": Decimal("0.083"),
 }
 
 # Salario mínimo por año (se puede cambiar con la variable SMLMV en Render)
@@ -61,34 +66,33 @@ def liquidar(recaudo: Decimal, anio: Optional[int] = None) -> dict:
     seguridad_social = base * p["seguridad_social"]
     distribuir = _peso(base - seguridad_social)
 
-    compensaciones = _peso(distribuir * p["compensaciones"])
-    if compensaciones < minimo:  # recaudo bajo: la compensación ordinaria se completa al SMLMV
-        compensaciones = min(minimo, distribuir)
+    sesenta = _peso(distribuir * p["compensaciones"])
+    bajo = sesenta < minimo
+    alertas, ajuste = [], Decimal(0)
+    if not bajo:  # mes normal: 60 % compensaciones (ordinaria = 1 SMLMV) y 40 % auxilio sindical
+        compensaciones, ibc = sesenta, sesenta
+    else:
+        # Recaudo bajo (como en los volantes de mayo y septiembre): todo va como compensación, sin auxilio;
+        # salud y pensión sobre 1 SMLMV, y un "ajuste sindical" completa la seguridad social de la asociación
+        compensaciones, ibc = distribuir, min(minimo, distribuir)
+        ajuste = max(Decimal(0), _peso(minimo * p["ss_asociacion"] - recaudo * p["ss_recaudo_bajo"]))
+        umbral = minimo / p["compensaciones"] / (1 - p["seguridad_social"]) / (
+            1 - sum(p[k] for k in ("probienestar", "administracion", "semestral", "anual", "vacaciones")))
+        alertas.append((f"Recaudo bajo (menos de ${_peso(umbral):,.0f}): el 60 % no alcanza a 1 SMLMV, así que todo va "
+                        f"como compensación, sin auxilio sindical, y se descuenta un ajuste sindical de "
+                        f"${ajuste:,.0f} para completar la seguridad social.").replace(",", "."))
     ordinaria = min(minimo, compensaciones)
     extraordinaria = compensaciones - ordinaria
     auxilio = distribuir - compensaciones
 
     deducciones = {
-        "salud": _peso(compensaciones * p["salud"]),
-        "pension": _peso(compensaciones * p["pension"]),
+        "salud": _peso(ibc * p["salud"]),
+        "pension": _peso(ibc * p["pension"]),
         "cuatro_por_mil": _peso(distribuir * p["cuatro_por_mil"]),
         "cuota_sostenimiento": _peso(minimo * p["cuota_sostenimiento"]),
+        "ajuste_sindical": ajuste,
     }
     neto = distribuir - sum(deducciones.values())
-
-    ss_necesaria = compensaciones * p["ss_asociacion"]
-    alertas = []
-    if distribuir * p["compensaciones"] < minimo:
-        umbral = minimo / p["compensaciones"] / (1 - p["seguridad_social"]) / (
-            1 - sum(p[k] for k in ("probienestar", "administracion", "semestral", "anual", "vacaciones")))
-        alertas.append(f"Recaudo bajo: el 60 % no alcanza a 1 SMLMV (se necesita un recaudo de al menos "
-                       f"${_peso(umbral):,.0f}). La compensación ordinaria se completó al mínimo y el auxilio "
-                       f"quedó en ".replace(",", ".") + f"{_pct(auxilio / distribuir)} en lugar del 40 %.")
-    if seguridad_social + 1 < ss_necesaria:
-        alertas.append((f"La seguridad social apropiada (${_peso(seguridad_social):,.0f}) no alcanza para el "
-                        f"PCT de las compensaciones (${_peso(ss_necesaria):,.0f}): faltan "
-                        f"${_peso(ss_necesaria - seguridad_social):,.0f}.").replace(",", ".")
-                       .replace("PCT", _pct(p["ss_asociacion"], 3)))
 
     return {
         "recaudo": _peso(recaudo),
@@ -115,18 +119,27 @@ CONCEPTOS = [  # (clave, nombre en pantalla, dónde está en la liquidación)
     ("cuota_sostenimiento", "Cuota de sostenimiento", ("deducciones", "cuota_sostenimiento")),
     ("salud", "Salud", ("deducciones", "salud")),
     ("pension", "Pensión", ("deducciones", "pension")),
+    ("ajuste_sindical", "Ajuste sindical", ("deducciones", "ajuste_sindical")),
     ("neto", "Neto a pagar (sin probienestar)", ("neto",)),
 ]
-TOLERANCIA = Decimal("2")  # diferencias de redondeo
+TOLERANCIA = Decimal("5")  # diferencias de redondeo
 
 
 def comparar(calculada: dict, volante: dict) -> list[dict]:
-    """Compara la liquidación calculada con los valores leídos del volante, concepto por concepto."""
+    """Compara la liquidación calculada con los valores leídos del volante, concepto por concepto.
+    Los conceptos del volante que la fórmula no calcula (ej. retención en la fuente) se muestran aparte
+    y se tienen en cuenta en el neto."""
+    otros = volante.get("otros") or []
+    efecto_otros = sum((Decimal(o.get("devengado") or 0) - Decimal(o.get("deducido") or 0) for o in otros), Decimal(0))
     filas = []
     for clave, nombre, ruta in CONCEPTOS:
         esperado = calculada
         for parte in ruta:
             esperado = esperado[parte]
+        if clave == "neto":
+            esperado = esperado + efecto_otros
+            if efecto_otros:
+                nombre += " (con los otros conceptos del volante)"
         leido = volante.get(clave)
         if leido is None:
             estado = "NO_APARECE" if esperado else "COINCIDE"
@@ -134,4 +147,8 @@ def comparar(calculada: dict, volante: dict) -> list[dict]:
             estado = "COINCIDE" if abs(Decimal(leido) - esperado) <= TOLERANCIA else "DIFERENTE"
         filas.append({"concepto": nombre, "calculado": esperado, "volante": leido,
                       "diferencia": None if leido is None else Decimal(leido) - esperado, "estado": estado})
+    for o in otros:
+        valor = Decimal(o.get("deducido") or 0) or Decimal(o.get("devengado") or 0)
+        filas.insert(-1, {"concepto": (o.get("concepto") or "Otro concepto").capitalize() + " (no se calcula)",
+                          "calculado": None, "volante": valor, "diferencia": None, "estado": "OTRO"})
     return filas

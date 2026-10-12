@@ -261,10 +261,11 @@ class VolanteExtraido(_Base):
     cuota_sostenimiento: Optional[Decimal] = None
     salud: Optional[Decimal] = None
     pension: Optional[Decimal] = None
+    ajuste_sindical: Optional[Decimal] = None
     neto: Optional[Decimal] = None
     otros: list[OtroConcepto] = []
 
     _f = field_validator("fecha_proceso", "periodo_desde", "periodo_hasta", mode="before")(_fecha_o_nulo)
     _p = field_validator("probienestar", "compensacion_ordinaria", "compensacion_extraordinaria", "auxilio_sindical",
-                         "cuatro_por_mil", "cuota_sostenimiento", "salud", "pension", "neto",
-                         mode="before")(_pesos_o_nulo)
+                         "cuatro_por_mil", "cuota_sostenimiento", "salud", "pension", "ajuste_sindical",
+                         "neto", mode="before")(_pesos_o_nulo)
