@@ -76,6 +76,9 @@ la API pública de Supabase no ve ningún dato; solo la app, que se conecta como
 | `GET` | `/api/relacion` · `/api/relacion.xlsx` | Relación de órdenes para facturación; `tipo`, `aseguradora_id` y `clinica_id` admiten varios valores; el Excel recibe `ids` (filas elegidas) y `mes` |
 | `GET` | `/api/pagos/{id}/liquidacion` | Volante calculado con la fórmula de AP sobre el recaudo neto del reporte |
 | `POST` | `/api/pagos/{id}/volante` | Lee el volante que entregó AP (IA) y lo compara concepto por concepto (no se guarda) |
+| `GET` | `/api/finanzas` | Estado financiero del anestesiólogo: ingreso base, gastos con semáforo, metas y consejos |
+| `POST` · `PUT` · `DELETE` | `/api/finanzas/partidas` · `/api/finanzas/metas` | Gastos, ingresos adicionales y metas de ahorro |
+| `POST` · `DELETE` | `/api/volantes` · `/api/volantes/{mes}` | Sube el volante de un mes (queda como ingreso real) o lo quita |
 | `GET` | `/api/clinicas` | Clínicas registradas (para sugerirlas al escribir) |
 | `GET` | `/api/procedimientos?q=` | Busca en el catálogo CUPS por nombre o por inicio del código (autocompletar) |
 | `GET` | `/api/documentos/{id}` | Estado del documento y datos extraídos |
@@ -142,6 +145,22 @@ Verificada contra los volantes reales de abril a octubre de 2026 (`tests/test_li
 
 El SMLMV está en `SMLMV` dentro de `app/liquidacion.py` (2026: $1.750.905); la variable de entorno
 `SMLMV` lo reemplaza sin tocar el código.
+
+## Finanzas personales
+
+Cada anestesiólogo ve solo las suyas (ni el administrador las ve). `app/finanzas.py`:
+
+- **Ingreso de cada mes:** el volante de AP si se subió (en Pagos al comparar, o en Finanzas); si no, la
+  liquidación calculada del reporte de pagos. Neto + tarjeta probienestar (es de libre uso).
+- **Ingreso base:** promedio de los 3 meses más bajos de los últimos 12, más los ingresos adicionales.
+  Con ingresos tan variables, el presupuesto se arma sobre esa base y no sobre el promedio.
+- **Gastos:** cada categoría tiene una referencia sana (% del ingreso base): vivienda 30, servicios 8,
+  educación 15, salud 10, deudas 20, alimentación 15, transporte 10, entretenimiento 10, personal 5,
+  otros 5. Semáforo: sano, alto (hasta 25 % por encima) o muy alto. Gasto total sano hasta el 80 %
+  (ahorro de al menos 20 %); gastos fijos hasta el 50 %.
+- **Metas:** cuánto apartar al mes según la fecha; el fondo de emergencias sugerido es de 6 meses de gastos.
+- **Consejos:** avisos sobre lo anterior y, cuando un mes entra por encima de la base, llevar el excedente
+  a las metas.
 
 ## Pagos: depurar pendientes
 

@@ -115,6 +115,27 @@
   .cab-relacion label { color: inherit; }
   @media (max-width: 600px) { .cab-relacion { grid-template-columns: 1fr; } }
   #impresion { display: none; }
+  /* Finanzas */
+  .estado-fin { display: inline-flex; align-items: center; gap: 4px; font-size: .75rem; font-weight: 600;
+                padding: 1px 8px; border-radius: 999px; white-space: nowrap; }
+  .estado-fin.SANO { background: var(--ok-bg); color: var(--ok-text); }
+  .estado-fin.ALTO { background: var(--warn-bg); color: var(--text); border: 1px solid var(--warn-line); }
+  .estado-fin.MUY_ALTO { background: var(--err-bg); color: var(--err-text); }
+  .medidor { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; margin: 6px 0 2px; }
+  .medidor > span { display: block; height: 100%; border-radius: 4px; background: var(--accent); }
+  .medidor.SANO > span { background: #0ca30c; } .medidor.ALTO > span { background: #fab219; }
+  .medidor.MUY_ALTO > span { background: #d03b3b; }
+  table.liq.meses-fin { font-size: .78rem; }
+  table.liq.meses-fin td.mes { white-space: nowrap; }
+  .fin-item { border-top: 1px solid var(--line); padding: 10px 0; }
+  .fin-item:first-child { border-top: 0; }
+  .fin-item .acciones { display: flex; gap: 6px; margin-top: 6px; }
+  .fin-item .acciones button { padding: 4px 10px; font-size: .8rem; }
+  .consejo { padding: 8px 10px; border-radius: 8px; margin: 6px 0; font-size: .9rem; }
+  .consejo.SANO { background: var(--ok-bg); color: var(--ok-text); }
+  .consejo.ALTO { background: var(--warn-bg); border: 1px solid var(--warn-line); }
+  .consejo.MUY_ALTO { background: var(--err-bg); color: var(--err-text); }
+  .consejo.INFO { background: var(--bg); border: 1px solid var(--line); }
   /* Liquidación del volante */
   table.liq { border-collapse: collapse; width: 100%; font-size: .9rem; }
   table.liq td, table.liq th { padding: 6px 4px; border-bottom: 1px solid var(--line); text-align: left; }
@@ -195,6 +216,7 @@
     <button type="button" role="tab" data-pestana="pagos" aria-selected="false">Pagos</button>
     <button type="button" role="tab" data-pestana="reportes" aria-selected="false">Reportes</button>
     <button type="button" role="tab" data-pestana="relacion" aria-selected="false">Relación</button>
+    <button type="button" role="tab" data-pestana="finanzas" aria-selected="false">Finanzas</button>
   </nav>
 
   <div id="pestana-nueva" class="pestana">
@@ -317,6 +339,59 @@
         <button type="button" class="primario" id="rel-imprimir">🖨 Imprimir / PDF</button>
         <button type="button" id="rel-excel">⬇ Excel</button>
       </div>
+    </section>
+  </div>
+
+  <div id="pestana-finanzas" class="pestana oculto">
+    <section class="card">
+      <h2>Mis finanzas</h2>
+      <p class="sub">🔒 Solo tú ves esta información. El presupuesto se arma sobre tu <strong>ingreso base</strong>
+        (el promedio de tus 3 meses más bajos), así un mes flojo no te descuadra.</p>
+      <div class="kpis" id="fin-kpis"></div>
+      <div id="fin-consejos"></div>
+    </section>
+    <section class="card">
+      <h2>Ingresos</h2>
+      <div id="fin-meses"></div>
+      <div class="atajos"><button type="button" id="fin-subir-volante">📄 Subir volante de un mes</button></div>
+      <div id="fin-estado-volante"></div>
+      <h3 style="margin-top:16px">Ingresos adicionales (cada mes)</h3>
+      <div id="fin-ingresos"></div>
+      <form id="fin-form-ingreso" class="fila" novalidate>
+        <div><label for="fin-ing-cat">Tipo</label><select id="fin-ing-cat"></select></div>
+        <div><label for="fin-ing-nombre">Descripción</label><input id="fin-ing-nombre" placeholder="Ej: arriendo apartamento"></div>
+        <div><label for="fin-ing-valor">Valor mensual ($)</label><input id="fin-ing-valor" class="pesos" inputmode="numeric"></div>
+        <div style="align-self:end"><button type="submit">Agregar ingreso</button></div>
+      </form>
+    </section>
+    <section class="card">
+      <h2>Gastos mensuales</h2>
+      <p class="sub">Cada categoría se compara con una referencia sana sobre tu ingreso base.</p>
+      <div id="fin-gastos"></div>
+      <form id="fin-form-gasto" class="fila" novalidate>
+        <div><label for="fin-gas-cat">Categoría</label><select id="fin-gas-cat"></select></div>
+        <div><label for="fin-gas-nombre">Descripción</label><input id="fin-gas-nombre" placeholder="Ej: colegio de los niños"></div>
+        <div><label for="fin-gas-valor">Valor mensual ($)</label><input id="fin-gas-valor" class="pesos" inputmode="numeric"></div>
+        <div style="align-self:end"><button type="submit" class="primario">Agregar gasto</button></div>
+      </form>
+      <div id="fin-estado-gasto"></div>
+    </section>
+    <section class="card">
+      <h2>Metas de ahorro</h2>
+      <div id="fin-metas"></div>
+      <form id="fin-form-meta" novalidate>
+        <div class="fila">
+          <div><label for="fin-meta-tipo">Meta</label><select id="fin-meta-tipo"></select></div>
+          <div><label for="fin-meta-nombre">Nombre</label><input id="fin-meta-nombre" placeholder="Ej: viaje a Europa"></div>
+        </div>
+        <div class="fila">
+          <div><label for="fin-meta-valor">Valor de la meta ($)</label><input id="fin-meta-valor" class="pesos" inputmode="numeric"></div>
+          <div><label for="fin-meta-ahorrado">Ya tengo ahorrado ($)</label><input id="fin-meta-ahorrado" class="pesos" inputmode="numeric"></div>
+          <div><label for="fin-meta-fecha">Para cuándo</label><input id="fin-meta-fecha" type="date"></div>
+        </div>
+        <button type="submit" class="primario" style="margin-top:10px">Agregar meta</button>
+        <div id="fin-estado-meta"></div>
+      </form>
     </section>
   </div>
 
@@ -828,10 +903,167 @@ function mostrarPestana(nombre) {
   if (nombre === "pagos") cargarReportesPago();
   if (nombre === "usuarios") cargarUsuarios();
   if (nombre === "relacion") abrirRelacion();
+  if (nombre === "finanzas") cargarFinanzas();
 }
 document.querySelectorAll("[data-pestana]").forEach((b) => b.onclick = () => {
   if (modo.tipo === "editar") modo = { tipo: "manual" };
   mostrarPestana(b.dataset.pestana);
+});
+
+// ---------------------------------------------------------------- finanzas personales
+const ETIQUETA_ESTADO = { SANO: "✓ Sano", ALTO: "⚠ Alto", MUY_ALTO: "✕ Muy alto" };
+const MESES_ES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+const nombreMes = (iso) => { const [a, m] = iso.split("-"); return `${MESES_ES[Number(m) - 1]} ${a}`; };
+const pct = (v) => `${String(Number(v).toFixed(1)).replace(".", ",")} %`;
+let finanzasDatos = null;
+
+document.addEventListener("input", (e) => {
+  if (!e.target.classList.contains("pesos")) return;
+  const digitos = e.target.value.replace(/\D/g, "");
+  e.target.value = digitos ? formatoMiles(digitos) : "";
+});
+
+async function cargarFinanzas() {
+  const r = await fetch("/api/finanzas");
+  if (!r.ok) return;
+  const f = finanzasDatos = await r.json();
+  const c = f.catalogos;
+  const opciones = (sel, items, texto) => {
+    if ($(sel).options.length) return;
+    $(sel).innerHTML = items.map((i) => `<option value="${i.clave}">${escapar(texto(i))}</option>`).join("");
+  };
+  opciones("#fin-gas-cat", c.gastos, (i) => `${i.nombre} (hasta ${i.referencia} %)`);
+  opciones("#fin-ing-cat", c.ingresos, (i) => i.nombre);
+  opciones("#fin-meta-tipo", c.metas, (i) => i.nombre);
+
+  // indicadores
+  const estadoTexto = (e) => e ? `<span class="estado-fin ${e}">${ETIQUETA_ESTADO[e]}</span>` : "";
+  $("#fin-kpis").innerHTML = `
+    <div class="kpi destacado"><div class="etiqueta">Ingreso base mensual</div><div class="cifra">${pesos(f.ingreso_base)}</div>
+      <div class="sub">${f.meses_base ? `Promedio de tus ${f.meses_base} meses más bajos de AP` : "Aún sin meses cargados"}${
+        Number(f.otros_ingresos) ? ` + ${pesos(f.otros_ingresos)} de otros ingresos` : ""} · promedio de AP: ${pesos(f.promedio_ap)}</div></div>
+    <div class="kpi"><div class="etiqueta">Gastos del mes</div><div class="cifra">${pesos(f.gastos)}</div>
+      <div class="sub">${f.porcentaje_gastos != null ? `${pct(f.porcentaje_gastos)} de la base ` : ""}${estadoTexto(f.estado_gastos)}</div></div>
+    <div class="kpi"><div class="etiqueta">Capacidad de ahorro</div><div class="cifra">${pesos(f.capacidad_ahorro)}</div>
+      <div class="sub">${f.tasa_ahorro != null ? `${pct(f.tasa_ahorro)} de la base` : ""}</div></div>
+    <div class="kpi"><div class="etiqueta">Metas piden al mes</div><div class="cifra">${pesos(f.cuotas_metas)}</div></div>
+    <div class="kpi"><div class="etiqueta">Fondo de emergencias</div><div class="cifra">${f.meses_colchon != null ? `${String(f.meses_colchon).replace(".", ",")} meses` : "—"}</div>
+      <div class="sub">La meta: 6 meses de gastos</div></div>`;
+  const icono = { SANO: "✓", ALTO: "⚠", MUY_ALTO: "✕", INFO: "ℹ" };
+  $("#fin-consejos").innerHTML = f.consejos.map((k) => `<div class="consejo ${k.nivel}">${icono[k.nivel]} ${escapar(k.texto)}</div>`).join("");
+
+  // ingresos por mes
+  $("#fin-meses").innerHTML = f.meses.length ? `<div class="tabla-scroll"><table class="liq meses-fin">
+      <tr><th>Mes</th><th class="v">Neto</th><th class="v">Probienestar</th><th class="v">Total</th></tr>
+      ${f.meses.map((m) => `<tr><td class="mes">${nombreMes(m.periodo)}<br><small class="sub">${m.fuente === "VOLANTE" ? "volante" : "calculado"}</small></td>
+        <td class="v">${pesos(m.neto)}</td><td class="v">${pesos(m.probienestar)}</td><td class="v"><strong>${pesos(m.total)}</strong></td></tr>`).join("")}
+    </table></div><p class="sub">«Calculado»: el mes tiene reporte de pagos pero no volante; sube el volante para usar el valor real.</p>`
+    : `<p class="sub">Sube tus reportes de pago en la pestaña Pagos, o tus volantes aquí, para conocer tu ingreso.</p>`;
+
+  // ingresos adicionales y gastos
+  const partida = (p, conMedidor) => `<div class="fin-item" data-partida="${p.partida_id}">
+      <div class="item-cab"><span>${escapar(p.nombre)}</span><strong>${pesos(p.valor_mensual)}</strong></div>
+      <div class="acciones"><button type="button" data-accion="valor">Cambiar valor</button>
+        <button type="button" data-accion="quitar">Quitar</button></div></div>`;
+  const ingresos = f.partidas.filter((p) => p.clase === "INGRESO");
+  $("#fin-ingresos").innerHTML = ingresos.length ? ingresos.map((p) => partida(p)).join("") : `<p class="sub">No has agregado ingresos adicionales.</p>`;
+  const gastos = f.partidas.filter((p) => p.clase === "GASTO");
+  $("#fin-gastos").innerHTML = f.por_categoria.length ? f.por_categoria.map((cat) => `
+    <div style="margin:14px 0 4px">
+      <div class="item-cab"><strong>${escapar(cat.nombre)}</strong>${estadoTexto(cat.estado)}</div>
+      <div class="medidor ${cat.estado}" role="img" aria-label="${pct(cat.porcentaje)} del ingreso base"><span style="width:${Math.min(100, Number(cat.porcentaje) / (cat.referencia * 1.5) * 100)}%"></span></div>
+      <div class="sub">${pesos(cat.valor)} · ${pct(cat.porcentaje)} del ingreso base · sano hasta ${cat.referencia} %</div>
+      ${gastos.filter((g) => g.categoria === cat.categoria).map((g) => partida(g)).join("")}
+    </div>`).join("") : `<p class="sub">Agrega tus gastos de cada mes: vivienda, colegios, mercado, créditos…</p>`;
+  document.querySelectorAll("[data-partida] button").forEach((b) => b.onclick = () => accionPartida(b));
+
+  // metas
+  $("#fin-metas").innerHTML = f.metas.length ? f.metas.map((m) => `<div class="fin-item" data-meta="${m.meta_id}">
+      <div class="item-cab"><strong>${escapar(m.nombre)}</strong><span>${pesos(m.valor_objetivo)}</span></div>
+      <div class="medidor" role="img" aria-label="${pct(m.avance)} ahorrado"><span style="width:${Math.min(100, Number(m.avance))}%"></span></div>
+      <div class="sub">Ahorrado ${pesos(m.ahorrado)} (${pct(m.avance)}) · faltan ${pesos(m.falta)}${m.fecha_objetivo
+        ? ` · aparta <strong>${pesos(m.cuota_mensual)} al mes</strong> por ${m.meses_restantes} mes${m.meses_restantes === 1 ? "" : "es"} (hasta ${nombreMes(m.fecha_objetivo)})`
+        : " · ponle una fecha para calcular cuánto apartar al mes"}</div>
+      <div class="acciones"><button type="button" data-accion="ahorro">Actualizar lo ahorrado</button>
+        <button type="button" data-accion="quitar">Quitar</button></div></div>`).join("")
+    : `<p class="sub">Empieza por el fondo de emergencias (6 meses de gastos${Number(f.fondo_sugerido) ? `: ${pesos(f.fondo_sugerido)}` : ""}); luego viajes, carro, casa…</p>`;
+  document.querySelectorAll("[data-meta] button").forEach((b) => b.onclick = () => accionMeta(b));
+}
+
+const valorPesos = (id) => $(id).value.replace(/\D/g, "");
+async function enviar(url, metodo, datos, avisoEn) {
+  const r = await fetch(url, { method: metodo, headers: { "Content-Type": "application/json" }, body: datos ? JSON.stringify(datos) : undefined });
+  if (!r.ok) {
+    const cuerpo = await r.json().catch(() => null);
+    if (avisoEn) aviso($(avisoEn), "err", mensajeError(cuerpo, "No se pudo guardar. Revisa los datos."));
+    return false;
+  }
+  if (avisoEn) aviso($(avisoEn), "", "");
+  await cargarFinanzas();
+  return true;
+}
+$("#fin-form-gasto").onsubmit = async (e) => {
+  e.preventDefault();
+  if (!valorPesos("#fin-gas-valor")) return aviso($("#fin-estado-gasto"), "err", "Escribe el valor mensual.");
+  const ok = await enviar("/api/finanzas/partidas", "POST", { clase: "GASTO", categoria: $("#fin-gas-cat").value,
+    nombre: $("#fin-gas-nombre").value.trim() || $("#fin-gas-cat").selectedOptions[0].text.split(" (")[0],
+    valor_mensual: valorPesos("#fin-gas-valor") }, "#fin-estado-gasto");
+  if (ok) { $("#fin-gas-nombre").value = ""; $("#fin-gas-valor").value = ""; }
+};
+$("#fin-form-ingreso").onsubmit = async (e) => {
+  e.preventDefault();
+  if (!valorPesos("#fin-ing-valor")) return;
+  const ok = await enviar("/api/finanzas/partidas", "POST", { clase: "INGRESO", categoria: $("#fin-ing-cat").value,
+    nombre: $("#fin-ing-nombre").value.trim() || $("#fin-ing-cat").selectedOptions[0].text,
+    valor_mensual: valorPesos("#fin-ing-valor") });
+  if (ok) { $("#fin-ing-nombre").value = ""; $("#fin-ing-valor").value = ""; }
+};
+$("#fin-meta-tipo").onchange = () => {
+  // el fondo de emergencias se sugiere de 6 meses de gastos
+  if ($("#fin-meta-tipo").value === "EMERGENCIA" && finanzasDatos && Number(finanzasDatos.fondo_sugerido) && !$("#fin-meta-valor").value)
+    $("#fin-meta-valor").value = formatoMiles(finanzasDatos.fondo_sugerido);
+};
+$("#fin-form-meta").onsubmit = async (e) => {
+  e.preventDefault();
+  if (!valorPesos("#fin-meta-valor")) return aviso($("#fin-estado-meta"), "err", "Escribe el valor de la meta.");
+  const ok = await enviar("/api/finanzas/metas", "POST", { tipo: $("#fin-meta-tipo").value,
+    nombre: $("#fin-meta-nombre").value.trim() || $("#fin-meta-tipo").selectedOptions[0].text,
+    valor_objetivo: valorPesos("#fin-meta-valor"), ahorrado: valorPesos("#fin-meta-ahorrado") || "0",
+    fecha_objetivo: $("#fin-meta-fecha").value || null }, "#fin-estado-meta");
+  if (ok) ["#fin-meta-nombre", "#fin-meta-valor", "#fin-meta-ahorrado", "#fin-meta-fecha"].forEach((id) => $(id).value = "");
+};
+async function accionPartida(boton) {
+  const id = boton.closest("[data-partida]").dataset.partida;
+  const p = finanzasDatos.partidas.find((x) => String(x.partida_id) === id);
+  if (boton.dataset.accion === "quitar") {
+    if (confirm(`¿Quitar «${p.nombre}»?`)) await enviar(`/api/finanzas/partidas/${id}`, "DELETE");
+    return;
+  }
+  const nuevo = prompt(`Nuevo valor mensual de «${p.nombre}»`, formatoMiles(p.valor_mensual));
+  if (nuevo && nuevo.replace(/\D/g, "")) await enviar(`/api/finanzas/partidas/${id}`, "PUT",
+    { clase: p.clase, categoria: p.categoria, nombre: p.nombre, valor_mensual: nuevo.replace(/\D/g, "") });
+}
+async function accionMeta(boton) {
+  const id = boton.closest("[data-meta]").dataset.meta;
+  const m = finanzasDatos.metas.find((x) => String(x.meta_id) === id);
+  if (boton.dataset.accion === "quitar") {
+    if (confirm(`¿Quitar la meta «${m.nombre}»?`)) await enviar(`/api/finanzas/metas/${id}`, "DELETE");
+    return;
+  }
+  const nuevo = prompt(`¿Cuánto llevas ahorrado para «${m.nombre}»?`, formatoMiles(m.ahorrado));
+  if (nuevo !== null && nuevo.replace(/\D/g, "") !== "") await enviar(`/api/finanzas/metas/${id}`, "PUT",
+    { tipo: m.tipo, nombre: m.nombre, valor_objetivo: m.valor_objetivo, ahorrado: nuevo.replace(/\D/g, ""), fecha_objetivo: m.fecha_objetivo });
+}
+$("#fin-subir-volante").onclick = () => elegirArchivo(async (archivo) => {
+  const estado = $("#fin-estado-volante");
+  estado.innerHTML = `<div class="cargando">Leyendo el volante con la IA…</div>`;
+  const form = new FormData();
+  form.append("archivo", new Blob([await archivo.arrayBuffer()], { type: archivo.type || "application/octet-stream" }), archivo.name || "volante");
+  const r = await fetch("/api/volantes", { method: "POST", body: form });
+  const cuerpo = await r.json().catch(() => null);
+  if (!r.ok) return aviso(estado, "err", mensajeError(cuerpo, "No se pudo leer el volante."));
+  aviso(estado, "ok", `Volante de ${nombreMes(cuerpo.periodo)} guardado: neto ${pesos(cuerpo.neto)} + probienestar ${pesos(cuerpo.probienestar)}.`);
+  cargarFinanzas();
 });
 
 // ---------------------------------------------------------------- relación de órdenes
