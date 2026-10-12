@@ -10,6 +10,6 @@
   <!-- trazo de monitor que termina en un visto bueno -->
   <polyline points="150,720 330,720 372,655 415,790 458,690 486,720 560,720"
             fill="none" stroke="#7fd3ff" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M556,718 C590,770 612,812 648,826 C690,842 735,770 790,690 C835,625 870,585 905,552"
-            fill="none" stroke="#ffffff" stroke-width="54" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M560,720 L622,838 C628,740 660,640 735,590 C790,555 850,540 905,530"
+            fill="none" stroke="#ffffff" stroke-width="50" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
