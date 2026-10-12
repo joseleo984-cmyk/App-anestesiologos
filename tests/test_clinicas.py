@@ -50,3 +50,14 @@ def test_desempate_entre_clinicas_parecidas(cliente, monkeypatch):
         "SABBAG RADIÓLOGOS - SEDE PORTOAZUL TORRE SABBAG"
     # Ventaja poco clara: se deja como la leyó la IA
     assert leer(cliente, monkeypatch, "Norte", n=3)["clinica"]["nombre"] == "Norte"
+
+
+def test_corregir_clinica_no_deja_el_nombre_viejo(cliente):
+    from tests.test_api import CONFIRMAR
+    r = cliente.post("/api/cirugias", json={**CONFIRMAR, "clinica": {"nombre": "Santa Ana", "ciudad": "Barranquilla"}})
+    cid = r.json()["cirugia_id"]
+    guardar(cliente, "Clínica del Caribe")  # otra clínica con cirugías no se toca
+    datos = {**CONFIRMAR, "clinica": {"nombre": "Clínica Santa Ana de Dios S.A.S.", "ciudad": "Barranquilla"}}
+    assert cliente.put(f"/api/cirugias/{cid}", json=datos).status_code == 200
+    nombres = [c["nombre"] for c in cliente.get("/api/clinicas").json()]
+    assert nombres == ["CLÍNICA DEL CARIBE", "CLÍNICA SANTA ANA DE DIOS S.A.S."]

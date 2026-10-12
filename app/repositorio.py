@@ -237,7 +237,7 @@ def guardar_orden(conn, anestesiologo_id: int, orden: OrdenConfirmada, documento
 def actualizar_orden(conn, anestesiologo_id: int, cirugia_id: int, orden: OrdenConfirmada) -> bool:
     """Corrige una cirugía existente. Devuelve False si no existe o es de otro anestesiólogo."""
     existe = conn.execute(
-        "SELECT 1 FROM cirugia WHERE cirugia_id = %s AND anestesiologo_id = %s FOR UPDATE",
+        "SELECT clinica_id FROM cirugia WHERE cirugia_id = %s AND anestesiologo_id = %s FOR UPDATE",
         (cirugia_id, anestesiologo_id),
     ).fetchone()
     if not existe:
@@ -254,6 +254,11 @@ def actualizar_orden(conn, anestesiologo_id: int, cirugia_id: int, orden: OrdenC
          orden.fecha_pago, orden.observaciones, orden.numero_orden, cirugia_id),
     )
     _guardar_procedimientos(conn, cirugia_id, orden)
+    if existe["clinica_id"] != r["clinica_id"]:
+        # Si se corrigió el nombre de la clínica, el nombre viejo no queda suelto en las sugerencias
+        conn.execute("""DELETE FROM clinica WHERE clinica_id = %s
+                          AND NOT EXISTS (SELECT 1 FROM cirugia WHERE clinica_id = %s)""",
+                     (existe["clinica_id"], existe["clinica_id"]))
     return True
 
 
