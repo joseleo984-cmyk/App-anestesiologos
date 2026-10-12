@@ -115,7 +115,7 @@ def test_registro_manual(cliente):
 
 def test_pagina_principal(cliente):
     r = cliente.get("/")
-    assert r.status_code == 200 and "Órdenes de cirugía" in r.text
+    assert r.status_code == 200 and "Auditorías AP" in r.text
 
 
 def test_foto_heic_aceptada(cliente):
@@ -137,3 +137,16 @@ def test_el_selector_no_filtra_tipos(cliente):
 
 def test_yo_incluye_version(cliente):
     assert cliente.get("/api/yo").json()["version"] == "local"
+
+
+def test_icono_y_manifiesto_sin_sesion(db_url):
+    """El iPhone pide el ícono y el manifiesto antes de iniciar sesión."""
+    from fastapi.testclient import TestClient
+    from app.main import app
+    with TestClient(app) as anonimo:
+        manifiesto = anonimo.get("/static/manifest.json")
+        assert manifiesto.status_code == 200 and manifiesto.json()["name"] == "Auditorías AP"
+        for icono in manifiesto.json()["icons"]:
+            assert anonimo.get(icono["src"]).headers["content-type"] == "image/png"
+        assert anonimo.get("/static/apple-touch-icon.png").status_code == 200
+        assert 'rel="apple-touch-icon"' in anonimo.get("/login").text

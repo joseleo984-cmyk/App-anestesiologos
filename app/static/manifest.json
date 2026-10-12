@@ -1,0 +1,23 @@
+{
+  "name": "Auditorías AP",
+  "short_name": "Auditorías AP",
+  "description": "Órdenes de cirugía, relaciones y pagos de Anestesiólogos Permanentes",
+  "lang": "es-CO",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0a3f86",
+  "theme_color": "#0b6bcb",
+  "icons": [
+    {
+      "src": "/static/icono-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/icono-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
