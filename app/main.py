@@ -622,7 +622,8 @@ def borrar_volante(periodo: date, conn=Depends(get_conn), anestesiologo_id=Depen
 
 @app.post("/api/finanzas/partidas", status_code=201)
 def crear_partida(p: PartidaEntrada, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
-    partida_id = finanzas.crear_partida(conn, anestesiologo_id, p.clase, p.categoria, p.nombre, p.valor_mensual)
+    partida_id = finanzas.crear_partida(conn, anestesiologo_id, p.clase, p.categoria, p.nombre, p.valor_mensual,
+                                        p.saldo, p.tasa_ea)
     conn.commit()
     return {"partida_id": partida_id}
 
@@ -630,7 +631,8 @@ def crear_partida(p: PartidaEntrada, conn=Depends(get_conn), anestesiologo_id=De
 @app.put("/api/finanzas/partidas/{partida_id}")
 def actualizar_partida(partida_id: int, p: PartidaEntrada, conn=Depends(get_conn),
                        anestesiologo_id=Depends(anestesiologo_actual)):
-    if not finanzas.actualizar_partida(conn, anestesiologo_id, partida_id, p.categoria, p.nombre, p.valor_mensual):
+    if not finanzas.actualizar_partida(conn, anestesiologo_id, partida_id, p.categoria, p.nombre, p.valor_mensual,
+                                       p.saldo, p.tasa_ea):
         raise HTTPException(404, "No encontrado.")
     conn.commit()
     return {"partida_id": partida_id}

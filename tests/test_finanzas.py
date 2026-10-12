@@ -97,3 +97,65 @@ def test_volante_comparado_queda_como_ingreso_y_sin_volante_se_calcula(con_repor
     assert r.status_code == 201 and r.json()["periodo"] == "2026-10-01"
     assert c.delete("/api/volantes/2026-10-01").status_code == 204
     assert c.get("/api/finanzas").json()["meses"][0]["fuente"] == "CALCULADO"
+
+
+# ------------------------------------------------------------------ fase 2
+def test_proyeccion_de_metas():
+    metas = [{"meta_id": 1, "tipo": "EMERGENCIA", "nombre": "Fondo", "falta": Decimal(3000000), "cuota_mensual": Decimal(0),
+              "fecha_objetivo": None},
+             {"meta_id": 2, "tipo": "VIAJE", "nombre": "Viaje", "falta": Decimal(6000000), "cuota_mensual": Decimal(1000000),
+              "fecha_objetivo": date(2027, 4, 1)}]
+    finanzas.proyectar_metas(metas, Decimal(1000000), date(2026, 10, 1))
+    fondo, viaje = metas
+    assert viaje["fecha_estimada"] == date(2027, 4, 1) and viaje["a_tiempo"]      # su cuota va primero
+    assert fondo["fecha_estimada"] == date(2027, 7, 1)                              # luego el sobrante
+    finanzas.proyectar_metas(metas, Decimal(500000), date(2026, 10, 1))
+    assert metas[1]["fecha_estimada"] == date(2027, 10, 1) and not metas[1]["a_tiempo"]
+    finanzas.proyectar_metas(metas, Decimal(0), date(2026, 10, 1))
+    assert metas[1]["fecha_estimada"] is None
+
+
+def test_creditos_y_vivienda():
+    gastos = [
+        {"partida_id": 1, "categoria": "DEUDAS", "nombre": "Tarjeta", "valor_mensual": Decimal(300000),
+         "saldo": Decimal(5000000), "tasa_ea": Decimal(30)},
+        {"partida_id": 2, "categoria": "DEUDAS", "nombre": "Libre inversión", "valor_mensual": Decimal(600000),
+         "saldo": Decimal(20000000), "tasa_ea": Decimal(18)},
+        {"partida_id": 3, "categoria": "VIVIENDA", "nombre": "Arriendo", "valor_mensual": Decimal(1), "saldo": None, "tasa_ea": None}]
+    c = finanzas.analizar_creditos(gastos, date(2026, 10, 15))
+    tarjeta, libre = c["creditos"]
+    assert tarjeta["meses"] == 22 and 1_500_000 < tarjeta["intereses"] < 1_700_000
+    assert libre["meses"] == 46 and c["saldo_total"] == 25000000
+    assert "Tarjeta" in c["recomendacion"]
+    gastos[0]["valor_mensual"] = Decimal(100000)   # no cubre ni los intereses (~110.000 al mes)
+    c = finanzas.analizar_creditos(gastos, date(2026, 10, 15))
+    assert not c["creditos"][0]["cubre_intereses"] and "no alcanza ni para los intereses" in c["recomendacion"]
+
+    v = finanzas.capacidad_vivienda(Decimal(5000000), None)
+    assert v["cuota_maxima"] == 1500000 and 141_000_000 < v["credito"] < 142_500_000
+    assert v["cuota_inicial"] == (v["precio_maximo"] * Decimal("0.3")).quantize(Decimal("1"))
+    casa = finanzas.capacidad_vivienda(Decimal(5000000), {"nombre": "Apartamento", "valor_objetivo": Decimal(90000000)})
+    assert casa["precio_meta"] == 300000000 and not casa["meta_alcanza"]   # cuota de ~2,3 M > 1,5 M
+
+
+def test_ahorros_de_ap_y_lo_que_viene(con_reporte):
+    from app.repositorio import conectar
+    from tests.test_pagos import crear
+    c = con_reporte
+    crear(c, "72000730", "2026-08-14")          # se paga en el reporte (SEGUROS UNO ... ver REPORTE)
+    crear(c, "32622878", "2026-07-25")
+    subir(c)                                    # reporte del 2026-10-07: pagos de agosto y julio
+    crear(c, "5551", "2026-10-01")              # pendientes de pago
+    crear(c, "5552", "2026-10-03")
+    crear(c, "5553", "2026-01-10")              # muy vieja: atrasada
+    with conectar() as conn:
+        finanzas.guardar_volante(conn, 1, VolanteExtraido.model_validate({
+            **VOLANTE_OCTUBRE, "acumulado_aporte_sindical": 1017800, "acumulado_semestral": 946882,
+            "acumulado_anual": 1948008, "acumulado_vacaciones": 683512}))
+        conn.commit()
+        e = finanzas.estado(conn, 1, hoy=date(2026, 10, 15))
+    a = e["ahorros_ap"]
+    assert a["semestral"] == 946882 and a["total"] == 946882 + 1948008 + 683512 and a["proximo_semestral"] == "diciembre"
+    p = e["por_cobrar"]
+    assert p["cirugias"] == 2 and p["atrasadas"] == 1 and p["rezago_dias"] > 30
+    assert all(m["periodo"] >= date(2026, 11, 1) for m in p["meses"]) and p["total_te_llega"] > 0

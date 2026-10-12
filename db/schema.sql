@@ -220,6 +220,8 @@ CREATE TABLE IF NOT EXISTS fin_partida (
     categoria          VARCHAR(20) NOT NULL,
     nombre             VARCHAR(120) NOT NULL,
     valor_mensual      NUMERIC(14,2) NOT NULL CHECK (valor_mensual >= 0),
+    saldo              NUMERIC(14,2),                  -- créditos: saldo pendiente
+    tasa_ea            NUMERIC(6,2),                   -- créditos: tasa efectiva anual (%)
     creado_en          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_fin_partida_anest ON fin_partida (anestesiologo_id);

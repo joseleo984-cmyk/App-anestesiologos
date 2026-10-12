@@ -128,3 +128,7 @@ CREATE TABLE IF NOT EXISTS fin_meta (
     creado_en          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_fin_meta_anest ON fin_meta (anestesiologo_id);
+
+-- 14. Créditos: saldo y tasa efectiva anual de las cuotas de deudas
+ALTER TABLE fin_partida ADD COLUMN IF NOT EXISTS saldo NUMERIC(14,2);
+ALTER TABLE fin_partida ADD COLUMN IF NOT EXISTS tasa_ea NUMERIC(6,2);

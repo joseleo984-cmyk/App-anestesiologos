@@ -365,6 +365,15 @@
       </form>
     </section>
     <section class="card">
+      <h2>Lo que viene</h2>
+      <p class="sub">Lo que AP te pagaría en los próximos meses por tus cirugías aún sin pagar.</p>
+      <div id="fin-por-cobrar"></div>
+    </section>
+    <section class="card" id="fin-card-ahorros-ap">
+      <h2>Tus ahorros en AP</h2>
+      <div id="fin-ahorros-ap"></div>
+    </section>
+    <section class="card">
       <h2>Gastos mensuales</h2>
       <p class="sub">Cada categoría se compara con una referencia sana sobre tu ingreso base.</p>
       <div id="fin-gastos"></div>
@@ -372,9 +381,12 @@
         <div><label for="fin-gas-cat">Categoría</label><select id="fin-gas-cat"></select></div>
         <div><label for="fin-gas-nombre">Descripción</label><input id="fin-gas-nombre" placeholder="Ej: colegio de los niños"></div>
         <div><label for="fin-gas-valor">Valor mensual ($)</label><input id="fin-gas-valor" class="pesos" inputmode="numeric"></div>
+        <div class="solo-credito oculto"><label for="fin-gas-saldo">Saldo que debes ($)</label><input id="fin-gas-saldo" class="pesos" inputmode="numeric"></div>
+        <div class="solo-credito oculto"><label for="fin-gas-tasa">Tasa efectiva anual (%)</label><input id="fin-gas-tasa" inputmode="decimal" placeholder="Ej: 24,5"></div>
         <div style="align-self:end"><button type="submit" class="primario">Agregar gasto</button></div>
       </form>
       <div id="fin-estado-gasto"></div>
+      <div id="fin-creditos"></div>
     </section>
     <section class="card">
       <h2>Metas de ahorro</h2>
@@ -392,6 +404,10 @@
         <button type="submit" class="primario" style="margin-top:10px">Agregar meta</button>
         <div id="fin-estado-meta"></div>
       </form>
+    </section>
+    <section class="card">
+      <h2>¿Para cuánto te alcanza una casa?</h2>
+      <div id="fin-vivienda"></div>
     </section>
   </div>
 
@@ -954,9 +970,9 @@ async function cargarFinanzas() {
 
   // ingresos por mes
   $("#fin-meses").innerHTML = f.meses.length ? `<div class="tabla-scroll"><table class="liq meses-fin">
-      <tr><th>Mes</th><th class="v">Neto</th><th class="v">Probienestar</th><th class="v">Total</th></tr>
+      <tr><th>Mes</th><th class="v">Neto + probienestar</th><th class="v">Total</th></tr>
       ${f.meses.map((m) => `<tr><td class="mes">${nombreMes(m.periodo)}<br><small class="sub">${m.fuente === "VOLANTE" ? "volante" : "calculado"}</small></td>
-        <td class="v">${pesos(m.neto)}</td><td class="v">${pesos(m.probienestar)}</td><td class="v"><strong>${pesos(m.total)}</strong></td></tr>`).join("")}
+        <td class="v">${pesos(m.neto)}<br><small class="sub">+ ${pesos(m.probienestar)}</small></td><td class="v"><strong>${pesos(m.total)}</strong></td></tr>`).join("")}
     </table></div><p class="sub">«Calculado»: el mes tiene reporte de pagos pero no volante; sube el volante para usar el valor real.</p>`
     : `<p class="sub">Sube tus reportes de pago en la pestaña Pagos, o tus volantes aquí, para conocer tu ingreso.</p>`;
 
@@ -988,7 +1004,66 @@ async function cargarFinanzas() {
         <button type="button" data-accion="quitar">Quitar</button></div></div>`).join("")
     : `<p class="sub">Empieza por el fondo de emergencias (6 meses de gastos${Number(f.fondo_sugerido) ? `: ${pesos(f.fondo_sugerido)}` : ""}); luego viajes, carro, casa…</p>`;
   document.querySelectorAll("[data-meta] button").forEach((b) => b.onclick = () => accionMeta(b));
+  pintarFase2(f);
 }
+
+function pintarFase2(f) {
+  // lo que viene
+  const pc = f.por_cobrar;
+  $("#fin-por-cobrar").innerHTML = !pc ? `<p class="sub">Cuando subas reportes de pago, la app aprende cuánto y en cuánto tiempo paga AP, y estima lo que viene.</p>`
+    : !pc.meses.length ? `<p class="sub">No tienes cirugías pendientes de pago para proyectar.</p>`
+    : `<div class="kpi" style="margin-bottom:10px"><div class="etiqueta">Te llegaría en los próximos meses</div>
+         <div class="cifra">${pesos(pc.total_te_llega)}</div><div class="sub">por ${pc.cirugias} cirugía${pc.cirugias === 1 ? "" : "s"} pendiente${pc.cirugias === 1 ? "" : "s"}</div></div>
+       <table class="liq"><tr><th>Mes</th><th class="v">Cirugías</th><th class="v">Recaudo</th><th class="v">Te llega</th></tr>
+       ${pc.meses.map((m) => `<tr><td>${nombreMes(m.periodo)}</td><td class="v">${m.cirugias}</td><td class="v">${pesos(m.recaudo)}</td>
+         <td class="v"><strong>${pesos(m.te_llega)}</strong></td></tr>`).join("")}</table>
+       <p class="sub">Estimado con lo que AP te ha pagado: unos ${pesos(pc.valor_promedio)} por paciente y ${pc.rezago_dias} días
+         desde la cirugía hasta el pago. No incluye pagos globales (como honorarios de una IPS) ni lo que pueda glosarse.
+         ${pc.atrasadas ? `<br>⚠ ${pc.atrasadas} cirugía${pc.atrasadas === 1 ? "" : "s"} de hace más de 6 meses sigue${pc.atrasadas === 1 ? "" : "n"} sin pago: revísala${pc.atrasadas === 1 ? "" : "s"} en Cirugías → pendientes.` : ""}</p>`;
+  // ahorros en AP
+  const a = f.ahorros_ap;
+  $("#fin-ahorros-ap").innerHTML = !a ? `<p class="sub">Sube un volante reciente: trae al final los «acumulados de aportes» (semestral, anual y vacaciones).</p>`
+    : `<table class="liq">
+        <tr><td>Compensación semestral</td><td class="v">${pesos(a.semestral)}</td></tr>
+        <tr><td>Compensación anual</td><td class="v">${pesos(a.anual)}</td></tr>
+        <tr><td>Vacaciones</td><td class="v">${pesos(a.vacaciones)}</td></tr>
+        <tr class="sub-total"><td>Total ahorrado en AP</td><td class="v">${pesos(a.total)}</td></tr>
+        <tr><td class="sub">Aporte sindical acumulado (cuotas)</td><td class="v sub">${pesos(a.aporte_sindical)}</td></tr></table>
+      <p class="sub">Según tu volante de ${nombreMes(a.periodo)}. La semestral se paga en ${a.proximo_semestral} (confírmalo con AP).
+        Es plata que llega en bloque: decide desde ya a qué meta va, empezando por el fondo de emergencias.</p>`;
+  // créditos
+  const cr = f.creditos.creditos;
+  $("#fin-creditos").innerHTML = !cr.length ? "" : `<h3 style="margin-top:16px">Tus créditos</h3>${cr.map((c) => `
+    <div class="fin-item"><div class="item-cab"><strong>${escapar(c.nombre)}</strong><span>${pesos(c.cuota)} al mes</span></div>
+      <div class="sub">${c.saldo == null || c.tasa_ea == null ? `Agrega el saldo y la tasa (con «Cambiar valor») para saber cuándo terminas de pagarlo.`
+        : !c.cubre_intereses ? `<span class="estado-fin MUY_ALTO">✕ La cuota no cubre los intereses</span> Saldo ${pesos(c.saldo)} al ${String(Number(c.tasa_ea)).replace(".", ",")} % EA.`
+        : `Saldo ${pesos(c.saldo)} al ${String(Number(c.tasa_ea)).replace(".", ",")} % EA · terminas en ${c.meses} meses (${nombreMes(c.fecha_fin)}) · pagarías ${pesos(c.intereses)} de intereses.`}</div></div>`).join("")}
+    ${Number(f.creditos.saldo_total) ? `<p class="sub">Deuda total: <strong>${pesos(f.creditos.saldo_total)}</strong></p>` : ""}`;
+  // metas: proyección
+  f.metas.forEach((m) => {
+    const cont = document.querySelector(`[data-meta="${m.meta_id}"] .sub`);
+    if (!cont) return;
+    const linea = !m.falta || Number(m.falta) === 0 ? "✓ ¡Meta cumplida!"
+      : !m.fecha_estimada ? "Con tu capacidad de ahorro actual no se alcanza: revisa tus gastos."
+      : `Con tu capacidad de ahorro actual la cumples en <strong>${nombreMes(m.fecha_estimada)}</strong>${m.fecha_objetivo ? (m.a_tiempo ? " ✓ a tiempo" : " ⚠ después de tu fecha") : ""}.`;
+    cont.insertAdjacentHTML("beforeend", `<br>${linea}`);
+  });
+  // vivienda
+  const v = f.vivienda;
+  $("#fin-vivienda").innerHTML = !v ? `<p class="sub">Primero necesitamos tu ingreso base.</p>`
+    : `<table class="liq">
+        <tr><td>Cuota máxima sana (30 % de tu ingreso base)</td><td class="v">${pesos(v.cuota_maxima)}</td></tr>
+        <tr><td>Crédito que te prestarían con esa cuota</td><td class="v">${pesos(v.credito)}</td></tr>
+        <tr class="sub-total"><td>Precio de vivienda hasta</td><td class="v">${pesos(v.precio_maximo)}</td></tr>
+        <tr><td>Cuota inicial que necesitas (30 %)</td><td class="v">${pesos(v.cuota_inicial)}</td></tr></table>
+      ${v.meta ? `<div class="consejo ${v.meta_alcanza ? "SANO" : "ALTO"}">${v.meta_alcanza ? "✓" : "⚠"} Tu meta «${escapar(v.meta)}» es una cuota
+        inicial para una casa de ${pesos(v.precio_meta)}: la cuota del crédito sería de unos ${pesos(v.cuota_meta)} al mes
+        ${v.meta_alcanza ? "y cabe en tu ingreso base." : "y pasa del 30 % de tu ingreso base."}</div>` : ""}
+      <p class="sub">Estimado con una tasa de ${v.tasa_supuesta} % EA a ${v.plazo_anios} años, sin subsidios. Pide la simulación real a tu banco.
+        Para la meta de casa, pon como valor la cuota inicial que quieres ahorrar.</p>`;
+}
+$("#fin-gas-cat").addEventListener("change", () =>
+  document.querySelectorAll(".solo-credito").forEach((el) => el.classList.toggle("oculto", $("#fin-gas-cat").value !== "DEUDAS")));
 
 const valorPesos = (id) => $(id).value.replace(/\D/g, "");
 async function enviar(url, metodo, datos, avisoEn) {
@@ -1007,8 +1082,10 @@ $("#fin-form-gasto").onsubmit = async (e) => {
   if (!valorPesos("#fin-gas-valor")) return aviso($("#fin-estado-gasto"), "err", "Escribe el valor mensual.");
   const ok = await enviar("/api/finanzas/partidas", "POST", { clase: "GASTO", categoria: $("#fin-gas-cat").value,
     nombre: $("#fin-gas-nombre").value.trim() || $("#fin-gas-cat").selectedOptions[0].text.split(" (")[0],
-    valor_mensual: valorPesos("#fin-gas-valor") }, "#fin-estado-gasto");
-  if (ok) { $("#fin-gas-nombre").value = ""; $("#fin-gas-valor").value = ""; }
+    valor_mensual: valorPesos("#fin-gas-valor"),
+    saldo: $("#fin-gas-cat").value === "DEUDAS" && valorPesos("#fin-gas-saldo") ? valorPesos("#fin-gas-saldo") : null,
+    tasa_ea: $("#fin-gas-cat").value === "DEUDAS" && $("#fin-gas-tasa").value.trim() ? $("#fin-gas-tasa").value.trim() : null }, "#fin-estado-gasto");
+  if (ok) ["#fin-gas-nombre", "#fin-gas-valor", "#fin-gas-saldo", "#fin-gas-tasa"].forEach((id) => $(id).value = "");
 };
 $("#fin-form-ingreso").onsubmit = async (e) => {
   e.preventDefault();
@@ -1040,8 +1117,16 @@ async function accionPartida(boton) {
     return;
   }
   const nuevo = prompt(`Nuevo valor mensual de «${p.nombre}»`, formatoMiles(p.valor_mensual));
-  if (nuevo && nuevo.replace(/\D/g, "")) await enviar(`/api/finanzas/partidas/${id}`, "PUT",
-    { clase: p.clase, categoria: p.categoria, nombre: p.nombre, valor_mensual: nuevo.replace(/\D/g, "") });
+  if (!nuevo || !nuevo.replace(/\D/g, "")) return;
+  let saldo = p.saldo, tasa = p.tasa_ea;
+  if (p.categoria === "DEUDAS") {
+    const s = prompt(`¿Cuánto debes todavía en «${p.nombre}»?`, p.saldo != null ? formatoMiles(p.saldo) : "");
+    if (s !== null) saldo = s.replace(/\D/g, "") || null;
+    const t = prompt(`Tasa efectiva anual de «${p.nombre}» (%)`, p.tasa_ea != null ? String(p.tasa_ea).replace(".", ",") : "");
+    if (t !== null) tasa = t.trim() || null;
+  }
+  await enviar(`/api/finanzas/partidas/${id}`, "PUT",
+    { clase: p.clase, categoria: p.categoria, nombre: p.nombre, valor_mensual: nuevo.replace(/\D/g, ""), saldo, tasa_ea: tasa });
 }
 async function accionMeta(boton) {
   const id = boton.closest("[data-meta]").dataset.meta;

@@ -161,6 +161,15 @@ Cada anestesiólogo ve solo las suyas (ni el administrador las ve). `app/finanza
 - **Metas:** cuánto apartar al mes según la fecha; el fondo de emergencias sugerido es de 6 meses de gastos.
 - **Consejos:** avisos sobre lo anterior y, cuando un mes entra por encima de la base, llevar el excedente
   a las metas.
+- **Lo que viene:** estima cuánto y cuándo pagará AP las cirugías realizadas y aún no pagadas, con el neto
+  promedio por paciente (por aseguradora si hay al menos 2 pagos) y la mediana de días entre la cirugía y
+  el pago; cada mes se pasa por la liquidación. Las de más de 6 meses se reportan como atrasadas.
+- **Ahorros en AP:** semestral, anual, vacaciones y aporte sindical del último volante que los trae.
+- **Proyección de metas:** mes a mes, primero el fondo de emergencias y las cuotas de las metas con fecha;
+  dice en qué mes se cumple cada una y si llega a tiempo.
+- **Créditos:** con saldo y tasa EA, meses para terminar, intereses totales y cuál abonar primero.
+- **Vivienda:** cuota hasta el 30 % del ingreso base, crédito a 20 años al 12 % EA (supuesto) y 30 % de
+  cuota inicial.
 
 ## Pagos: depurar pendientes
 

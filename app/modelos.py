@@ -264,11 +264,17 @@ class VolanteExtraido(_Base):
     ajuste_sindical: Optional[Decimal] = None
     neto: Optional[Decimal] = None
     otros: list[OtroConcepto] = []
+    # "ACUMULADO DE APORTES" del pie del volante
+    acumulado_aporte_sindical: Optional[Decimal] = None
+    acumulado_semestral: Optional[Decimal] = None
+    acumulado_anual: Optional[Decimal] = None
+    acumulado_vacaciones: Optional[Decimal] = None
 
     _f = field_validator("fecha_proceso", "periodo_desde", "periodo_hasta", mode="before")(_fecha_o_nulo)
     _p = field_validator("probienestar", "compensacion_ordinaria", "compensacion_extraordinaria", "auxilio_sindical",
                          "cuatro_por_mil", "cuota_sostenimiento", "salud", "pension", "ajuste_sindical",
-                         "neto", mode="before")(_pesos_o_nulo)
+                         "neto", "acumulado_aporte_sindical", "acumulado_semestral", "acumulado_anual",
+                         "acumulado_vacaciones", mode="before")(_pesos_o_nulo)
 
 
 # ---------------------------------------------------------------- finanzas personales
@@ -284,8 +290,18 @@ class PartidaEntrada(_Base):
     categoria: str = Field(min_length=2, max_length=20)
     nombre: str = Field(min_length=1, max_length=120)
     valor_mensual: Decimal = Field(ge=0, max_digits=14, decimal_places=2)
+    saldo: Optional[Decimal] = Field(default=None, ge=0, max_digits=14, decimal_places=2)   # solo créditos
+    tasa_ea: Optional[Decimal] = Field(default=None, ge=0, le=200, max_digits=6, decimal_places=2)  # % efectivo anual
 
-    _p = field_validator("valor_mensual", mode="before")(_pesos_positivos)
+    _p = field_validator("valor_mensual", "saldo", mode="before")(_pesos_positivos)
+
+    @field_validator("tasa_ea", mode="before")
+    @classmethod
+    def _tasa(cls, v):  # acepta "24,5" o "24.5"
+        if isinstance(v, str):
+            v = v.replace("%", "").replace(",", ".").strip()
+            return Decimal(v) if v else None
+        return v
 
     @model_validator(mode="after")
     def _categoria_valida(self):
