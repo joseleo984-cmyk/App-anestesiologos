@@ -197,3 +197,42 @@ CREATE INDEX idx_cirugia_clinica      ON cirugia (clinica_id);
 CREATE INDEX idx_cirugia_cirujano     ON cirugia (cirujano_id);
 CREATE INDEX idx_cobertura_paciente   ON cobertura (paciente_id);
 CREATE INDEX idx_procedimiento_nombre ON procedimiento (nombre);
+-- ---------------------------------------------------------------------
+-- 13. Finanzas personales de cada anestesiólogo (solo las ve él mismo)
+-- ---------------------------------------------------------------------
+-- Volante de pago de AP, uno por mes: es el ingreso real del mes
+CREATE TABLE IF NOT EXISTS volante_pago (
+    volante_id         BIGSERIAL PRIMARY KEY,
+    anestesiologo_id   BIGINT NOT NULL REFERENCES anestesiologo(anestesiologo_id) ON DELETE CASCADE,
+    periodo            DATE NOT NULL,                  -- primer día del mes liquidado
+    neto               NUMERIC(14,2) NOT NULL,         -- neto del volante (ya con retención descontada)
+    probienestar       NUMERIC(14,2) NOT NULL DEFAULT 0,
+    datos_extraidos    JSONB,
+    subido_en          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (anestesiologo_id, periodo)
+);
+
+-- Gastos mensuales e ingresos adicionales (arriendos, consulta particular, otro empleo…)
+CREATE TABLE IF NOT EXISTS fin_partida (
+    partida_id         BIGSERIAL PRIMARY KEY,
+    anestesiologo_id   BIGINT NOT NULL REFERENCES anestesiologo(anestesiologo_id) ON DELETE CASCADE,
+    clase              VARCHAR(10) NOT NULL CHECK (clase IN ('GASTO', 'INGRESO')),
+    categoria          VARCHAR(20) NOT NULL,
+    nombre             VARCHAR(120) NOT NULL,
+    valor_mensual      NUMERIC(14,2) NOT NULL CHECK (valor_mensual >= 0),
+    creado_en          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_fin_partida_anest ON fin_partida (anestesiologo_id);
+
+-- Metas de ahorro: fondo de emergencias, viajes, carro, casa…
+CREATE TABLE IF NOT EXISTS fin_meta (
+    meta_id            BIGSERIAL PRIMARY KEY,
+    anestesiologo_id   BIGINT NOT NULL REFERENCES anestesiologo(anestesiologo_id) ON DELETE CASCADE,
+    tipo               VARCHAR(12) NOT NULL,
+    nombre             VARCHAR(120) NOT NULL,
+    valor_objetivo     NUMERIC(14,2) NOT NULL CHECK (valor_objetivo > 0),
+    ahorrado           NUMERIC(14,2) NOT NULL DEFAULT 0 CHECK (ahorrado >= 0),
+    fecha_objetivo     DATE,
+    creado_en          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_fin_meta_anest ON fin_meta (anestesiologo_id);

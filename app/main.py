@@ -21,8 +21,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from rapidfuzz import fuzz
 
-from app import almacenamiento, auth, catalogo, config, exportar, extraccion, inicio, liquidacion, repositorio
-from app.modelos import OrdenConfirmada, Sugerencia
+from app import almacenamiento, auth, catalogo, config, exportar, extraccion, finanzas, inicio, liquidacion, repositorio
+from app.modelos import MetaEntrada, OrdenConfirmada, PartidaEntrada, Sugerencia
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 log = logging.getLogger(__name__)
@@ -573,6 +573,11 @@ def comparar_volante(reporte_id: int, archivo: UploadFile, conn=Depends(get_conn
         raise HTTPException(422, {"mensaje": "No se encontraron los valores de un volante de pago en el documento."})
     calculada = _liquidacion_de(reporte)
     avisos = []
+    if volante.neto is not None and (volante.periodo_hasta or volante.fecha_proceso or reporte["periodo_hasta"]):
+        if not (volante.periodo_hasta or volante.fecha_proceso):
+            volante.periodo_hasta = reporte["periodo_hasta"]
+        finanzas.guardar_volante(conn, anestesiologo_id, volante)  # queda como ingreso real del mes
+        conn.commit()
     if volante.periodo_hasta and reporte["periodo_hasta"] and \
             (volante.periodo_hasta.year, volante.periodo_hasta.month) != (reporte["periodo_hasta"].year, reporte["periodo_hasta"].month):
         avisos.append(f"El volante es del periodo que termina el {volante.periodo_hasta:%d/%m/%Y} y el reporte de pagos "
@@ -582,6 +587,84 @@ def comparar_volante(reporte_id: int, archivo: UploadFile, conn=Depends(get_conn
                       ", ".join(o.concepto or "sin nombre" for o in volante.otros) + ".")
     return {"liquidacion": calculada, "volante": leidos,
             "comparacion": liquidacion.comparar(calculada, leidos), "avisos": avisos}
+
+
+# ---------------------------------------------------------------- finanzas personales
+@app.get("/api/finanzas")
+def estado_financiero(conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+    """Solo del anestesiólogo que consulta: ni el administrador ve las finanzas de otros."""
+    return {**finanzas.estado(conn, anestesiologo_id), "catalogos": finanzas.catalogos()}
+
+
+@app.post("/api/volantes", status_code=201)
+def subir_volante(archivo: UploadFile, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+    """Sube el volante de AP de un mes: queda como el ingreso real de ese mes."""
+    datos, tipo = _leer_subida(archivo)
+    try:
+        volante = extraccion.extraer_volante(datos, tipo)
+    except extraccion.ExtraccionError as e:
+        raise HTTPException(422, {"mensaje": str(e)})
+    try:
+        guardado = finanzas.guardar_volante(conn, anestesiologo_id, volante)
+    except ValueError:
+        raise HTTPException(422, {"mensaje": "No se encontró el mes o el neto del volante. ¿Es un volante de pago?"})
+    conn.commit()
+    return guardado
+
+
+@app.delete("/api/volantes/{periodo}", status_code=204)
+def borrar_volante(periodo: date, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+    conn.execute("DELETE FROM volante_pago WHERE anestesiologo_id = %s AND periodo = %s",
+                 (anestesiologo_id, periodo.replace(day=1)))
+    conn.commit()
+    return Response(status_code=204)
+
+
+@app.post("/api/finanzas/partidas", status_code=201)
+def crear_partida(p: PartidaEntrada, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+    partida_id = finanzas.crear_partida(conn, anestesiologo_id, p.clase, p.categoria, p.nombre, p.valor_mensual)
+    conn.commit()
+    return {"partida_id": partida_id}
+
+
+@app.put("/api/finanzas/partidas/{partida_id}")
+def actualizar_partida(partida_id: int, p: PartidaEntrada, conn=Depends(get_conn),
+                       anestesiologo_id=Depends(anestesiologo_actual)):
+    if not finanzas.actualizar_partida(conn, anestesiologo_id, partida_id, p.categoria, p.nombre, p.valor_mensual):
+        raise HTTPException(404, "No encontrado.")
+    conn.commit()
+    return {"partida_id": partida_id}
+
+
+@app.delete("/api/finanzas/partidas/{partida_id}", status_code=204)
+def borrar_partida(partida_id: int, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+    if not finanzas.borrar_partida(conn, anestesiologo_id, partida_id):
+        raise HTTPException(404, "No encontrado.")
+    conn.commit()
+    return Response(status_code=204)
+
+
+@app.post("/api/finanzas/metas", status_code=201)
+def crear_meta(m: MetaEntrada, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+    meta_id = finanzas.crear_meta(conn, anestesiologo_id, m)
+    conn.commit()
+    return {"meta_id": meta_id}
+
+
+@app.put("/api/finanzas/metas/{meta_id}")
+def actualizar_meta(meta_id: int, m: MetaEntrada, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+    if not finanzas.actualizar_meta(conn, anestesiologo_id, meta_id, m):
+        raise HTTPException(404, "No encontrado.")
+    conn.commit()
+    return {"meta_id": meta_id}
+
+
+@app.delete("/api/finanzas/metas/{meta_id}", status_code=204)
+def borrar_meta(meta_id: int, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+    if not finanzas.borrar_meta(conn, anestesiologo_id, meta_id):
+        raise HTTPException(404, "No encontrado.")
+    conn.commit()
+    return Response(status_code=204)
 
 
 @app.post("/api/pagos/{reporte_id}/aplicar")

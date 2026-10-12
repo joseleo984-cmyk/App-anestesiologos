@@ -269,3 +269,43 @@ class VolanteExtraido(_Base):
     _p = field_validator("probienestar", "compensacion_ordinaria", "compensacion_extraordinaria", "auxilio_sindical",
                          "cuatro_por_mil", "cuota_sostenimiento", "salud", "pension", "ajuste_sindical",
                          "neto", mode="before")(_pesos_o_nulo)
+
+
+# ---------------------------------------------------------------- finanzas personales
+def _pesos_positivos(v):
+    if isinstance(v, str):
+        digitos = "".join(ch for ch in v if ch.isdigit())
+        return Decimal(digitos) if digitos else None
+    return v
+
+
+class PartidaEntrada(_Base):
+    clase: Literal["GASTO", "INGRESO"]
+    categoria: str = Field(min_length=2, max_length=20)
+    nombre: str = Field(min_length=1, max_length=120)
+    valor_mensual: Decimal = Field(ge=0, max_digits=14, decimal_places=2)
+
+    _p = field_validator("valor_mensual", mode="before")(_pesos_positivos)
+
+    @model_validator(mode="after")
+    def _categoria_valida(self):
+        from app.finanzas import CATEGORIAS, CATEGORIAS_INGRESO
+        validas = [c[0] for c in (CATEGORIAS if self.clase == "GASTO" else CATEGORIAS_INGRESO)]
+        if self.categoria not in validas:
+            raise ValueError(f"categoría inválida: {self.categoria}")
+        return self
+
+
+class MetaEntrada(_Base):
+    tipo: Literal["EMERGENCIA", "VIAJE", "CARRO", "CASA", "EDUCACION", "RETIRO", "OTRO"]
+    nombre: str = Field(min_length=1, max_length=120)
+    valor_objetivo: Decimal = Field(gt=0, max_digits=14, decimal_places=2)
+    ahorrado: Decimal = Field(default=Decimal(0), ge=0, max_digits=14, decimal_places=2)
+    fecha_objetivo: Optional[date] = None
+
+    _p = field_validator("valor_objetivo", "ahorrado", mode="before")(_pesos_positivos)
+
+    @field_validator("ahorrado", mode="before")
+    @classmethod
+    def _cero(cls, v):
+        return Decimal(0) if v in (None, "") else v
