@@ -177,6 +177,10 @@ Cada anestesiólogo ve solo las suyas (ni el administrador las ve). `app/finanza
   lo ahorrado). Cada categoría se compara con su presupuesto: dentro, pasado (hasta 10 % más), muy pasado
   o sin presupuesto. Se puede mirar cualquier mes anterior.
 - **Semestral de AP:** se paga con los cortes de junio y diciembre (confirmado con AP).
+- **Gráficas:** ingresos por mes (neto + probienestar, con la línea del ingreso base), a dónde va el ingreso
+  base (gastos fijos, variables, metas y lo libre), gastos de los últimos 6 meses contra el presupuesto, lo que
+  llegaría por mes y, en Reportes, cirugías por mes (pagado y por cobrar). Se tocan para ver el detalle de cada
+  mes; los colores están validados para daltonismo y modo oscuro.
 - **Extractos del banco** (`app/extractos.py`): se sube el extracto de una tarjeta, cuenta o crédito y la app
   anota los gastos. El PDF (con o sin clave; muchas hojas, máximo 100) y las fotos se leen con la IA de 10 en
   10 hojas, en segundo plano, mostrando el avance. El Excel (.xlsx) o CSV del banco se lee sin IA (detecta las

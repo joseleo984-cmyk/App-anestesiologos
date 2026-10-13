@@ -210,3 +210,12 @@ def test_gastos_reales_contra_presupuesto(cliente):
     post("/api/finanzas/movimientos", {"clase": "APORTE", "meta_id": meta, "valor": 1000000})
     m = cliente.get("/api/finanzas").json()["metas"][0]
     assert m["cumple_mes"] and m["racha"] == 1 and Decimal(m["ahorrado"]) == 1000000
+
+
+def test_historial_de_gastos_de_6_meses(conn):
+    from app.modelos import MovimientoEntrada
+    for fecha, valor in [("2026-05-03", 100000), ("2026-10-02", 250000), ("2026-10-20", 50000), ("2026-03-01", 999)]:
+        finanzas.crear_movimiento(conn, 1, MovimientoEntrada(clase="GASTO", categoria="OTROS", fecha=fecha, valor=valor))
+    h = finanzas.estado(conn, 1, hoy=date(2026, 10, 15))["mes"]["historial"]
+    assert [x["periodo"].month for x in h] == [5, 6, 7, 8, 9, 10]
+    assert [x["gastos"] for x in h] == [100000, 0, 0, 0, 0, 300000]

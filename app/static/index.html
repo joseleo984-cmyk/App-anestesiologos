@@ -17,12 +17,14 @@
     --bg: #f6f7f9; --card: #ffffff; --text: #1b1f24; --muted: #5b6470; --line: #d9dde3;
     --accent: #0b6bcb; --accent-text: #ffffff; --warn-bg: #fff4d6; --warn-line: #e0a800;
     --ok-bg: #e5f5ea; --ok-text: #1d6b35; --err-bg: #fde8e8; --err-text: #a61b1b;
+    --serie-1: #2a78d6; --serie-2: #eb6834; --serie-3: #1baf7a; --rejilla: #e8eaee; --eje: #c3c7ce; --libre: #e3e6ea;
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #12151a; --card: #1b2028; --text: #e7eaee; --muted: #9aa4b1; --line: #313844;
       --accent: #4b9cf0; --accent-text: #0b0f14; --warn-bg: #3a3014; --warn-line: #c99a1a;
       --ok-bg: #173323; --ok-text: #8fd9a8; --err-bg: #3d1c1c; --err-text: #f1a3a3;
+      --serie-1: #3987e5; --serie-2: #d95926; --serie-3: #199e70; --rejilla: #262c36; --eje: #3a424f; --libre: #2a313c;
     }
   }
   * { box-sizing: border-box; }
@@ -139,6 +141,24 @@
   .ext-fila .ext-motivo { font-size: .75rem; color: var(--muted); }
   .barra-avance { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; margin: 8px 0; }
   .barra-avance span { display: block; height: 100%; background: var(--accent); transition: width .3s; }
+  .grafica { position: relative; margin: 10px 0 4px; touch-action: pan-y; }
+  .grafica svg { display: block; overflow: visible; }
+  .grafica text { font: 11px system-ui, -apple-system, "Segoe UI", sans-serif; fill: var(--muted); font-variant-numeric: tabular-nums; }
+  .grafica text.dato { fill: var(--text); font-weight: 600; }
+  .grafica .tip { position: absolute; pointer-events: none; background: var(--card); color: var(--text);
+    border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; font-size: .78rem; line-height: 1.35;
+    box-shadow: 0 4px 14px rgba(0,0,0,.14); white-space: nowrap; z-index: 2; }
+  .leyenda { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: .8rem; color: var(--muted); margin: 6px 0; }
+  .leyenda span { display: inline-flex; align-items: center; gap: 6px; }
+  .leyenda i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; flex: 0 0 auto; }
+  .leyenda i.linea { height: 2px; border-radius: 1px; background: var(--text); }
+  .reparto { display: flex; gap: 2px; height: 18px; margin: 12px 0 6px; }
+  .reparto span { min-width: 3px; }
+  .reparto span:first-child { border-radius: 4px 0 0 4px; }
+  .reparto span:last-child { border-radius: 0 4px 4px 0; }
+  .reparto-leyenda { display: grid; grid-template-columns: 1fr auto auto; gap: 2px 12px; font-size: .85rem; }
+  .reparto-leyenda .v { text-align: right; font-variant-numeric: tabular-nums; }
+  .reparto-leyenda .p { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
   .fin-item .acciones button { padding: 4px 10px; font-size: .8rem; }
   .consejo { padding: 8px 10px; border-radius: 8px; margin: 6px 0; font-size: .9rem; }
   .consejo.SANO { background: var(--ok-bg); color: var(--ok-text); }
@@ -357,6 +377,7 @@
       <p class="sub">🔒 Solo tú ves esta información. El presupuesto se arma sobre tu <strong>ingreso base</strong>
         (el promedio de tus 3 meses más bajos), así un mes flojo no te descuadra.</p>
       <div class="kpis" id="fin-kpis"></div>
+      <div id="fin-reparto"></div>
       <div id="fin-consejos"></div>
     </section>
     <section class="card">
@@ -412,6 +433,7 @@
     </section>
     <section class="card">
       <h2>Ingresos</h2>
+      <div id="fin-grafica-ingresos"></div>
       <div id="fin-meses"></div>
       <div class="atajos"><button type="button" id="fin-subir-volante">📄 Subir volante de un mes</button></div>
       <div id="fin-estado-volante"></div>
@@ -996,6 +1018,112 @@ document.addEventListener("input", (e) => {
   e.target.value = digitos ? formatoMiles(digitos) : "";
 });
 
+// ---------------------------------------------------------------- gráficas
+const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+// "$ 3,9 M", "$ 850 mil": para ejes y etiquetas cortas
+function pesosCorto(v) {
+  v = Number(v) || 0;
+  const a = Math.abs(v);
+  if (a >= 1e6) return `$ ${(v / 1e6).toFixed(a >= 1e7 ? 0 : 1).replace(".", ",").replace(",0", "")} M`;
+  if (a >= 1e3) return `$ ${Math.round(v / 1e3)} mil`;
+  return `$ ${Math.round(v)}`;
+}
+function pasoRedondo(max, partes = 3) {
+  const crudo = max / partes, mag = 10 ** Math.floor(Math.log10(crudo || 1));
+  return [1, 2, 2.5, 5, 10].map((m) => m * mag).find((p) => p >= crudo) || mag * 10;
+}
+const graficasVivas = new Map();
+let anchoAnterior = window.innerWidth;
+window.addEventListener("resize", () => {
+  if (Math.abs(window.innerWidth - anchoAnterior) < 20) return;
+  anchoAnterior = window.innerWidth;
+  graficasVivas.forEach((opts, cont) => cont.isConnected ? graficaColumnas(cont, opts) : graficasVivas.delete(cont));
+});
+
+/* Columnas por mes (apiladas si hay varias series), con línea de referencia opcional y detalle al tocar.
+   opts: { puntos: [{periodo, valores: [..], detalle?}], series: [{nombre, color}], referencia?: {valor, nombre},
+           formato?: fn, unidad?: fn para el total del tooltip } */
+function graficaColumnas(cont, opts) {
+  if (!cont) return;
+  graficasVivas.set(cont, opts);
+  const { puntos, series, referencia } = opts, formato = opts.formato || pesos, corto = opts.corto || pesosCorto;
+  if (!puntos.length) { cont.innerHTML = ""; return; }
+  const ancho = Math.max(260, cont.clientWidth || 320), alto = 170, izq = 50, der = referencia ? 8 : 8, arriba = 18, abajo = 30;
+  const totales = puntos.map((p) => p.valores.reduce((a, b) => a + Number(b || 0), 0));
+  const tope = Math.max(...totales, referencia ? Number(referencia.valor) : 0, 1);
+  const paso = opts.entero ? Math.max(1, Math.ceil(pasoRedondo(tope))) : pasoRedondo(tope), maxY = Math.ceil(tope * 1.08 / paso) * paso;
+  const y = (v) => arriba + alto - (v / maxY) * alto;
+  const banda = (ancho - izq - der) / puntos.length, w = Math.min(24, banda * 0.62);
+  const xc = (i) => izq + banda * i + banda / 2;
+  let svg = `<rect class="resalte" x="0" y="${arriba}" width="${banda}" height="${alto}" fill="var(--rejilla)" opacity="0"/>`;
+  for (let v = 0; v <= maxY + 1; v += paso)  // rejilla fina y valores del eje
+    svg += `<line x1="${izq}" x2="${ancho - der}" y1="${y(v)}" y2="${y(v)}" stroke="var(--${v ? "rejilla" : "eje"})" stroke-width="1"/>
+      <text x="${izq - 6}" y="${y(v) + 4}" text-anchor="end">${v ? corto(v) : "0"}</text>`;
+  puntos.forEach((p, i) => {
+    let base = 0;
+    const visibles = p.valores.map((v, k) => [Number(v || 0), k]).filter(([v]) => v > 0);
+    visibles.forEach(([v, k], j) => {
+      const y0 = y(base), y1 = y(base + v), x = xc(i) - w / 2, ultimo = j === visibles.length - 1;
+      const gap = j > 0 ? 2 : 0, h = Math.max(1, y0 - y1 - gap), top = y0 - gap - h, r = ultimo ? Math.min(4, h, w / 2) : 0;
+      svg += `<path fill="${series[k].color}" d="M${x},${top + h} L${x},${top + r} Q${x},${top} ${x + r},${top} L${x + w - r},${top} Q${x + w},${top} ${x + w},${top + r} L${x + w},${top + h} Z"/>`;
+      base += v;
+    });
+    const [a, m] = p.periodo.split("-").map(Number);
+    const primero = i === 0 || Number(puntos[i - 1].periodo.slice(0, 4)) !== a;
+    svg += `<text x="${xc(i)}" y="${arriba + alto + 14}" text-anchor="middle">${MESES_CORTOS[m - 1]}</text>`;
+    if (primero && puntos.length > 1) svg += `<text x="${xc(i)}" y="${arriba + alto + 26}" text-anchor="middle">${a}</text>`;
+  });
+  // solo se rotula el último mes; el resto se ve al tocar
+  const u = puntos.length - 1;
+  if (totales[u]) svg += `<text class="dato" x="${Math.min(xc(u), ancho - 30)}" y="${y(totales[u]) - 6}" text-anchor="middle">${corto(totales[u])}</text>`;
+  if (referencia && Number(referencia.valor)) {
+    const yr = y(Number(referencia.valor));
+    svg += `<line x1="${izq}" x2="${ancho - der}" y1="${yr}" y2="${yr}" stroke="var(--text)" stroke-width="1.5" opacity=".7"/>`;
+  }
+  puntos.forEach((p, i) => svg += `<rect data-i="${i}" x="${izq + banda * i}" y="${arriba}" width="${banda}" height="${alto}" fill="transparent"/>`);
+  const leyenda = series.length > 1 || referencia ? `<div class="leyenda">${series.length > 1 ? series.map((s) =>
+      `<span><i style="background:${s.color}"></i>${escapar(s.nombre)}</span>`).join("") : ""}${referencia ? `<span><i class="linea"></i>${escapar(referencia.nombre)}: ${formato(referencia.valor)}</span>` : ""}</div>` : "";
+  cont.innerHTML = `${leyenda}<div class="grafica" role="img" aria-label="${escapar(opts.titulo || "Gráfica por mes")}">
+    <svg width="${ancho}" height="${arriba + alto + abajo}">${svg}</svg><div class="tip oculto"></div></div>`;
+  const caja = cont.querySelector(".grafica"), tip = caja.querySelector(".tip");
+  const mostrar = (i) => {
+    const p = puntos[i];
+    const resalte = caja.querySelector(".resalte");
+    resalte.setAttribute("x", izq + banda * i);
+    resalte.setAttribute("opacity", "1");
+    tip.innerHTML = `<strong>${nombreMes(p.periodo)}</strong>${series.map((s, k) => `<br>${series.length > 1
+      ? `<i style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${s.color};margin-right:5px"></i>${escapar(s.nombre)}: ` : ""}${formato(p.valores[k] || 0)}`).join("")}${
+      series.length > 1 ? `<br>Total: <strong>${formato(totales[i])}</strong>` : ""}${p.detalle ? `<br><span class="sub">${p.detalle}</span>` : ""}`;
+    tip.classList.remove("oculto");
+    const tw = tip.offsetWidth, x = Math.min(Math.max(xc(i) - tw / 2, 0), ancho - tw);
+    tip.style.left = `${x}px`;
+    tip.style.top = `${Math.max(0, y(totales[i]) - tip.offsetHeight - 10)}px`;
+  };
+  const ocultar = () => { tip.classList.add("oculto"); caja.querySelector(".resalte").setAttribute("opacity", "0"); };
+  caja.querySelectorAll("rect[data-i]").forEach((r) => {
+    r.addEventListener("pointerenter", () => mostrar(Number(r.dataset.i)));
+    r.addEventListener("click", () => mostrar(Number(r.dataset.i)));
+  });
+  caja.addEventListener("pointerleave", ocultar);
+}
+
+// Barra de reparto del ingreso base: gastos fijos, variables, metas y lo que queda libre
+function pintarReparto(f) {
+  const base = Number(f.ingreso_base), gastos = Number(f.gastos), fijos = Number(f.gastos_fijos || 0);
+  if (!base || !gastos) { $("#fin-reparto").innerHTML = ""; return; }
+  const variables = Math.max(0, gastos - fijos), metas = Number(f.cuotas_metas || 0);
+  const usado = fijos + variables + metas, total = Math.max(base, usado), libre = Math.max(0, base - usado);
+  const partes = [["Gastos fijos", fijos, "var(--serie-1)"], ["Gastos variables", variables, "var(--serie-2)"],
+                  ["Metas de ahorro", metas, "var(--serie-3)"], ["Te queda libre", libre, "var(--libre)"]].filter(([, v]) => v > 0);
+  const pct = (v) => `${Math.round(v / base * 100)} %`;
+  $("#fin-reparto").innerHTML = `<h3 style="margin:16px 0 0">¿A dónde va tu ingreso base?</h3>
+    <div class="reparto" role="img" aria-label="${partes.map(([n, v]) => `${n} ${pct(v)}`).join(", ")}">
+      ${partes.map(([n, v, c]) => `<span style="flex:${v / total} 1 0;background:${c}" title="${n}: ${pesos(v)}"></span>`).join("")}</div>
+    <div class="reparto-leyenda">${partes.map(([n, v, c]) => `<span class="leyenda" style="margin:0"><span><i style="background:${c}"></i>${n}</span></span>
+      <span class="v">${pesos(v)}</span><span class="p">${pct(v)}</span>`).join("")}</div>
+    ${usado > base ? `<div class="consejo MUY_ALTO" style="margin-top:8px">✕ Gastos y metas suman ${pesos(usado)}: ${pesos(usado - base)} más que tu ingreso base.</div>` : ""}`;
+}
+
 let finMes = null;  // primer día del mes elegido (AAAA-MM-01)
 const isoMes = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
 function moverMes(n) {
@@ -1034,6 +1162,11 @@ async function cargarFinanzas() {
   $("#fin-consejos").innerHTML = f.consejos.map((k) => `<div class="consejo ${k.nivel}">${icono[k.nivel]} ${escapar(k.texto)}</div>`).join("");
 
   // ingresos por mes
+  graficaColumnas($("#fin-grafica-ingresos"), { titulo: "Ingresos por mes",
+    puntos: [...f.meses].reverse().map((m) => ({ periodo: m.periodo, valores: [m.neto, m.probienestar],
+      detalle: m.fuente === "VOLANTE" ? "según el volante" : "calculado del reporte de pagos" })),
+    series: [{ nombre: "Neto", color: "var(--serie-1)" }, { nombre: "Probienestar", color: "var(--serie-3)" }],
+    referencia: Number(f.ingreso_base_ap) ? { valor: f.ingreso_base_ap, nombre: "Ingreso base de AP" } : null });
   $("#fin-meses").innerHTML = f.meses.length ? `<div class="tabla-scroll"><table class="liq meses-fin">
       <tr><th>Mes</th><th class="v">Neto + probienestar</th><th class="v">Total</th></tr>
       ${f.meses.map((m) => `<tr><td class="mes">${nombreMes(m.periodo)}<br><small class="sub">${m.fuente === "VOLANTE" ? "volante" : "calculado"}</small></td>
@@ -1076,6 +1209,7 @@ async function cargarFinanzas() {
   pintarFase2(f);
   pintarMes(f);
   pintarCuentas(f);
+  pintarReparto(f);
   retomarExtracto();
 }
 
@@ -1095,6 +1229,7 @@ function pintarMes(f) {
         <div class="sub">${Number(m.presupuesto) ? (Number(m.disponible) >= 0 ? `te quedan ${pesos(m.disponible)}` : `te pasaste ${pesos(-m.disponible)}`) : ""}</div></div>
       <div class="kpi"><div class="etiqueta">Ahorrado para metas</div><div class="cifra">${pesos(m.aportes)}</div></div>
     </div>
+    <div id="fin-grafica-mes"></div>
     ${m.categorias.map((c) => `<div style="margin:10px 0">
       <div class="item-cab"><span>${escapar(c.nombre.split(" (")[0])}</span><span class="estado-fin ${clase(c.estado)}">${etiqueta[c.estado]}</span></div>
       <div class="medidor ${clase(c.estado)}" role="img" aria-label="${c.uso == null ? "sin presupuesto" : pct(c.uso) + " del presupuesto"}"><span style="width:${c.uso == null ? 100 : Math.min(100, Number(c.uso))}%"></span></div>
@@ -1105,6 +1240,12 @@ function pintarMes(f) {
         <strong>${pesos(x.valor)}</strong></div>
         <div class="acciones"><button type="button">Quitar</button></div></div>`).join("")}`
       : `<p class="sub" style="margin-top:10px">Aún no has anotado nada en ${nombreMes(m.periodo)}.</p>`}`;
+  const anotado = m.historial.some((h) => Number(h.gastos) || Number(h.aportes));
+  if (anotado) graficaColumnas($("#fin-grafica-mes"), { titulo: "Gastos de los últimos 6 meses",
+    puntos: m.historial.map((h) => ({ periodo: h.periodo, valores: [h.gastos],
+      detalle: Number(h.aportes) ? `Ahorraste ${pesos(h.aportes)} para metas` : "" })),
+    series: [{ nombre: "Gastos", color: "var(--serie-1)" }],
+    referencia: Number(m.presupuesto) ? { valor: m.presupuesto, nombre: "Presupuesto de gastos" } : null });
   document.querySelectorAll("[data-mov] button").forEach((b) => b.onclick = async () => {
     if (confirm("¿Quitar este movimiento?")) await enviar(`/api/finanzas/movimientos/${b.closest("[data-mov]").dataset.mov}`, "DELETE");
   });
@@ -1140,12 +1281,17 @@ function pintarFase2(f) {
     : !pc.meses.length ? `<p class="sub">No tienes cirugías pendientes de pago para proyectar.</p>`
     : `<div class="kpi" style="margin-bottom:10px"><div class="etiqueta">Te llegaría en los próximos meses</div>
          <div class="cifra">${pesos(pc.total_te_llega)}</div><div class="sub">por ${pc.cirugias} cirugía${pc.cirugias === 1 ? "" : "s"} pendiente${pc.cirugias === 1 ? "" : "s"}</div></div>
+       <div id="fin-grafica-viene"></div>
        <table class="liq"><tr><th>Mes</th><th class="v">Cirugías</th><th class="v">Recaudo</th><th class="v">Te llega</th></tr>
        ${pc.meses.map((m) => `<tr><td>${nombreMes(m.periodo)}</td><td class="v">${m.cirugias}</td><td class="v">${pesos(m.recaudo)}</td>
          <td class="v"><strong>${pesos(m.te_llega)}</strong></td></tr>`).join("")}</table>
        <p class="sub">Estimado con lo que AP te ha pagado: unos ${pesos(pc.valor_promedio)} por paciente y ${pc.rezago_dias} días
          desde la cirugía hasta el pago. No incluye pagos globales (como honorarios de una IPS) ni lo que pueda glosarse.
          ${pc.atrasadas ? `<br>⚠ ${pc.atrasadas} cirugía${pc.atrasadas === 1 ? "" : "s"} de hace más de 6 meses sigue${pc.atrasadas === 1 ? "" : "n"} sin pago: revísala${pc.atrasadas === 1 ? "" : "s"} en Cirugías → pendientes.` : ""}</p>`;
+  if (pc && pc.meses.length) graficaColumnas($("#fin-grafica-viene"), { titulo: "Lo que te llegaría por mes",
+    puntos: pc.meses.map((m) => ({ periodo: m.periodo, valores: [m.te_llega],
+      detalle: `${m.cirugias} cirugía${m.cirugias === 1 ? "" : "s"} · recaudo ${pesos(m.recaudo)}` })),
+    series: [{ nombre: "Te llega", color: "var(--serie-1)" }] });
   // ahorros en AP
   const a = f.ahorros_ap;
   $("#fin-ahorros-ap").innerHTML = !a ? `<p class="sub">Sube un volante reciente: trae al final los «acumulados de aportes» (semestral, anual y vacaciones).</p>`
@@ -1865,18 +2011,19 @@ document.querySelectorAll("[data-metrica]").forEach((b) => b.onclick = () => {
   cargarReporte();
 });
 
-function ranking(titulo, filas) {
+function ranking(titulo, filas, enTarjeta = true) {
   if (!filas.length) return "";
   const valor = (f) => Number(f[metrica]);
   const ordenadas = titulo === "Por mes" ? filas : [...filas].sort((x, y) => valor(y) - valor(x) || y.cirugias - x.cirugias);
   const max = Math.max(...ordenadas.map(valor), 1);
   const texto = (f) => metrica === "total" ? pesos(f.total) : `${f.cirugias} cirugía${f.cirugias === 1 ? "" : "s"}`;
-  return `<section class="card"><h2>${titulo}</h2><ul class="ranking">${ordenadas.map((f) => `
+  const lista = `<ul class="ranking">${ordenadas.map((f) => `
     <li title="${escapar(f.nombre)}: ${f.cirugias} cirugías · total ${pesos(f.total)} · pagado ${pesos(f.pagado)} · por cobrar ${pesos(f.por_cobrar)}">
       <div class="nombre"><span>${escapar(f.nombre)}</span><span class="valor">${texto(f)}</span></div>
       <div class="pista"><div class="barra" style="width:${Math.max(valor(f) / max * 100, 0.5)}%"></div></div>
       <div class="detalle">${metrica === "total" ? `${f.cirugias} cirugía${f.cirugias === 1 ? "" : "s"} · ` : `${pesos(f.total)} · `}pagado ${pesos(f.pagado)} · por cobrar ${pesos(f.por_cobrar)}${f.sin_valor ? ` · ${f.sin_valor} sin valor` : ""}</div>
-    </li>`).join("")}</ul></section>`;
+    </li>`).join("")}</ul>`;
+  return enTarjeta ? `<section class="card"><h2>${titulo}</h2>${lista}</section>` : lista;
 }
 
 function seccionGlosas(g) {
@@ -1934,9 +2081,21 @@ async function cargarReporte() {
       ${ranking("Por cirujano", d.por_cirujano)}
       ${ranking("Por clínica", d.por_clinica)}
       ${ranking("Por aseguradora", d.por_aseguradora)}
-      ${ranking("Por mes", d.por_mes)}
+      ${d.por_mes.length > 1 ? `<section class="card"><h2>Por mes</h2><div id="r-grafica-mes"></div>
+        <details><summary class="sub" style="cursor:pointer">Ver el detalle por mes</summary>${ranking("Por mes", d.por_mes, false)}</details></section>`
+        : ranking("Por mes", d.por_mes)}
       ${seccionGlosas(g)}`;
     $("#kpi-pendientes").onclick = verPendientes;
+    const enPesos = metrica === "total";
+    graficaColumnas($("#r-grafica-mes"), { titulo: "Por mes",
+      puntos: [...d.por_mes].reverse().map((m) => ({ periodo: `${m.nombre}-01`,
+        valores: enPesos ? [m.pagado, m.por_cobrar] : [m.cirugias],
+        detalle: enPesos ? `${m.cirugias} cirugía${m.cirugias === 1 ? "" : "s"}${m.sin_valor ? ` · ${m.sin_valor} sin valor` : ""}`
+                         : `${pesos(m.total)} · pagado ${pesos(m.pagado)}` })),
+      series: enPesos ? [{ nombre: "Pagado", color: "var(--serie-1)" }, { nombre: "Por cobrar", color: "var(--serie-2)" }]
+                      : [{ nombre: "Cirugías", color: "var(--serie-1)" }],
+      formato: enPesos ? pesos : (v) => `${v} cirugía${Number(v) === 1 ? "" : "s"}`,
+      corto: enPesos ? pesosCorto : (v) => String(v), entero: !enPesos });
   } catch (e) {
     cont.innerHTML = `<p class="aviso err">No se pudo cargar el reporte: ${escapar(e.message)}</p>`;
   }

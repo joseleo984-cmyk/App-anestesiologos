@@ -508,8 +508,19 @@ def movimientos_del_mes(conn, anestesiologo_id: int, mes: date, gastos_presupues
                            "uso": uso.quantize(Decimal("0.1")) if uso is not None else None, "estado": estado_cat})
     total_p, total_r = sum(presupuesto.values(), Decimal(0)), sum(real.values(), Decimal(0))
     aportes = sum((m["valor"] for m in movimientos if m["clase"] == "APORTE"), Decimal(0))
+    # gastos y ahorros de los 6 meses que terminan en el elegido, para la gráfica
+    desde = _sumar_meses(mes, -5)
+    por_mes = {r["periodo"]: r for r in conn.execute(
+        """SELECT date_trunc('month', fecha)::date AS periodo,
+                  COALESCE(SUM(valor) FILTER (WHERE clase = 'GASTO'), 0) AS gastos,
+                  COALESCE(SUM(valor) FILTER (WHERE clase = 'APORTE'), 0) AS aportes
+             FROM fin_movimiento WHERE anestesiologo_id = %s AND fecha >= %s AND fecha < %s GROUP BY 1""",
+        (anestesiologo_id, desde, hasta))}
+    historial = [{"periodo": p, "gastos": por_mes[p]["gastos"] if p in por_mes else Decimal(0),
+                  "aportes": por_mes[p]["aportes"] if p in por_mes else Decimal(0)}
+                 for p in (_sumar_meses(desde, i) for i in range(6))]
     return {"periodo": mes, "categorias": categorias, "presupuesto": total_p, "real": total_r, "aportes": aportes,
-            "disponible": total_p - total_r, "movimientos": movimientos}
+            "disponible": total_p - total_r, "movimientos": movimientos, "historial": historial}
 
 
 def seguimiento_compromisos(conn, anestesiologo_id: int, metas: list[dict], mes: date, mes_actual: date) -> None:
