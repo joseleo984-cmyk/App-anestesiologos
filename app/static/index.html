@@ -130,6 +130,15 @@
   .fin-item { border-top: 1px solid var(--line); padding: 10px 0; }
   .fin-item:first-child { border-top: 0; }
   .fin-item .acciones { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .ext-fila { display: flex; gap: 8px; align-items: flex-start; border-top: 1px solid var(--line); padding: 8px 0; }
+  .ext-fila input[type=checkbox] { width: 22px; height: 22px; margin-top: 2px; flex: 0 0 auto; }
+  .ext-fila .ext-cuerpo { flex: 1 1 auto; min-width: 0; }
+  .ext-fila .ext-desc { overflow-wrap: anywhere; }
+  .ext-fila select { margin-top: 4px; width: 100%; }
+  .ext-fila.apagada .ext-desc, .ext-fila.apagada strong { opacity: .55; }
+  .ext-fila .ext-motivo { font-size: .75rem; color: var(--muted); }
+  .barra-avance { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; margin: 8px 0; }
+  .barra-avance span { display: block; height: 100%; background: var(--accent); transition: width .3s; }
   .fin-item .acciones button { padding: 4px 10px; font-size: .8rem; }
   .consejo { padding: 8px 10px; border-radius: 8px; margin: 6px 0; font-size: .9rem; }
   .consejo.SANO { background: var(--ok-bg); color: var(--ok-text); }
@@ -372,6 +381,34 @@
         <div id="fin-estado-mov"></div>
       </form>
       <div id="fin-mes"></div>
+    </section>
+    <section class="card" id="fin-card-extractos">
+      <h2>Extractos del banco</h2>
+      <p class="sub">Sube el extracto de tu tarjeta, cuenta o crédito y la app anota tus gastos por ti. Sirve el PDF
+        (aunque tenga muchas hojas), fotos de las hojas, o el Excel/CSV que descargas del banco. Antes de guardar,
+        revisas todo. 🔒 El archivo no se guarda: solo los gastos que apruebes.</p>
+      <h3>Mis cuentas y tarjetas</h3>
+      <div id="ext-cuentas"></div>
+      <form id="ext-form-cuenta" class="fila" novalidate>
+        <div><label for="ext-cta-banco">Banco</label><input id="ext-cta-banco" placeholder="Ej: Bancolombia" list="ext-bancos" autocomplete="off"></div>
+        <div><label for="ext-cta-tipo">Tipo</label><select id="ext-cta-tipo"></select></div>
+        <div style="flex:0 1 110px"><label for="ext-cta-digitos">Últimos 4</label><input id="ext-cta-digitos" inputmode="numeric" maxlength="4" placeholder="1234"></div>
+        <button type="submit" style="flex:0 0 auto;align-self:flex-end">Agregar</button>
+      </form>
+      <datalist id="ext-bancos"><option>Bancolombia</option><option>Davivienda</option><option>Banco de Bogotá</option>
+        <option>BBVA</option><option>Banco de Occidente</option><option>Banco Popular</option><option>Banco AV Villas</option>
+        <option>Scotiabank Colpatria</option><option>Itaú</option><option>Banco Caja Social</option><option>Nu</option>
+        <option>Falabella</option><option>Banco Agrario</option><option>Coomeva</option></datalist>
+      <div id="ext-estado-cuenta"></div>
+      <h3 style="margin-top:16px">Subir un extracto</h3>
+      <div class="fila">
+        <div><label for="ext-clave">Clave del PDF (si tiene)</label>
+          <input id="ext-clave" type="password" autocomplete="off" placeholder="Suele ser tu cédula"></div>
+      </div>
+      <div class="atajos"><button type="button" id="ext-subir" class="primario">🏦 Subir extracto</button></div>
+      <p class="sub">Un extracto a la vez: el PDF completo, o todas las fotos de sus hojas juntas. No sirve el Excel antiguo (.xls).</p>
+      <div id="ext-estado"></div>
+      <div id="ext-revision"></div>
     </section>
     <section class="card">
       <h2>Ingresos</h2>
@@ -1038,6 +1075,8 @@ async function cargarFinanzas() {
   document.querySelectorAll("[data-meta] button").forEach((b) => b.onclick = () => accionMeta(b));
   pintarFase2(f);
   pintarMes(f);
+  pintarCuentas(f);
+  retomarExtracto();
 }
 
 function pintarMes(f) {
@@ -1062,7 +1101,7 @@ function pintarMes(f) {
       <div class="sub">${pesos(c.real)} de ${pesos(c.presupuesto)}${c.uso != null ? ` · ${pct(c.uso)}` : ""}</div></div>`).join("")}
     ${m.movimientos.length ? `<h3 style="margin-top:14px">Anotado en ${nombreMes(m.periodo)}</h3>${m.movimientos.map((x) => `
       <div class="fin-item" data-mov="${x.movimiento_id}"><div class="item-cab">
-        <span>${escapar(x.fecha.slice(8, 10))}/${escapar(x.fecha.slice(5, 7))} · ${x.clase === "APORTE" ? `💰 ${escapar(x.meta || "Meta")}` : escapar((f.catalogos.gastos.find((g) => g.clave === x.categoria) || {}).nombre?.split(" (")[0] || x.categoria)}${x.descripcion ? ` · ${escapar(x.descripcion)}` : ""}</span>
+        <span>${escapar(x.fecha.slice(8, 10))}/${escapar(x.fecha.slice(5, 7))} · ${x.clase === "APORTE" ? `💰 ${escapar(x.meta || "Meta")}` : escapar((f.catalogos.gastos.find((g) => g.clave === x.categoria) || {}).nombre?.split(" (")[0] || x.categoria)}${x.descripcion ? ` · ${escapar(x.descripcion)}` : ""}${x.cuenta ? ` <small class="sub">(${escapar(x.cuenta)})</small>` : ""}</span>
         <strong>${pesos(x.valor)}</strong></div>
         <div class="acciones"><button type="button">Quitar</button></div></div>`).join("")}`
       : `<p class="sub" style="margin-top:10px">Aún no has anotado nada en ${nombreMes(m.periodo)}.</p>`}`;
@@ -1249,6 +1288,153 @@ $("#fin-subir-volante").onclick = () => elegirArchivo(async (archivo) => {
   aviso(estado, "ok", `Volante de ${nombreMes(cuerpo.periodo)} guardado: neto ${pesos(cuerpo.neto)} + probienestar ${pesos(cuerpo.probienestar)}.`);
   cargarFinanzas();
 });
+
+// ---------------------------------------------------------------- extractos del banco
+const TIPO_CUENTA = { TARJETA_CREDITO: "Tarjeta de crédito", CUENTA_AHORROS: "Cuenta de ahorros",
+  CUENTA_CORRIENTE: "Cuenta corriente", CREDITO: "Crédito", OTRO: "Otra" };
+const nombreCuenta = (c) => `${c.banco} · ${TIPO_CUENTA[c.tipo] || c.tipo}${c.ultimos_digitos ? ` ****${c.ultimos_digitos}` : ""}`;
+let extActual = null, extTemporizador = null;
+const guardarExt = (id) => { try { id ? localStorage.setItem("extracto", id) : localStorage.removeItem("extracto"); } catch (e) {} };
+
+function pintarCuentas(f) {
+  if (!$("#ext-cta-tipo").options.length)
+    $("#ext-cta-tipo").innerHTML = f.catalogos.cuentas.map((c) => `<option value="${c.clave}">${escapar(c.nombre)}</option>`).join("");
+  $("#ext-cuentas").innerHTML = f.cuentas.length ? f.cuentas.map((c) => `<div class="fin-item" data-cuenta="${c.cuenta_id}">
+      <div class="item-cab"><span>${escapar(nombreCuenta(c))}</span>
+        <span class="sub">${c.ultimo_movimiento ? `hasta ${escapar(c.ultimo_movimiento.split("-").reverse().join("/"))}` : "sin gastos aún"}</span></div>
+      <div class="acciones"><button type="button">Quitar</button></div></div>`).join("")
+    : `<p class="sub">Agrega tus tarjetas, cuentas y créditos, o súbelos directo: la app los reconoce del extracto.</p>`;
+  document.querySelectorAll("[data-cuenta] button").forEach((b) => b.onclick = async () => {
+    if (confirm("¿Quitar esta cuenta? Los gastos ya anotados se conservan.")) await enviar(`/api/finanzas/cuentas/${b.closest("[data-cuenta]").dataset.cuenta}`, "DELETE");
+  });
+}
+$("#ext-form-cuenta").onsubmit = async (e) => {
+  e.preventDefault();
+  if (!$("#ext-cta-banco").value.trim()) return aviso($("#ext-estado-cuenta"), "err", "Escribe el banco.");
+  const ok = await enviar("/api/finanzas/cuentas", "POST", { banco: $("#ext-cta-banco").value.trim(), tipo: $("#ext-cta-tipo").value,
+    ultimos_digitos: $("#ext-cta-digitos").value.trim() || null }, "#ext-estado-cuenta");
+  if (ok) { $("#ext-cta-banco").value = ""; $("#ext-cta-digitos").value = ""; }
+};
+
+$("#ext-subir").onclick = () => elegirArchivo(async (archivos) => {
+  const estado = $("#ext-estado");
+  $("#ext-revision").innerHTML = "";
+  estado.innerHTML = `<div class="cargando">Subiendo ${archivos.length > 1 ? `${archivos.length} archivos` : "el extracto"}…</div>`;
+  const form = new FormData();
+  for (const a of archivos)
+    form.append("archivos", new Blob([await a.arrayBuffer()], { type: a.type || "application/octet-stream" }), a.name || "extracto");
+  if ($("#ext-clave").value.trim()) form.append("clave_pdf", $("#ext-clave").value.trim());
+  const r = await fetch("/api/finanzas/importaciones", { method: "POST", body: form });
+  const cuerpo = await r.json().catch(() => null);
+  if (!r.ok) return aviso(estado, "err", mensajeError(cuerpo, "No se pudo leer el extracto."));
+  $("#ext-clave").value = "";
+  guardarExt(cuerpo.importacion_id);
+  seguirExtracto(cuerpo.importacion_id);
+}, true);
+
+async function seguirExtracto(id) {
+  clearTimeout(extTemporizador);
+  const r = await fetch(`/api/finanzas/importaciones/${id}`);
+  const estado = $("#ext-estado");
+  if (!r.ok) { guardarExt(null); return aviso(estado, "", ""); }
+  const imp = await r.json();
+  if (imp.estado === "PROCESANDO") {
+    const hojas = imp.paginas_total, leidas = imp.partes_leidas;
+    const texto = !hojas ? "Clasificando los movimientos del archivo…"
+      : imp.partes_total === 1 ? `Leyendo ${hojas} hoja${hojas === 1 ? "" : "s"}…`
+      : `Leyendo hojas ${leidas * 10 + 1} a ${Math.min((leidas + 1) * 10, hojas)} de ${hojas}…`;
+    estado.innerHTML = `<div class="cargando">${texto}</div>
+      <div class="barra-avance"><span style="width:${Math.round(100 * leidas / imp.partes_total)}%"></span></div>
+      <p class="sub">Puedes seguir usando la app; esto puede tardar uno o dos minutos por cada 10 hojas.</p>`;
+    extTemporizador = setTimeout(() => seguirExtracto(id), 2500);
+    return;
+  }
+  if (imp.estado === "ERROR") { guardarExt(null); return aviso(estado, "err", imp.error || "No se pudo leer el extracto."); }
+  if (imp.estado === "CONFIRMADA") { guardarExt(null); return aviso(estado, "", ""); }
+  aviso(estado, "", "");
+  extActual = imp;
+  pintarRevision();
+}
+
+function pintarRevision() {
+  const imp = extActual, res = imp.resultado, enc = res.encabezado || {}, f = finanzasDatos;
+  const cats = f.catalogos.gastos.map((g) => [g.clave, g.nombre.split(" (")[0]]);
+  const detectada = enc.banco ? `${enc.banco} · ${TIPO_CUENTA[enc.tipo_producto] || "Cuenta"}${enc.ultimos_digitos ? ` ****${enc.ultimos_digitos}` : ""}` : null;
+  const opcionesCuenta = [
+    ...f.cuentas.map((c) => `<option value="${c.cuenta_id}"${c.cuenta_id === res.cuenta_sugerida ? " selected" : ""}>${escapar(nombreCuenta(c))}</option>`),
+    detectada && !res.cuenta_sugerida ? `<option value="nueva" selected>Nueva: ${escapar(detectada)}</option>` : "",
+    `<option value=""${!detectada && !res.cuenta_sugerida ? " selected" : ""}>Sin cuenta</option>`].join("");
+  const fila = (it) => `<div class="ext-fila${it.incluir ? "" : " apagada"}" data-indice="${it.indice}">
+      <input type="checkbox" aria-label="Anotar este gasto"${it.incluir ? " checked" : ""}>
+      <div class="ext-cuerpo">
+        <div class="item-cab"><span class="ext-desc">${escapar(it.fecha.slice(8, 10))}/${escapar(it.fecha.slice(5, 7))} · ${escapar(it.descripcion)}</span>
+          <strong>${pesos(it.valor)}</strong></div>
+        ${it.motivo || it.sin_fecha ? `<div class="ext-motivo">${escapar(it.motivo || "")}${it.sin_fecha ? " · sin fecha: se usó la del corte" : ""}</div>` : ""}
+        <select aria-label="Categoría">${cats.map(([c, n]) => `<option value="${c}"${c === (it.categoria || "OTROS") ? " selected" : ""}>${escapar(n)}</option>`).join("")}</select>
+        ${it.regla ? `<div class="ext-motivo">Categoría que aprendió de ti</div>` : ""}
+      </div></div>`;
+  const marcados = res.items.filter((i) => i.incluir).length;
+  $("#ext-revision").innerHTML = `
+    <h3 style="margin-top:16px">Revisa antes de anotar</h3>
+    <p class="sub">${escapar(imp.nombre_archivo || "")}${enc.periodo_desde && enc.periodo_hasta ? ` · periodo ${escapar(enc.periodo_desde.split("-").reverse().join("/"))} a ${escapar(enc.periodo_hasta.split("-").reverse().join("/"))}` : ""}
+      · ${res.items.length} movimiento${res.items.length === 1 ? "" : "s"} leído${res.items.length === 1 ? "" : "s"}, ${marcados} parece${marcados === 1 ? "" : "n"} gasto${marcados === 1 ? "" : "s"}.
+      Los pagos a la tarjeta, abonos, lo ya importado y lo dudoso quedan sin marcar: márcalos si sí son gastos.
+      Si cambias una categoría, la app la recuerda para ese comercio.</p>
+    <div class="fila"><div><label for="ext-cuenta">¿De qué cuenta es?</label><select id="ext-cuenta">${opcionesCuenta}</select></div></div>
+    <div id="ext-totales" style="margin:10px 0"></div>
+    <div class="atajos"><button type="button" id="ext-todos">Marcar todo</button><button type="button" id="ext-ninguno">Desmarcar todo</button></div>
+    <div id="ext-filas">${res.items.map(fila).join("") || `<p class="sub">No se encontraron movimientos.</p>`}</div>
+    <div class="atajos" style="margin-top:12px"><button type="button" id="ext-anotar" class="primario"></button>
+      <button type="button" id="ext-descartar">Descartar</button></div>
+    <div id="ext-estado-anotar"></div>`;
+  const actualizar = () => {
+    const filas = [...document.querySelectorAll("#ext-filas .ext-fila")];
+    const porCat = {};
+    let n = 0, total = 0;
+    filas.forEach((el) => {
+      const marcado = el.querySelector("input").checked;
+      el.classList.toggle("apagada", !marcado);
+      if (!marcado) return;
+      const it = res.items[Number(el.dataset.indice)], cat = el.querySelector("select").value;
+      n++; total += Number(it.valor); porCat[cat] = (porCat[cat] || 0) + Number(it.valor);
+    });
+    $("#ext-totales").innerHTML = Object.keys(porCat).length ? `<table class="liq">${cats.filter(([c]) => porCat[c]).map(([c, nom]) =>
+      `<tr><td>${escapar(nom)}</td><td class="v">${pesos(porCat[c])}</td></tr>`).join("")}
+      <tr class="sub-total"><td>Total</td><td class="v">${pesos(total)}</td></tr></table>` : "";
+    $("#ext-anotar").textContent = n ? `Anotar ${n} gasto${n === 1 ? "" : "s"} (${pesos(total)})` : "Nada marcado";
+    $("#ext-anotar").disabled = !n;
+  };
+  document.querySelectorAll("#ext-filas input, #ext-filas select").forEach((el) => el.onchange = actualizar);
+  $("#ext-todos").onclick = () => { document.querySelectorAll("#ext-filas input").forEach((i) => i.checked = true); actualizar(); };
+  $("#ext-ninguno").onclick = () => { document.querySelectorAll("#ext-filas input").forEach((i) => i.checked = false); actualizar(); };
+  $("#ext-descartar").onclick = async () => {
+    if (!confirm("¿Descartar esta lectura? No se anota nada.")) return;
+    await fetch(`/api/finanzas/importaciones/${imp.importacion_id}`, { method: "DELETE" });
+    guardarExt(null); extActual = null; $("#ext-revision").innerHTML = "";
+  };
+  $("#ext-anotar").onclick = async () => {
+    const cuenta = $("#ext-cuenta").value;
+    const items = [...document.querySelectorAll("#ext-filas .ext-fila")].map((el) => ({ indice: Number(el.dataset.indice),
+      incluir: el.querySelector("input").checked, categoria: el.querySelector("select").value }));
+    const datos = { items, cuenta_id: cuenta && cuenta !== "nueva" ? Number(cuenta) : null,
+      nueva_cuenta: cuenta === "nueva" ? { banco: enc.banco, tipo: enc.tipo_producto || "OTRO", ultimos_digitos: enc.ultimos_digitos } : null };
+    $("#ext-anotar").disabled = true;
+    const r = await fetch(`/api/finanzas/importaciones/${imp.importacion_id}/confirmar`, { method: "POST",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify(datos) });
+    const cuerpo = await r.json().catch(() => null);
+    if (!r.ok) { $("#ext-anotar").disabled = false; return aviso($("#ext-estado-anotar"), "err", mensajeError(cuerpo, "No se pudo anotar.")); }
+    guardarExt(null); extActual = null; $("#ext-revision").innerHTML = "";
+    aviso($("#ext-estado"), "ok", `Listo: ${cuerpo.anotados} gasto${cuerpo.anotados === 1 ? "" : "s"} anotado${cuerpo.anotados === 1 ? "" : "s"} por ${pesos(cuerpo.total)}${
+      cuerpo.repetidos ? ` (${cuerpo.repetidos} ya estaban y no se repitieron)` : ""}. Míralos en «Este mes».`);
+    await cargarFinanzas();
+  };
+  actualizar();
+}
+function retomarExtracto() {
+  let id = null;
+  try { id = localStorage.getItem("extracto"); } catch (e) {}
+  if (id && !extActual && !extTemporizador) seguirExtracto(id);
+}
 
 // ---------------------------------------------------------------- relación de órdenes
 const TIPOS = [["EPS", "EPS"], ["PREPAGADA", "Prepagada"], ["POLIZA", "Póliza"], ["PARTICULAR", "Particular"]];

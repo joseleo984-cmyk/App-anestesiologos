@@ -177,6 +177,15 @@ Cada anestesiólogo ve solo las suyas (ni el administrador las ve). `app/finanza
   lo ahorrado). Cada categoría se compara con su presupuesto: dentro, pasado (hasta 10 % más), muy pasado
   o sin presupuesto. Se puede mirar cualquier mes anterior.
 - **Semestral de AP:** se paga con los cortes de junio y diciembre (confirmado con AP).
+- **Extractos del banco** (`app/extractos.py`): se sube el extracto de una tarjeta, cuenta o crédito y la app
+  anota los gastos. El PDF (con o sin clave; muchas hojas, máximo 100) y las fotos se leen con la IA de 10 en
+  10 hojas, en segundo plano, mostrando el avance. El Excel (.xlsx) o CSV del banco se lee sin IA (detecta las
+  columnas de fecha, descripción y valor o débito/crédito) y la IA solo sugiere categorías (texto, barato; si
+  falla, se clasifica por palabras clave). Solo cuentan los gastos: el pago a la tarjeta, abonos y traslados
+  entre cuentas propias no. Cada fila lleva una huella (fecha, valor, comercio) para no anotar dos veces lo
+  mismo; también se avisa si coincide con un gasto anotado a mano y se desmarcan las compras diferidas de
+  meses anteriores. El usuario revisa, cambia categorías y confirma; las categorías corregidas se recuerdan
+  por comercio. Varias cuentas y tarjetas por anestesiólogo; el archivo del banco no se guarda.
 
 ## Pagos: depurar pendientes
 
