@@ -352,3 +352,43 @@ class CompromisoEntrada(_Base):
     compromiso_mensual: Optional[Decimal] = Field(default=None, gt=0, max_digits=14, decimal_places=2)
 
     _p = field_validator("compromiso_mensual", mode="before")(_pesos_positivos)
+
+
+TipoCuenta = Literal["TARJETA_CREDITO", "CUENTA_AHORROS", "CUENTA_CORRIENTE", "CREDITO", "OTRO"]
+
+
+class CuentaEntrada(_Base):
+    """Una cuenta, tarjeta o crédito de donde vienen los extractos."""
+    banco: str = Field(min_length=1, max_length=60)
+    tipo: TipoCuenta
+    ultimos_digitos: Optional[str] = Field(default=None, max_length=4)
+    nombre: Optional[str] = Field(default=None, max_length=80)
+
+    @field_validator("ultimos_digitos", mode="before")
+    @classmethod
+    def _digitos(cls, v):
+        if isinstance(v, str):
+            v = "".join(c for c in v if c.isdigit())[-4:]
+        return v or None
+
+
+class ItemConfirmado(_Base):
+    indice: int = Field(ge=0)
+    incluir: bool
+    categoria: Optional[str] = None
+
+
+class ImportacionConfirmada(_Base):
+    """Lo que el usuario aprueba del extracto: a qué cuenta va y qué filas se anotan como gastos."""
+    cuenta_id: Optional[int] = None
+    nueva_cuenta: Optional[CuentaEntrada] = None
+    items: list[ItemConfirmado] = Field(default_factory=list, max_length=3000)
+
+    @model_validator(mode="after")
+    def _categorias(self):
+        from app.finanzas import CATEGORIAS
+        validas = [c[0] for c in CATEGORIAS]
+        for i in self.items:
+            if i.incluir and i.categoria not in validas:
+                raise ValueError(f"elige la categoría de la fila {i.indice + 1}")
+        return self

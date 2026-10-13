@@ -483,8 +483,10 @@ def movimientos_del_mes(conn, anestesiologo_id: int, mes: date, gastos_presupues
     """Gastos reales del mes contra el presupuesto, por categoría, y los movimientos registrados."""
     hasta = _sumar_meses(mes, 1)
     movimientos = conn.execute(
-        """SELECT m.movimiento_id, m.fecha, m.clase, m.categoria, m.meta_id, f.nombre AS meta, m.descripcion, m.valor
+        """SELECT m.movimiento_id, m.fecha, m.clase, m.categoria, m.meta_id, f.nombre AS meta, m.descripcion, m.valor,
+                  m.cuenta_id, NULLIF(concat_ws(' ', c.banco, c.ultimos_digitos), '') AS cuenta
              FROM fin_movimiento m LEFT JOIN fin_meta f ON f.meta_id = m.meta_id
+             LEFT JOIN fin_cuenta c ON c.cuenta_id = m.cuenta_id
             WHERE m.anestesiologo_id = %s AND m.fecha >= %s AND m.fecha < %s
             ORDER BY m.fecha DESC, m.movimiento_id DESC""", (anestesiologo_id, mes, hasta)).fetchall()
     nombres = {c: n for c, n, _, _ in CATEGORIAS}

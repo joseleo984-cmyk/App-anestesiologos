@@ -254,3 +254,41 @@ CREATE TABLE IF NOT EXISTS fin_movimiento (
     CHECK ((clase = 'GASTO' AND categoria IS NOT NULL) OR (clase = 'APORTE' AND meta_id IS NOT NULL))
 );
 CREATE INDEX IF NOT EXISTS idx_fin_mov_anest_fecha ON fin_movimiento (anestesiologo_id, fecha);
+
+-- Extractos bancarios: cuentas y tarjetas, importaciones leídas por partes y reglas de categoría aprendidas
+CREATE TABLE IF NOT EXISTS fin_cuenta (
+    cuenta_id          BIGSERIAL PRIMARY KEY,
+    anestesiologo_id   BIGINT NOT NULL REFERENCES anestesiologo(anestesiologo_id) ON DELETE CASCADE,
+    banco              VARCHAR(60) NOT NULL,
+    tipo               VARCHAR(20) NOT NULL CHECK (tipo IN ('TARJETA_CREDITO', 'CUENTA_AHORROS', 'CUENTA_CORRIENTE',
+                                                            'CREDITO', 'OTRO')),
+    ultimos_digitos    VARCHAR(4),
+    nombre             VARCHAR(80),
+    creado_en          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_fin_cuenta_anest ON fin_cuenta (anestesiologo_id);
+CREATE TABLE IF NOT EXISTS fin_importacion (
+    importacion_id     BIGSERIAL PRIMARY KEY,
+    anestesiologo_id   BIGINT NOT NULL REFERENCES anestesiologo(anestesiologo_id) ON DELETE CASCADE,
+    estado             VARCHAR(12) NOT NULL DEFAULT 'PROCESANDO'
+                       CHECK (estado IN ('PROCESANDO', 'LISTO', 'ERROR', 'CONFIRMADA')),
+    nombre_archivo     VARCHAR(200),
+    partes_total       INTEGER NOT NULL DEFAULT 0,
+    partes_leidas      INTEGER NOT NULL DEFAULT 0,
+    paginas_total      INTEGER NOT NULL DEFAULT 0,
+    resultado          JSONB,
+    error              TEXT,
+    creado_en          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    actualizado_en     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_fin_importacion_anest ON fin_importacion (anestesiologo_id);
+CREATE TABLE IF NOT EXISTS fin_regla_categoria (
+    anestesiologo_id   BIGINT NOT NULL REFERENCES anestesiologo(anestesiologo_id) ON DELETE CASCADE,
+    clave              VARCHAR(80) NOT NULL,           -- comercio normalizado (ej. "EXITO", "TERPEL")
+    categoria          VARCHAR(20),                    -- null: no es un gasto (se desmarca al importar)
+    actualizado_en     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (anestesiologo_id, clave)
+);
+ALTER TABLE fin_movimiento ADD COLUMN IF NOT EXISTS cuenta_id BIGINT REFERENCES fin_cuenta(cuenta_id) ON DELETE SET NULL;
+ALTER TABLE fin_movimiento ADD COLUMN IF NOT EXISTS huella VARCHAR(64);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_fin_mov_huella ON fin_movimiento (anestesiologo_id, huella) WHERE huella IS NOT NULL;

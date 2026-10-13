@@ -15,14 +15,16 @@ from datetime import date
 from pathlib import Path
 from typing import Literal, Optional
 
-from fastapi import Cookie, Depends, FastAPI, File, HTTPException, Query, Response, UploadFile
+from fastapi import BackgroundTasks, Cookie, Depends, FastAPI, File, Form, HTTPException, Query, Response, UploadFile
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from rapidfuzz import fuzz
 
-from app import almacenamiento, auth, catalogo, config, exportar, extraccion, finanzas, inicio, liquidacion, repositorio
-from app.modelos import CompromisoEntrada, MetaEntrada, MovimientoEntrada, OrdenConfirmada, PartidaEntrada, Sugerencia
+from app import (almacenamiento, auth, catalogo, config, exportar, extraccion, extractos, finanzas, inicio, liquidacion,
+                 repositorio)
+from app.modelos import (CompromisoEntrada, CuentaEntrada, ImportacionConfirmada, MetaEntrada, MovimientoEntrada,
+                         OrdenConfirmada, PartidaEntrada, Sugerencia)
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 log = logging.getLogger(__name__)
@@ -594,7 +596,96 @@ def comparar_volante(reporte_id: int, archivo: UploadFile, conn=Depends(get_conn
 def estado_financiero(mes: Optional[date] = None, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
     """Solo del anestesiólogo que consulta: ni el administrador ve las finanzas de otros.
     `mes` (cualquier día del mes) elige el mes de los gastos reales y aportes; por defecto, el actual."""
-    return {**finanzas.estado(conn, anestesiologo_id, mes=mes), "catalogos": finanzas.catalogos()}
+    return {**finanzas.estado(conn, anestesiologo_id, mes=mes), "cuentas": extractos.listar_cuentas(conn, anestesiologo_id),
+            "catalogos": {**finanzas.catalogos(),
+                          "cuentas": [{"clave": c, "nombre": n} for c, n in extractos.TIPOS_CUENTA]}}
+
+
+# ---------------------------------------------------------------- cuentas y extractos bancarios
+@app.post("/api/finanzas/cuentas", status_code=201)
+def crear_cuenta(c: CuentaEntrada, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+    cuenta_id = extractos.crear_cuenta(conn, anestesiologo_id, c)
+    conn.commit()
+    return {"cuenta_id": cuenta_id}
+
+
+@app.put("/api/finanzas/cuentas/{cuenta_id}")
+def actualizar_cuenta(cuenta_id: int, c: CuentaEntrada, conn=Depends(get_conn),
+                      anestesiologo_id=Depends(anestesiologo_actual)):
+    if not extractos.actualizar_cuenta(conn, anestesiologo_id, cuenta_id, c):
+        raise HTTPException(404, "No encontrado.")
+    conn.commit()
+    return {"cuenta_id": cuenta_id}
+
+
+@app.delete("/api/finanzas/cuentas/{cuenta_id}", status_code=204)
+def borrar_cuenta(cuenta_id: int, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+    if not extractos.borrar_cuenta(conn, anestesiologo_id, cuenta_id):
+        raise HTTPException(404, "No encontrado.")
+    conn.commit()
+    return Response(status_code=204)
+
+
+@app.post("/api/finanzas/importaciones", status_code=202)
+def importar_extracto(tareas: BackgroundTasks, archivos: list[UploadFile] = File(...),
+                      clave_pdf: Optional[str] = Form(default=None), conn=Depends(get_conn),
+                      anestesiologo_id=Depends(anestesiologo_actual)):
+    """Recibe el extracto (PDF de muchas hojas, fotos, o Excel/CSV del banco) y lo lee en segundo plano.
+    La pantalla consulta el avance con GET /api/finanzas/importaciones/{id}."""
+    if len(archivos) > extractos.MAX_HOJAS:
+        raise HTTPException(413, f"Máximo {extractos.MAX_HOJAS} archivos.")
+    subidos = []
+    for a in archivos:
+        datos = a.file.read(config.MAX_ARCHIVO_MB * 1024 * 1024 + 1)
+        if not datos:
+            raise HTTPException(400, "El archivo está vacío.")
+        if len(datos) > config.MAX_ARCHIVO_MB * 1024 * 1024:
+            raise HTTPException(413, f"El archivo supera {config.MAX_ARCHIVO_MB} MB.")
+        subidos.append((datos, a.filename or ""))
+    try:
+        preparado = extractos.preparar_partes(subidos, (clave_pdf or "").strip() or None)
+    except extractos.ExtractoError as e:
+        raise HTTPException(422, {"mensaje": str(e)})
+    nombre = archivos[0].filename or "extracto"
+    if len(archivos) > 1:
+        nombre += f" y {len(archivos) - 1} más"
+    importacion_id = extractos.crear_importacion(conn, anestesiologo_id, nombre, preparado)
+    conn.commit()
+    tareas.add_task(extractos.procesar, importacion_id, anestesiologo_id, preparado)
+    return {"importacion_id": importacion_id, "partes_total": len(preparado.get("partes", [])) or 1,
+            "paginas_total": preparado["hojas"]}
+
+
+@app.get("/api/finanzas/importaciones/{importacion_id}")
+def ver_importacion(importacion_id: int, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+    imp = extractos.obtener(conn, anestesiologo_id, importacion_id)
+    if imp is None:
+        raise HTTPException(404, "No encontrado.")
+    return imp
+
+
+@app.post("/api/finanzas/importaciones/{importacion_id}/confirmar")
+def confirmar_importacion(importacion_id: int, datos: ImportacionConfirmada, conn=Depends(get_conn),
+                          anestesiologo_id=Depends(anestesiologo_actual)):
+    try:
+        resumen = extractos.confirmar(conn, anestesiologo_id, importacion_id, datos)
+    except LookupError as e:
+        conn.rollback()
+        raise HTTPException(404, str(e))
+    except extractos.ExtractoError as e:
+        conn.rollback()
+        raise HTTPException(409, str(e))
+    conn.commit()
+    return resumen
+
+
+@app.delete("/api/finanzas/importaciones/{importacion_id}", status_code=204)
+def descartar_importacion(importacion_id: int, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+    """Descarta la lectura (los gastos ya anotados no se tocan)."""
+    conn.execute("DELETE FROM fin_importacion WHERE importacion_id = %s AND anestesiologo_id = %s",
+                 (importacion_id, anestesiologo_id))
+    conn.commit()
+    return Response(status_code=204)
 
 
 @app.post("/api/finanzas/movimientos", status_code=201)
