@@ -235,6 +235,22 @@ CREATE TABLE IF NOT EXISTS fin_meta (
     valor_objetivo     NUMERIC(14,2) NOT NULL CHECK (valor_objetivo > 0),
     ahorrado           NUMERIC(14,2) NOT NULL DEFAULT 0 CHECK (ahorrado >= 0),
     fecha_objetivo     DATE,
+    compromiso_mensual NUMERIC(14,2),                  -- lo que se compromete a ahorrar cada mes
+    comprometido_en    DATE,
     creado_en          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_fin_meta_anest ON fin_meta (anestesiologo_id);
+
+CREATE TABLE IF NOT EXISTS fin_movimiento (
+    movimiento_id      BIGSERIAL PRIMARY KEY,
+    anestesiologo_id   BIGINT NOT NULL REFERENCES anestesiologo(anestesiologo_id) ON DELETE CASCADE,
+    fecha              DATE NOT NULL,
+    clase              VARCHAR(10) NOT NULL CHECK (clase IN ('GASTO', 'APORTE')),
+    categoria          VARCHAR(20),                    -- gastos: la categoría del presupuesto
+    meta_id            BIGINT REFERENCES fin_meta(meta_id) ON DELETE CASCADE,  -- aportes: la meta
+    descripcion        VARCHAR(160),
+    valor              NUMERIC(14,2) NOT NULL CHECK (valor > 0),
+    creado_en          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CHECK ((clase = 'GASTO' AND categoria IS NOT NULL) OR (clase = 'APORTE' AND meta_id IS NOT NULL))
+);
+CREATE INDEX IF NOT EXISTS idx_fin_mov_anest_fecha ON fin_movimiento (anestesiologo_id, fecha);

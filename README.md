@@ -76,7 +76,9 @@ la API pública de Supabase no ve ningún dato; solo la app, que se conecta como
 | `GET` | `/api/relacion` · `/api/relacion.xlsx` | Relación de órdenes para facturación; `tipo`, `aseguradora_id` y `clinica_id` admiten varios valores; el Excel recibe `ids` (filas elegidas) y `mes` |
 | `GET` | `/api/pagos/{id}/liquidacion` | Volante calculado con la fórmula de AP sobre el recaudo neto del reporte |
 | `POST` | `/api/pagos/{id}/volante` | Lee el volante que entregó AP (IA) y lo compara concepto por concepto (no se guarda) |
-| `GET` | `/api/finanzas` | Estado financiero del anestesiólogo: ingreso base, gastos con semáforo, metas y consejos |
+| `GET` | `/api/finanzas?mes=` | Estado financiero del anestesiólogo: ingreso base, gastos con semáforo, metas, compromisos, el mes elegido y consejos |
+| `POST` · `DELETE` | `/api/finanzas/movimientos` | Gastos reales y aportes a metas (el aporte suma a lo ahorrado) |
+| `PUT` | `/api/finanzas/metas/{id}/compromiso` | Compromiso de ahorro mensual de una meta (null lo quita) |
 | `POST` · `PUT` · `DELETE` | `/api/finanzas/partidas` · `/api/finanzas/metas` | Gastos, ingresos adicionales y metas de ahorro |
 | `POST` · `DELETE` | `/api/volantes` · `/api/volantes/{mes}` | Sube el volante de un mes (queda como ingreso real) o lo quita |
 | `GET` | `/api/clinicas` | Clínicas registradas (para sugerirlas al escribir) |
@@ -168,8 +170,13 @@ Cada anestesiólogo ve solo las suyas (ni el administrador las ve). `app/finanza
 - **Proyección de metas:** mes a mes, primero el fondo de emergencias y las cuotas de las metas con fecha;
   dice en qué mes se cumple cada una y si llega a tiempo.
 - **Créditos:** con saldo y tasa EA, meses para terminar, intereses totales y cuál abonar primero.
-- **Vivienda:** cuota hasta el 30 % del ingreso base, crédito a 20 años al 12 % EA (supuesto) y 30 % de
-  cuota inicial.
+- **Compromisos de ahorro:** cada meta muestra cuánto hay que ahorrar al mes para llegar a la fecha; el
+  anestesiólogo se compromete a un valor mensual y la app lleva el cumplimiento de cada mes, la racha de
+  meses seguidos cumplidos, el historial de 6 meses y en qué mes se cumple la meta a ese ritmo.
+- **Este mes (gastos reales):** se anotan los gastos (por categoría) y los ahorros (a una meta, que suman a
+  lo ahorrado). Cada categoría se compara con su presupuesto: dentro, pasado (hasta 10 % más), muy pasado
+  o sin presupuesto. Se puede mirar cualquier mes anterior.
+- **Semestral de AP:** se paga con los cortes de junio y diciembre (confirmado con AP).
 
 ## Pagos: depurar pendientes
 

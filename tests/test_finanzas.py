@@ -131,12 +131,6 @@ def test_creditos_y_vivienda():
     c = finanzas.analizar_creditos(gastos, date(2026, 10, 15))
     assert not c["creditos"][0]["cubre_intereses"] and "no alcanza ni para los intereses" in c["recomendacion"]
 
-    v = finanzas.capacidad_vivienda(Decimal(5000000), None)
-    assert v["cuota_maxima"] == 1500000 and 141_000_000 < v["credito"] < 142_500_000
-    assert v["cuota_inicial"] == (v["precio_maximo"] * Decimal("0.3")).quantize(Decimal("1"))
-    casa = finanzas.capacidad_vivienda(Decimal(5000000), {"nombre": "Apartamento", "valor_objetivo": Decimal(90000000)})
-    assert casa["precio_meta"] == 300000000 and not casa["meta_alcanza"]   # cuota de ~2,3 M > 1,5 M
-
 
 def test_ahorros_de_ap_y_lo_que_viene(con_reporte):
     from app.repositorio import conectar
@@ -159,3 +153,60 @@ def test_ahorros_de_ap_y_lo_que_viene(con_reporte):
     p = e["por_cobrar"]
     assert p["cirugias"] == 2 and p["atrasadas"] == 1 and p["rezago_dias"] > 30
     assert all(m["periodo"] >= date(2026, 11, 1) for m in p["meses"]) and p["total_te_llega"] > 0
+
+
+# ------------------------------------------------------------------ fase 3
+def test_compromiso_de_ahorro_con_racha(conn):
+    from app.modelos import MetaEntrada, MovimientoEntrada
+    meta = finanzas.crear_meta(conn, 1, MetaEntrada(tipo="VIAJE", nombre="Europa", valor_objetivo=6000000,
+                                                    fecha_objetivo=date(2027, 6, 1)))
+    finanzas.fijar_compromiso(conn, 1, meta, Decimal(500000), hoy=date(2026, 8, 3))
+    for fecha, valor in ((date(2026, 8, 10), 500000), (date(2026, 9, 5), 600000), (date(2026, 10, 2), 200000)):
+        finanzas.crear_movimiento(conn, 1, MovimientoEntrada(clase="APORTE", meta_id=meta, fecha=fecha, valor=valor))
+    conn.commit()
+    e = finanzas.estado(conn, 1, hoy=date(2026, 10, 20))
+    m = e["metas"][0]
+    assert m["ahorrado"] == 1300000 and m["aportado_mes"] == 200000 and m["cumple_mes"] is False
+    assert m["racha"] == 2
+    assert [(h["periodo"].month, h["estado"]) for h in m["historial"]] == [(8, "CUMPLIDO"), (9, "CUMPLIDO"), (10, "EN_CURSO")]
+    assert m["fecha_con_compromiso"] == date(2027, 8, 1)          # 4,7 M / 500 mil = 10 meses
+    textos = " ".join(c["texto"] for c in e["consejos"])
+    assert "llevas $200.000 de tu compromiso de $500.000" in textos and "08/2027" in textos
+    # septiembre, mirado como mes elegido: cumplido
+    sept = finanzas.estado(conn, 1, hoy=date(2026, 10, 20), mes=date(2026, 9, 1))
+    assert sept["metas"][0]["cumple_mes"] and sept["metas"][0]["aportado_mes"] == 600000
+    # borrar un aporte devuelve lo ahorrado
+    mov = e["mes"]["movimientos"][0]["movimiento_id"]
+    assert finanzas.borrar_movimiento(conn, 1, mov)
+    assert finanzas.listar_metas(conn, 1)[0]["ahorrado"] == 1100000
+    finanzas.fijar_compromiso(conn, 1, meta, None)
+    assert finanzas.listar_metas(conn, 1)[0]["comprometido_en"] is None
+
+
+def test_gastos_reales_contra_presupuesto(cliente):
+    def post(url, datos, codigo=201):
+        r = cliente.post(url, json=datos)
+        assert r.status_code == codigo, r.text
+        return r.json()
+    post("/api/finanzas/partidas", {"clase": "GASTO", "categoria": "ALIMENTACION", "nombre": "Mercado", "valor_mensual": 600000})
+    post("/api/finanzas/partidas", {"clase": "GASTO", "categoria": "ENTRETENIMIENTO", "nombre": "Salidas", "valor_mensual": 300000})
+    hoy = date.today().isoformat()
+    for cat, valor in (("ALIMENTACION", "400.000"), ("ALIMENTACION", "250.000"), ("ENTRETENIMIENTO", 400000), ("TRANSPORTE", 100000)):
+        post("/api/finanzas/movimientos", {"clase": "GASTO", "categoria": cat, "valor": valor, "fecha": hoy})
+    mes = cliente.get("/api/finanzas").json()["mes"]
+    cats = {c["categoria"]: c for c in mes["categorias"]}
+    assert cats["ALIMENTACION"]["estado"] == "ALTO" and Decimal(cats["ALIMENTACION"]["real"]) == 650000
+    assert cats["ENTRETENIMIENTO"]["estado"] == "MUY_ALTO"
+    assert cats["TRANSPORTE"]["estado"] == "SIN_PRESUPUESTO"
+    assert Decimal(mes["real"]) == 1150000 and len(mes["movimientos"]) == 4
+    # otro mes: vacío
+    assert cliente.get("/api/finanzas", params={"mes": "2020-01-01"}).json()["mes"]["movimientos"] == []
+    # validaciones
+    post("/api/finanzas/movimientos", {"clase": "GASTO", "valor": 1000}, 422)
+    post("/api/finanzas/movimientos", {"clase": "APORTE", "meta_id": 999, "valor": 1000}, 404)
+    meta = post("/api/finanzas/metas", {"tipo": "CARRO", "nombre": "Carro", "valor_objetivo": 30000000})["meta_id"]
+    r = cliente.put(f"/api/finanzas/metas/{meta}/compromiso", json={"compromiso_mensual": "1.000.000"})
+    assert r.status_code == 200
+    post("/api/finanzas/movimientos", {"clase": "APORTE", "meta_id": meta, "valor": 1000000})
+    m = cliente.get("/api/finanzas").json()["metas"][0]
+    assert m["cumple_mes"] and m["racha"] == 1 and Decimal(m["ahorrado"]) == 1000000

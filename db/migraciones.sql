@@ -132,3 +132,20 @@ CREATE INDEX IF NOT EXISTS idx_fin_meta_anest ON fin_meta (anestesiologo_id);
 -- 14. Créditos: saldo y tasa efectiva anual de las cuotas de deudas
 ALTER TABLE fin_partida ADD COLUMN IF NOT EXISTS saldo NUMERIC(14,2);
 ALTER TABLE fin_partida ADD COLUMN IF NOT EXISTS tasa_ea NUMERIC(6,2);
+
+-- 15. Compromiso de ahorro mensual por meta, y lo que realmente se gasta y se aporta cada mes
+ALTER TABLE fin_meta ADD COLUMN IF NOT EXISTS compromiso_mensual NUMERIC(14,2);
+ALTER TABLE fin_meta ADD COLUMN IF NOT EXISTS comprometido_en DATE;
+CREATE TABLE IF NOT EXISTS fin_movimiento (
+    movimiento_id      BIGSERIAL PRIMARY KEY,
+    anestesiologo_id   BIGINT NOT NULL REFERENCES anestesiologo(anestesiologo_id) ON DELETE CASCADE,
+    fecha              DATE NOT NULL,
+    clase              VARCHAR(10) NOT NULL CHECK (clase IN ('GASTO', 'APORTE')),
+    categoria          VARCHAR(20),                    -- gastos: la categoría del presupuesto
+    meta_id            BIGINT REFERENCES fin_meta(meta_id) ON DELETE CASCADE,  -- aportes: la meta
+    descripcion        VARCHAR(160),
+    valor              NUMERIC(14,2) NOT NULL CHECK (valor > 0),
+    creado_en          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CHECK ((clase = 'GASTO' AND categoria IS NOT NULL) OR (clase = 'APORTE' AND meta_id IS NOT NULL))
+);
+CREATE INDEX IF NOT EXISTS idx_fin_mov_anest_fecha ON fin_movimiento (anestesiologo_id, fecha);

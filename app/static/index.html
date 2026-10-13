@@ -129,7 +129,7 @@
   table.liq.meses-fin td.mes { white-space: nowrap; }
   .fin-item { border-top: 1px solid var(--line); padding: 10px 0; }
   .fin-item:first-child { border-top: 0; }
-  .fin-item .acciones { display: flex; gap: 6px; margin-top: 6px; }
+  .fin-item .acciones { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
   .fin-item .acciones button { padding: 4px 10px; font-size: .8rem; }
   .consejo { padding: 8px 10px; border-radius: 8px; margin: 6px 0; font-size: .9rem; }
   .consejo.SANO { background: var(--ok-bg); color: var(--ok-text); }
@@ -351,6 +351,29 @@
       <div id="fin-consejos"></div>
     </section>
     <section class="card">
+      <div class="item-cab"><h2>Este mes</h2>
+        <div style="display:flex;gap:4px;align-items:center;flex:0 0 auto">
+          <button type="button" id="fin-mes-ant" aria-label="Mes anterior">◀</button>
+          <strong id="fin-mes-nombre" style="min-width:80px;text-align:center"></strong>
+          <button type="button" id="fin-mes-sig" aria-label="Mes siguiente">▶</button></div></div>
+      <p class="sub">Anota lo que gastas y lo que ahorras: la app lo compara con tu presupuesto y tus compromisos.</p>
+      <form id="fin-form-mov" novalidate>
+        <div class="fila">
+          <div><label for="fin-mov-clase">Es un</label>
+            <select id="fin-mov-clase"><option value="GASTO">Gasto</option><option value="APORTE">Ahorro para una meta</option></select></div>
+          <div><label for="fin-mov-destino" id="fin-mov-destino-label">Categoría</label><select id="fin-mov-destino"></select></div>
+        </div>
+        <div class="fila">
+          <div><label for="fin-mov-valor">Valor ($)</label><input id="fin-mov-valor" class="pesos" inputmode="numeric"></div>
+          <div><label for="fin-mov-desc">Descripción (opcional)</label><input id="fin-mov-desc" placeholder="Ej: mercado del sábado"></div>
+          <div><label for="fin-mov-fecha">Fecha</label><input id="fin-mov-fecha" type="date"></div>
+        </div>
+        <button type="submit" class="primario" style="margin-top:10px">Anotar</button>
+        <div id="fin-estado-mov"></div>
+      </form>
+      <div id="fin-mes"></div>
+    </section>
+    <section class="card">
       <h2>Ingresos</h2>
       <div id="fin-meses"></div>
       <div class="atajos"><button type="button" id="fin-subir-volante">📄 Subir volante de un mes</button></div>
@@ -405,10 +428,7 @@
         <div id="fin-estado-meta"></div>
       </form>
     </section>
-    <section class="card">
-      <h2>¿Para cuánto te alcanza una casa?</h2>
-      <div id="fin-vivienda"></div>
-    </section>
+
   </div>
 
   <div id="pestana-clave" class="pestana oculto">
@@ -939,8 +959,16 @@ document.addEventListener("input", (e) => {
   e.target.value = digitos ? formatoMiles(digitos) : "";
 });
 
+let finMes = null;  // primer día del mes elegido (AAAA-MM-01)
+const isoMes = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+function moverMes(n) {
+  const [a, m] = (finMes || isoMes(new Date())).split("-").map(Number);
+  finMes = isoMes(new Date(a, m - 1 + n, 1));
+  cargarFinanzas();
+}
 async function cargarFinanzas() {
-  const r = await fetch("/api/finanzas");
+  finMes = finMes || isoMes(new Date());
+  const r = await fetch(`/api/finanzas?mes=${finMes}`);
   if (!r.ok) return;
   const f = finanzasDatos = await r.json();
   const c = f.catalogos;
@@ -1000,12 +1028,71 @@ async function cargarFinanzas() {
       <div class="sub">Ahorrado ${pesos(m.ahorrado)} (${pct(m.avance)}) · faltan ${pesos(m.falta)}${m.fecha_objetivo
         ? ` · aparta <strong>${pesos(m.cuota_mensual)} al mes</strong> por ${m.meses_restantes} mes${m.meses_restantes === 1 ? "" : "es"} (hasta ${nombreMes(m.fecha_objetivo)})`
         : " · ponle una fecha para calcular cuánto apartar al mes"}</div>
-      <div class="acciones"><button type="button" data-accion="ahorro">Actualizar lo ahorrado</button>
+      <div class="compromiso"></div>
+      <div class="acciones">${m.compromiso_mensual
+          ? `<button type="button" data-accion="aporte" class="primario">💰 Registrar ahorro</button><button type="button" data-accion="compromiso">Cambiar compromiso</button>`
+          : `<button type="button" data-accion="compromiso" class="primario">🤝 Comprometerme</button>`}
+        <button type="button" data-accion="ahorro">Corregir lo ahorrado</button>
         <button type="button" data-accion="quitar">Quitar</button></div></div>`).join("")
     : `<p class="sub">Empieza por el fondo de emergencias (6 meses de gastos${Number(f.fondo_sugerido) ? `: ${pesos(f.fondo_sugerido)}` : ""}); luego viajes, carro, casa…</p>`;
   document.querySelectorAll("[data-meta] button").forEach((b) => b.onclick = () => accionMeta(b));
   pintarFase2(f);
+  pintarMes(f);
 }
+
+function pintarMes(f) {
+  const m = f.mes, esActual = finMes === isoMes(new Date());
+  $("#fin-mes-nombre").textContent = nombreMes(m.periodo);
+  $("#fin-mes-sig").disabled = esActual;
+  if (!$("#fin-mov-fecha").value || !$("#fin-mov-fecha").value.startsWith(finMes.slice(0, 7)))
+    $("#fin-mov-fecha").value = esActual ? iso(new Date()) : finMes;
+  llenarDestinoMov();
+  const etiqueta = { SANO: "✓ Dentro", ALTO: "⚠ Pasado", MUY_ALTO: "✕ Muy pasado", SIN_PRESUPUESTO: "Sin presupuesto" };
+  const clase = (e) => e === "SIN_PRESUPUESTO" ? "ALTO" : e;
+  $("#fin-mes").innerHTML = `
+    <div class="kpis" style="margin-top:14px">
+      <div class="kpi"><div class="etiqueta">Presupuesto del mes</div><div class="cifra">${pesos(m.presupuesto)}</div></div>
+      <div class="kpi"><div class="etiqueta">Gastado</div><div class="cifra">${pesos(m.real)}</div>
+        <div class="sub">${Number(m.presupuesto) ? (Number(m.disponible) >= 0 ? `te quedan ${pesos(m.disponible)}` : `te pasaste ${pesos(-m.disponible)}`) : ""}</div></div>
+      <div class="kpi"><div class="etiqueta">Ahorrado para metas</div><div class="cifra">${pesos(m.aportes)}</div></div>
+    </div>
+    ${m.categorias.map((c) => `<div style="margin:10px 0">
+      <div class="item-cab"><span>${escapar(c.nombre.split(" (")[0])}</span><span class="estado-fin ${clase(c.estado)}">${etiqueta[c.estado]}</span></div>
+      <div class="medidor ${clase(c.estado)}" role="img" aria-label="${c.uso == null ? "sin presupuesto" : pct(c.uso) + " del presupuesto"}"><span style="width:${c.uso == null ? 100 : Math.min(100, Number(c.uso))}%"></span></div>
+      <div class="sub">${pesos(c.real)} de ${pesos(c.presupuesto)}${c.uso != null ? ` · ${pct(c.uso)}` : ""}</div></div>`).join("")}
+    ${m.movimientos.length ? `<h3 style="margin-top:14px">Anotado en ${nombreMes(m.periodo)}</h3>${m.movimientos.map((x) => `
+      <div class="fin-item" data-mov="${x.movimiento_id}"><div class="item-cab">
+        <span>${escapar(x.fecha.slice(8, 10))}/${escapar(x.fecha.slice(5, 7))} · ${x.clase === "APORTE" ? `💰 ${escapar(x.meta || "Meta")}` : escapar((f.catalogos.gastos.find((g) => g.clave === x.categoria) || {}).nombre?.split(" (")[0] || x.categoria)}${x.descripcion ? ` · ${escapar(x.descripcion)}` : ""}</span>
+        <strong>${pesos(x.valor)}</strong></div>
+        <div class="acciones"><button type="button">Quitar</button></div></div>`).join("")}`
+      : `<p class="sub" style="margin-top:10px">Aún no has anotado nada en ${nombreMes(m.periodo)}.</p>`}`;
+  document.querySelectorAll("[data-mov] button").forEach((b) => b.onclick = async () => {
+    if (confirm("¿Quitar este movimiento?")) await enviar(`/api/finanzas/movimientos/${b.closest("[data-mov]").dataset.mov}`, "DELETE");
+  });
+}
+function llenarDestinoMov() {
+  const f = finanzasDatos, aporte = $("#fin-mov-clase").value === "APORTE";
+  $("#fin-mov-destino-label").textContent = aporte ? "Meta" : "Categoría";
+  const actual = $("#fin-mov-destino").value;
+  $("#fin-mov-destino").innerHTML = aporte
+    ? (f.metas.length ? f.metas.map((m) => `<option value="${m.meta_id}">${escapar(m.nombre)}</option>`).join("") : `<option value="">Primero crea una meta</option>`)
+    : f.catalogos.gastos.map((g) => `<option value="${g.clave}">${escapar(g.nombre.split(" (")[0])}</option>`).join("");
+  if ([...$("#fin-mov-destino").options].some((o) => o.value === actual)) $("#fin-mov-destino").value = actual;
+}
+$("#fin-mov-clase").onchange = llenarDestinoMov;
+$("#fin-mes-ant").onclick = () => moverMes(-1);
+$("#fin-mes-sig").onclick = () => moverMes(1);
+$("#fin-form-mov").onsubmit = async (e) => {
+  e.preventDefault();
+  const aporte = $("#fin-mov-clase").value === "APORTE";
+  if (!valorPesos("#fin-mov-valor")) return aviso($("#fin-estado-mov"), "err", "Escribe el valor.");
+  if (!$("#fin-mov-destino").value) return aviso($("#fin-estado-mov"), "err", "Primero crea una meta abajo.");
+  const ok = await enviar("/api/finanzas/movimientos", "POST", { clase: aporte ? "APORTE" : "GASTO",
+    categoria: aporte ? null : $("#fin-mov-destino").value, meta_id: aporte ? Number($("#fin-mov-destino").value) : null,
+    descripcion: $("#fin-mov-desc").value.trim() || null, valor: valorPesos("#fin-mov-valor"),
+    fecha: $("#fin-mov-fecha").value || null }, "#fin-estado-mov");
+  if (ok) { $("#fin-mov-valor").value = ""; $("#fin-mov-desc").value = ""; }
+};
 
 function pintarFase2(f) {
   // lo que viene
@@ -1029,7 +1116,7 @@ function pintarFase2(f) {
         <tr><td>Vacaciones</td><td class="v">${pesos(a.vacaciones)}</td></tr>
         <tr class="sub-total"><td>Total ahorrado en AP</td><td class="v">${pesos(a.total)}</td></tr>
         <tr><td class="sub">Aporte sindical acumulado (cuotas)</td><td class="v sub">${pesos(a.aporte_sindical)}</td></tr></table>
-      <p class="sub">Según tu volante de ${nombreMes(a.periodo)}. La semestral se paga en ${a.proximo_semestral} (confírmalo con AP).
+      <p class="sub">Según tu volante de ${nombreMes(a.periodo)}. AP paga la semestral con los cortes de junio y diciembre: la próxima llega en ${a.proximo_semestral}.
         Es plata que llega en bloque: decide desde ya a qué meta va, empezando por el fondo de emergencias.</p>`;
   // créditos
   const cr = f.creditos.creditos;
@@ -1039,28 +1126,24 @@ function pintarFase2(f) {
         : !c.cubre_intereses ? `<span class="estado-fin MUY_ALTO">✕ La cuota no cubre los intereses</span> Saldo ${pesos(c.saldo)} al ${String(Number(c.tasa_ea)).replace(".", ",")} % EA.`
         : `Saldo ${pesos(c.saldo)} al ${String(Number(c.tasa_ea)).replace(".", ",")} % EA · terminas en ${c.meses} meses (${nombreMes(c.fecha_fin)}) · pagarías ${pesos(c.intereses)} de intereses.`}</div></div>`).join("")}
     ${Number(f.creditos.saldo_total) ? `<p class="sub">Deuda total: <strong>${pesos(f.creditos.saldo_total)}</strong></p>` : ""}`;
-  // metas: proyección
+  // metas: compromiso y proyección
   f.metas.forEach((m) => {
+    const caja = document.querySelector(`[data-meta="${m.meta_id}"] .compromiso`);
+    if (caja && Number(m.falta)) caja.innerHTML = !m.compromiso_mensual
+      ? `<div class="consejo INFO">Para llegar ${m.fecha_objetivo ? `a ${nombreMes(m.fecha_objetivo)}` : "a tu meta"} necesitas ahorrar
+          <strong>${pesos(m.cuota_mensual || 0)} al mes</strong>${m.fecha_objetivo ? "" : " (ponle una fecha para calcularlo)"}. ¿Te comprometes?</div>`
+      : `<div class="consejo ${m.cumple_mes ? "SANO" : "INFO"}">🤝 Tu compromiso: <strong>${pesos(m.compromiso_mensual)} al mes</strong>.
+          En ${nombreMes(f.mes.periodo)} llevas ${pesos(m.aportado_mes)} ${m.cumple_mes ? "✓ cumplido" : `(faltan ${pesos(Math.max(0, m.compromiso_mensual - m.aportado_mes))})`}.
+          ${m.racha ? `<br>🔥 ${m.racha} mes${m.racha === 1 ? "" : "es"} seguido${m.racha === 1 ? "" : "s"} cumpliendo.` : ""}
+          ${m.fecha_con_compromiso ? `<br>A este ritmo la cumples en <strong>${nombreMes(m.fecha_con_compromiso)}</strong>.` : ""}
+          ${m.historial.length > 1 ? `<br><span class="sub">${m.historial.map((h) => `${MESES_ES[Number(h.periodo.slice(5, 7)) - 1]} ${h.estado === "CUMPLIDO" ? "✓" : h.estado === "EN_CURSO" ? "⏳" : "✗"}`).join(" · ")}</span>` : ""}</div>`;
     const cont = document.querySelector(`[data-meta="${m.meta_id}"] .sub`);
-    if (!cont) return;
+    if (!cont || (m.compromiso_mensual && Number(m.falta))) return;  // con compromiso manda su propia proyección
     const linea = !m.falta || Number(m.falta) === 0 ? "✓ ¡Meta cumplida!"
       : !m.fecha_estimada ? "Con tu capacidad de ahorro actual no se alcanza: revisa tus gastos."
       : `Con tu capacidad de ahorro actual la cumples en <strong>${nombreMes(m.fecha_estimada)}</strong>${m.fecha_objetivo ? (m.a_tiempo ? " ✓ a tiempo" : " ⚠ después de tu fecha") : ""}.`;
     cont.insertAdjacentHTML("beforeend", `<br>${linea}`);
   });
-  // vivienda
-  const v = f.vivienda;
-  $("#fin-vivienda").innerHTML = !v ? `<p class="sub">Primero necesitamos tu ingreso base.</p>`
-    : `<table class="liq">
-        <tr><td>Cuota máxima sana (30 % de tu ingreso base)</td><td class="v">${pesos(v.cuota_maxima)}</td></tr>
-        <tr><td>Crédito que te prestarían con esa cuota</td><td class="v">${pesos(v.credito)}</td></tr>
-        <tr class="sub-total"><td>Precio de vivienda hasta</td><td class="v">${pesos(v.precio_maximo)}</td></tr>
-        <tr><td>Cuota inicial que necesitas (30 %)</td><td class="v">${pesos(v.cuota_inicial)}</td></tr></table>
-      ${v.meta ? `<div class="consejo ${v.meta_alcanza ? "SANO" : "ALTO"}">${v.meta_alcanza ? "✓" : "⚠"} Tu meta «${escapar(v.meta)}» es una cuota
-        inicial para una casa de ${pesos(v.precio_meta)}: la cuota del crédito sería de unos ${pesos(v.cuota_meta)} al mes
-        ${v.meta_alcanza ? "y cabe en tu ingreso base." : "y pasa del 30 % de tu ingreso base."}</div>` : ""}
-      <p class="sub">Estimado con una tasa de ${v.tasa_supuesta} % EA a ${v.plazo_anios} años, sin subsidios. Pide la simulación real a tu banco.
-        Para la meta de casa, pon como valor la cuota inicial que quieres ahorrar.</p>`;
 }
 $("#fin-gas-cat").addEventListener("change", () =>
   document.querySelectorAll(".solo-credito").forEach((el) => el.classList.toggle("oculto", $("#fin-gas-cat").value !== "DEUDAS")));
@@ -1131,6 +1214,22 @@ async function accionPartida(boton) {
 async function accionMeta(boton) {
   const id = boton.closest("[data-meta]").dataset.meta;
   const m = finanzasDatos.metas.find((x) => String(x.meta_id) === id);
+  if (boton.dataset.accion === "compromiso") {
+    const sugerido = m.compromiso_mensual || m.cuota_mensual;
+    const v = prompt(`¿Cuánto te comprometes a ahorrar cada mes para «${m.nombre}»?` +
+      (Number(m.cuota_mensual) ? `\nPara llegar a tiempo necesitas ${formatoMiles(m.cuota_mensual)}.` : "") +
+      "\n(Deja vacío para quitar el compromiso)", Number(sugerido) ? formatoMiles(sugerido) : "");
+    if (v === null) return;
+    await enviar(`/api/finanzas/metas/${id}/compromiso`, "PUT", { compromiso_mensual: v.replace(/\D/g, "") || null });
+    return;
+  }
+  if (boton.dataset.accion === "aporte") {
+    const pendiente = Math.max(0, Number(m.compromiso_mensual) - Number(m.aportado_mes));
+    const v = prompt(`¿Cuánto ahorraste para «${m.nombre}»?`, formatoMiles(pendiente || m.compromiso_mensual));
+    if (v && v.replace(/\D/g, "")) await enviar("/api/finanzas/movimientos", "POST",
+      { clase: "APORTE", meta_id: m.meta_id, valor: v.replace(/\D/g, ""), fecha: finMes === isoMes(new Date()) ? iso(new Date()) : finMes });
+    return;
+  }
   if (boton.dataset.accion === "quitar") {
     if (confirm(`¿Quitar la meta «${m.nombre}»?`)) await enviar(`/api/finanzas/metas/${id}`, "DELETE");
     return;

@@ -123,7 +123,8 @@ def borrar_partida(conn, anestesiologo_id: int, partida_id: int) -> bool:
 
 def listar_metas(conn, anestesiologo_id: int) -> list[dict]:
     return conn.execute(
-        """SELECT meta_id, tipo, nombre, valor_objetivo, ahorrado, fecha_objetivo FROM fin_meta
+        """SELECT meta_id, tipo, nombre, valor_objetivo, ahorrado, fecha_objetivo, compromiso_mensual, comprometido_en
+             FROM fin_meta
             WHERE anestesiologo_id = %s ORDER BY (tipo <> 'EMERGENCIA'), fecha_objetivo NULLS LAST, meta_id""",
         (anestesiologo_id,)).fetchall()
 
@@ -140,6 +141,46 @@ def actualizar_meta(conn, anestesiologo_id: int, meta_id: int, m) -> bool:
         """UPDATE fin_meta SET tipo = %s, nombre = %s, valor_objetivo = %s, ahorrado = %s, fecha_objetivo = %s
             WHERE meta_id = %s AND anestesiologo_id = %s""",
         (m.tipo, m.nombre, m.valor_objetivo, m.ahorrado, m.fecha_objetivo, meta_id, anestesiologo_id)).rowcount == 1
+
+
+def fijar_compromiso(conn, anestesiologo_id: int, meta_id: int, valor: Optional[Decimal], hoy: Optional[date] = None) -> bool:
+    """El anestesiólogo se compromete a ahorrar `valor` cada mes para la meta (None lo quita).
+    El cumplimiento se cuenta desde el mes en que se compromete."""
+    return conn.execute(
+        """UPDATE fin_meta SET compromiso_mensual = %s,
+                  comprometido_en = CASE WHEN %s::numeric IS NULL THEN NULL
+                                         ELSE COALESCE(comprometido_en, %s) END
+            WHERE meta_id = %s AND anestesiologo_id = %s""",
+        (valor, valor, _primer_dia(hoy or date.today()), meta_id, anestesiologo_id)).rowcount == 1
+
+
+# ------------------------------------------------------------------ movimientos reales (fase 3)
+class MovimientoInvalido(ValueError):
+    pass
+
+
+def crear_movimiento(conn, anestesiologo_id: int, m) -> int:
+    """Registra un gasto real o un aporte a una meta. El aporte suma a lo ahorrado de la meta."""
+    if m.clase == "APORTE":
+        meta = conn.execute("SELECT 1 FROM fin_meta WHERE meta_id = %s AND anestesiologo_id = %s",
+                            (m.meta_id, anestesiologo_id)).fetchone()
+        if not meta:
+            raise MovimientoInvalido("La meta no existe.")
+        conn.execute("UPDATE fin_meta SET ahorrado = ahorrado + %s WHERE meta_id = %s", (m.valor, m.meta_id))
+    return conn.execute(
+        """INSERT INTO fin_movimiento (anestesiologo_id, fecha, clase, categoria, meta_id, descripcion, valor)
+           VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING movimiento_id""",
+        (anestesiologo_id, m.fecha, m.clase, m.categoria if m.clase == "GASTO" else None,
+         m.meta_id if m.clase == "APORTE" else None, m.descripcion, m.valor)).fetchone()["movimiento_id"]
+
+
+def borrar_movimiento(conn, anestesiologo_id: int, movimiento_id: int) -> bool:
+    mov = conn.execute("""DELETE FROM fin_movimiento WHERE movimiento_id = %s AND anestesiologo_id = %s
+                          RETURNING clase, meta_id, valor""", (movimiento_id, anestesiologo_id)).fetchone()
+    if mov and mov["clase"] == "APORTE":
+        conn.execute("UPDATE fin_meta SET ahorrado = GREATEST(0, ahorrado - %s) WHERE meta_id = %s",
+                     (mov["valor"], mov["meta_id"]))
+    return mov is not None
 
 
 def borrar_meta(conn, anestesiologo_id: int, meta_id: int) -> bool:
@@ -162,8 +203,9 @@ def _pesos(v) -> str:
     return f"${Decimal(v):,.0f}".replace(",", ".")
 
 
-def estado(conn, anestesiologo_id: int, hoy: Optional[date] = None) -> dict:
+def estado(conn, anestesiologo_id: int, hoy: Optional[date] = None, mes: Optional[date] = None) -> dict:
     hoy = hoy or date.today()
+    mes = _primer_dia(mes or hoy)
     meses = ingresos_por_mes(conn, anestesiologo_id)
     partidas = listar_partidas(conn, anestesiologo_id)
     gastos = [p for p in partidas if p["clase"] == "GASTO"]
@@ -198,7 +240,9 @@ def estado(conn, anestesiologo_id: int, hoy: Optional[date] = None) -> dict:
         lista_metas.append({**m, "falta": falta, "avance": min(Decimal(100), m["ahorrado"] * 100 / m["valor_objetivo"]),
                             "meses_restantes": meses_rest,
                             "cuota_mensual": (falta / meses_rest).quantize(Decimal("1")) if meses_rest and falta else Decimal(0)})
-    cuotas = sum((m["cuota_mensual"] for m in lista_metas), Decimal(0))
+    cuotas = sum((m["compromiso_mensual"] or m["cuota_mensual"] for m in lista_metas), Decimal(0))
+    mes_info = movimientos_del_mes(conn, anestesiologo_id, mes, gastos)
+    seguimiento_compromisos(conn, anestesiologo_id, lista_metas, mes, _primer_dia(hoy))
     emergencia = [m for m in metas if m["tipo"] == "EMERGENCIA"]
     meses_colchon = (sum((m["ahorrado"] for m in emergencia), Decimal(0)) / total_gastos) if total_gastos else None
 
@@ -241,11 +285,27 @@ def estado(conn, anestesiologo_id: int, hoy: Optional[date] = None) -> dict:
     ahorros = ahorros_ap(conn, anestesiologo_id)
     proyectar_metas(lista_metas, capacidad, hoy_mes)
     creditos = analizar_creditos(gastos, hoy)
-    casa = capacidad_vivienda(base, next((m for m in lista_metas if m["tipo"] == "CASA"), None))
     for m in lista_metas:
         if m["fecha_objetivo"] and m["fecha_estimada"] and not m["a_tiempo"]:
             consejos.append(("ALTO", f"Con tu capacidad de ahorro actual, «{m['nombre']}» se cumpliría en "
                                      f"{m['fecha_estimada']:%m/%Y}, después de la fecha que te pusiste."))
+    for m in lista_metas:
+        if not m["compromiso_mensual"] or not m["falta"]:
+            continue
+        if m["cumple_mes"]:
+            consejos.append(("SANO", f"Cumpliste tu compromiso de {mes:%m/%Y} con «{m['nombre']}»"
+                                     + (f": llevas {m['racha']} meses seguidos." if m["racha"] > 1 else ".")))
+        elif mes == _primer_dia(hoy):
+            consejos.append(("INFO", f"Este mes llevas {_pesos(m['aportado_mes'])} de tu compromiso de "
+                                     f"{_pesos(m['compromiso_mensual'])} para «{m['nombre']}»."))
+        if m["fecha_objetivo"] and m["fecha_con_compromiso"] and m["fecha_con_compromiso"] > _primer_dia(m["fecha_objetivo"]):
+            consejos.append(("ALTO", f"Con tu compromiso de {_pesos(m['compromiso_mensual'])} al mes, «{m['nombre']}» "
+                                     f"se cumple en {m['fecha_con_compromiso']:%m/%Y}: para llegar a tiempo necesitas "
+                                     f"{_pesos(m['cuota_mensual'])} al mes."))
+    for c in mes_info["categorias"]:
+        if c["estado"] in ("ALTO", "MUY_ALTO"):
+            consejos.append((c["estado"], f"En {mes:%m/%Y} llevas {_pesos(c['real'])} en {c['nombre'].split(' (')[0].lower()}, "
+                                          f"el {_num(c['uso'])} % de lo presupuestado ({_pesos(c['presupuesto'])})."))
     if creditos["recomendacion"]:
         consejos.append(("INFO", creditos["recomendacion"]))
     if ahorros and emergencia and meses_colchon is not None and meses_colchon < MESES_EMERGENCIA:
@@ -253,7 +313,7 @@ def estado(conn, anestesiologo_id: int, hoy: Optional[date] = None) -> dict:
                                  "de emergencias hasta completar 6 meses de gastos."))
 
     return {
-        "por_cobrar": por_cobrar, "ahorros_ap": ahorros, "creditos": creditos, "vivienda": casa,
+        "por_cobrar": por_cobrar, "ahorros_ap": ahorros, "creditos": creditos, "mes": mes_info,
         "meses": meses, "ingreso_base_ap": base_ap.quantize(Decimal("1")), "promedio_ap": promedio_ap.quantize(Decimal("1")),
         "meses_base": len(bajos), "otros_ingresos": otros, "ingreso_base": base.quantize(Decimal("1")),
         "gastos": total_gastos, "gastos_fijos": fijos, "capacidad_ahorro": capacidad.quantize(Decimal("1")),
@@ -270,10 +330,6 @@ def estado(conn, anestesiologo_id: int, hoy: Optional[date] = None) -> dict:
 # ------------------------------------------------------------------ fase 2
 REZAGO_DIAS_DEFECTO = 60          # si aún no hay pagos para medir cuánto tarda AP en pagar una cirugía
 DIAS_PENDIENTE_MAX = 180          # cirugías más viejas sin pagar no se proyectan: se reportan como atrasadas
-TASA_HIPOTECA_EA = Decimal("12")  # supuesta para estimar la capacidad de compra de vivienda
-PLAZO_HIPOTECA_MESES = 240
-CUOTA_VIVIENDA_MAX = Decimal("0.30")   # los bancos suelen limitar la cuota al 30 % del ingreso
-CUOTA_INICIAL = Decimal("0.30")        # vivienda no VIS: el banco financia hasta el 70 %
 
 
 def _sumar_meses(d: date, n: int) -> date:
@@ -347,7 +403,7 @@ def ahorros_ap(conn, anestesiologo_id: int) -> Optional[dict]:
             semestral, anual, vacaciones = valor("acumulado_semestral"), valor("acumulado_anual"), valor("acumulado_vacaciones")
             return {"periodo": v["periodo"], "semestral": semestral, "anual": anual, "vacaciones": vacaciones,
                     "aporte_sindical": valor("acumulado_aporte_sindical"), "total": semestral + anual + vacaciones,
-                    # en los volantes de 2026 la semestral quedó en cero con el corte de junio
+                    # AP paga la semestral con los cortes de junio y diciembre (confirmado)
                     "proximo_semestral": "junio" if v["periodo"].month < 6 else "diciembre"}
     return None
 
@@ -364,9 +420,10 @@ def proyectar_metas(metas: list[dict], capacidad: Decimal, desde: date, limite: 
         if disponible_mes <= 0 or all(falta[id(m)] <= 0 for m in orden):
             break
         disponible = disponible_mes
-        for m in orden:  # primero las cuotas de las metas con fecha
-            if m["cuota_mensual"] and falta[id(m)] > 0:
-                aporte = min(m["cuota_mensual"], falta[id(m)], disponible)
+        for m in orden:  # primero lo comprometido (o la cuota de las metas con fecha)
+            cuota = m.get("compromiso_mensual") or m["cuota_mensual"]
+            if cuota and falta[id(m)] > 0:
+                aporte = min(cuota, falta[id(m)], disponible)
                 falta[id(m)] -= aporte
                 disponible -= aporte
         for m in orden:  # lo que sobra, en orden de prioridad
@@ -419,23 +476,68 @@ def analizar_creditos(gastos: list[dict], hoy: Optional[date] = None) -> dict:
             "recomendacion": recomendacion}
 
 
-def capacidad_vivienda(base: Decimal, meta_casa: Optional[dict]) -> Optional[dict]:
-    """Para cuánto alcanza una vivienda con el ingreso base: cuota hasta el 30 % y crédito a 20 años."""
-    if base <= 0:
-        return None
-    cuota = base * CUOTA_VIVIENDA_MAX
-    r = (1 + float(TASA_HIPOTECA_EA) / 100) ** (1 / 12) - 1
-    prestamo = Decimal(float(cuota) * (1 - (1 + r) ** -PLAZO_HIPOTECA_MESES) / r)
-    precio = prestamo / (1 - CUOTA_INICIAL)
-    resultado = {"cuota_maxima": cuota.quantize(Decimal("1")), "credito": prestamo.quantize(Decimal("1")),
-                 "precio_maximo": precio.quantize(Decimal("1")), "cuota_inicial": (precio * CUOTA_INICIAL).quantize(Decimal("1")),
-                 "tasa_supuesta": TASA_HIPOTECA_EA, "plazo_anios": PLAZO_HIPOTECA_MESES // 12}
-    if meta_casa:  # la meta es la cuota inicial: ¿la cuota del crédito para esa casa cabe en el 30 %?
-        precio_meta = meta_casa["valor_objetivo"] / CUOTA_INICIAL
-        cuota_meta = Decimal(float(precio_meta * (1 - CUOTA_INICIAL)) * r / (1 - (1 + r) ** -PLAZO_HIPOTECA_MESES))
-        resultado.update({"meta": meta_casa["nombre"], "precio_meta": precio_meta.quantize(Decimal("1")),
-                          "cuota_meta": cuota_meta.quantize(Decimal("1")), "meta_alcanza": cuota_meta <= cuota})
-    return resultado
+USO_ALTO = Decimal(110)   # gastar hasta 10 % más de lo presupuestado: "alto"; más: "muy alto"
+
+
+def movimientos_del_mes(conn, anestesiologo_id: int, mes: date, gastos_presupuesto: list[dict]) -> dict:
+    """Gastos reales del mes contra el presupuesto, por categoría, y los movimientos registrados."""
+    hasta = _sumar_meses(mes, 1)
+    movimientos = conn.execute(
+        """SELECT m.movimiento_id, m.fecha, m.clase, m.categoria, m.meta_id, f.nombre AS meta, m.descripcion, m.valor
+             FROM fin_movimiento m LEFT JOIN fin_meta f ON f.meta_id = m.meta_id
+            WHERE m.anestesiologo_id = %s AND m.fecha >= %s AND m.fecha < %s
+            ORDER BY m.fecha DESC, m.movimiento_id DESC""", (anestesiologo_id, mes, hasta)).fetchall()
+    nombres = {c: n for c, n, _, _ in CATEGORIAS}
+    presupuesto: dict[str, Decimal] = {}
+    for g in gastos_presupuesto:
+        presupuesto[g["categoria"]] = presupuesto.get(g["categoria"], Decimal(0)) + g["valor_mensual"]
+    real: dict[str, Decimal] = {}
+    for m in movimientos:
+        if m["clase"] == "GASTO":
+            real[m["categoria"]] = real.get(m["categoria"], Decimal(0)) + m["valor"]
+    categorias = []
+    for clave, nombre, _, _ in CATEGORIAS:
+        p, r = presupuesto.get(clave, Decimal(0)), real.get(clave, Decimal(0))
+        if not p and not r:
+            continue
+        uso = (r * 100 / p) if p else None
+        estado_cat = ("SIN_PRESUPUESTO" if not p else "SANO" if uso <= 100 else "ALTO" if uso <= USO_ALTO else "MUY_ALTO")
+        categorias.append({"categoria": clave, "nombre": nombres[clave], "presupuesto": p, "real": r,
+                           "uso": uso.quantize(Decimal("0.1")) if uso is not None else None, "estado": estado_cat})
+    total_p, total_r = sum(presupuesto.values(), Decimal(0)), sum(real.values(), Decimal(0))
+    aportes = sum((m["valor"] for m in movimientos if m["clase"] == "APORTE"), Decimal(0))
+    return {"periodo": mes, "categorias": categorias, "presupuesto": total_p, "real": total_r, "aportes": aportes,
+            "disponible": total_p - total_r, "movimientos": movimientos}
+
+
+def seguimiento_compromisos(conn, anestesiologo_id: int, metas: list[dict], mes: date, mes_actual: date) -> None:
+    """Para cada meta con compromiso: lo aportado en el mes, si cumplió, la racha de meses seguidos cumplidos
+    y el historial de los últimos 6 meses. También en qué mes se cumple la meta ahorrando el compromiso."""
+    filas = conn.execute(
+        """SELECT meta_id, date_trunc('month', fecha)::date AS periodo, SUM(valor) AS total FROM fin_movimiento
+            WHERE anestesiologo_id = %s AND clase = 'APORTE' GROUP BY 1, 2""", (anestesiologo_id,)).fetchall()
+    aportes = {(f["meta_id"], f["periodo"]): f["total"] for f in filas}
+    for m in metas:
+        compromiso, inicio = m["compromiso_mensual"], m["comprometido_en"]
+        m.update({"aportado_mes": aportes.get((m["meta_id"], mes), Decimal(0)), "cumple_mes": None,
+                  "racha": 0, "historial": [], "fecha_con_compromiso": None})
+        if not compromiso:
+            continue
+        cumple = lambda p: aportes.get((m["meta_id"], p), Decimal(0)) >= compromiso  # noqa: E731
+        m["cumple_mes"] = cumple(mes)
+        if m["falta"]:
+            m["fecha_con_compromiso"] = _sumar_meses(mes_actual, math.ceil(m["falta"] / compromiso))
+        # racha: meses seguidos cumplidos hasta el actual (el actual cuenta si ya se cumplió)
+        p = mes_actual if cumple(mes_actual) else _sumar_meses(mes_actual, -1)
+        while p >= inicio and cumple(p):
+            m["racha"] += 1
+            p = _sumar_meses(p, -1)
+        for n in range(5, -1, -1):
+            p = _sumar_meses(mes_actual, -n)
+            if p < inicio:
+                continue
+            m["historial"].append({"periodo": p, "aportado": aportes.get((m["meta_id"], p), Decimal(0)),
+                                   "estado": "CUMPLIDO" if cumple(p) else ("EN_CURSO" if p == mes_actual else "NO_CUMPLIDO")})
 
 
 def catalogos() -> dict:

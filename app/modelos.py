@@ -325,3 +325,30 @@ class MetaEntrada(_Base):
     @classmethod
     def _cero(cls, v):
         return Decimal(0) if v in (None, "") else v
+
+
+class MovimientoEntrada(_Base):
+    """Un gasto real del mes o un aporte a una meta."""
+    clase: Literal["GASTO", "APORTE"]
+    fecha: date = Field(default_factory=date.today)
+    categoria: Optional[str] = None
+    meta_id: Optional[int] = None
+    descripcion: Optional[str] = Field(default=None, max_length=160)
+    valor: Decimal = Field(gt=0, max_digits=14, decimal_places=2)
+
+    _p = field_validator("valor", mode="before")(_pesos_positivos)
+
+    @model_validator(mode="after")
+    def _segun_clase(self):
+        from app.finanzas import CATEGORIAS
+        if self.clase == "GASTO" and self.categoria not in [c[0] for c in CATEGORIAS]:
+            raise ValueError("elige la categoría del gasto")
+        if self.clase == "APORTE" and not self.meta_id:
+            raise ValueError("elige la meta del aporte")
+        return self
+
+
+class CompromisoEntrada(_Base):
+    compromiso_mensual: Optional[Decimal] = Field(default=None, gt=0, max_digits=14, decimal_places=2)
+
+    _p = field_validator("compromiso_mensual", mode="before")(_pesos_positivos)

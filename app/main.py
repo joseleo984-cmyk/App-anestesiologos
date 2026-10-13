@@ -22,7 +22,7 @@ from pydantic import BaseModel, Field
 from rapidfuzz import fuzz
 
 from app import almacenamiento, auth, catalogo, config, exportar, extraccion, finanzas, inicio, liquidacion, repositorio
-from app.modelos import MetaEntrada, OrdenConfirmada, PartidaEntrada, Sugerencia
+from app.modelos import CompromisoEntrada, MetaEntrada, MovimientoEntrada, OrdenConfirmada, PartidaEntrada, Sugerencia
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 log = logging.getLogger(__name__)
@@ -591,9 +591,38 @@ def comparar_volante(reporte_id: int, archivo: UploadFile, conn=Depends(get_conn
 
 # ---------------------------------------------------------------- finanzas personales
 @app.get("/api/finanzas")
-def estado_financiero(conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
-    """Solo del anestesiólogo que consulta: ni el administrador ve las finanzas de otros."""
-    return {**finanzas.estado(conn, anestesiologo_id), "catalogos": finanzas.catalogos()}
+def estado_financiero(mes: Optional[date] = None, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+    """Solo del anestesiólogo que consulta: ni el administrador ve las finanzas de otros.
+    `mes` (cualquier día del mes) elige el mes de los gastos reales y aportes; por defecto, el actual."""
+    return {**finanzas.estado(conn, anestesiologo_id, mes=mes), "catalogos": finanzas.catalogos()}
+
+
+@app.post("/api/finanzas/movimientos", status_code=201)
+def registrar_movimiento(m: MovimientoEntrada, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+    try:
+        movimiento_id = finanzas.crear_movimiento(conn, anestesiologo_id, m)
+    except finanzas.MovimientoInvalido as e:
+        conn.rollback()
+        raise HTTPException(404, str(e))
+    conn.commit()
+    return {"movimiento_id": movimiento_id}
+
+
+@app.delete("/api/finanzas/movimientos/{movimiento_id}", status_code=204)
+def borrar_movimiento(movimiento_id: int, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+    if not finanzas.borrar_movimiento(conn, anestesiologo_id, movimiento_id):
+        raise HTTPException(404, "No encontrado.")
+    conn.commit()
+    return Response(status_code=204)
+
+
+@app.put("/api/finanzas/metas/{meta_id}/compromiso")
+def comprometerse(meta_id: int, c: CompromisoEntrada, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+    """Compromiso de ahorro mensual para la meta (null lo quita)."""
+    if not finanzas.fijar_compromiso(conn, anestesiologo_id, meta_id, c.compromiso_mensual):
+        raise HTTPException(404, "No encontrado.")
+    conn.commit()
+    return {"meta_id": meta_id, "compromiso_mensual": c.compromiso_mensual}
 
 
 @app.post("/api/volantes", status_code=201)
