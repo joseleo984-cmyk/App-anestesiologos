@@ -141,6 +141,20 @@
   .ext-fila .ext-motivo { font-size: .75rem; color: var(--muted); }
   .barra-avance { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; margin: 8px 0; }
   .barra-avance span { display: block; height: 100%; background: var(--accent); transition: width .3s; }
+  #visor { position: fixed; inset: 0; z-index: 50; background: var(--bg); display: flex; flex-direction: column;
+    transition: transform .15s ease-out; }
+  .visor-barra { display: flex; align-items: center; gap: 10px; padding: calc(env(safe-area-inset-top) + 8px) 12px 8px;
+    background: var(--card); border-bottom: 1px solid var(--line); }
+  .visor-barra strong { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
+  .visor-barra button { flex: 0 0 auto; min-height: 44px; font-weight: 600; }
+  .visor-asa { width: 40px; height: 5px; border-radius: 3px; background: var(--line); margin: 6px auto 0; flex: 0 0 auto; }
+  #visor-cuerpo { flex: 1 1 auto; overflow: auto; -webkit-overflow-scrolling: touch; padding: 8px 8px calc(env(safe-area-inset-bottom) + 16px);
+    display: flex; flex-direction: column; align-items: center; gap: 8px; touch-action: pan-x pan-y pinch-zoom; }
+  #visor-cuerpo img { max-width: 100%; height: auto; }
+  #visor-cuerpo canvas { max-width: 100%; height: auto; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
+  #visor-cuerpo iframe { width: 100%; flex: 1 1 auto; min-height: 70vh; border: 0; background: #fff; }
+  .visor-descarga { text-align: center; max-width: 360px; margin: 40px auto; }
+  body.sin-scroll { overflow: hidden; }
   .grafica { position: relative; margin: 10px 0 4px; touch-action: pan-y; }
   .grafica svg { display: block; overflow: visible; }
   .grafica text { font: 11px system-ui, -apple-system, "Segoe UI", sans-serif; fill: var(--muted); font-variant-numeric: tabular-nums; }
@@ -276,7 +290,7 @@
     <section class="card">
       <div class="barra-acciones">
         <input id="f-q" type="search" placeholder="Buscar paciente o documento" style="flex:2 1 200px">
-        <a class="boton" id="excel" href="/api/cirugias.xlsx">⬇ Excel</a>
+        <a class="boton excel" id="excel" href="/api/cirugias.xlsx">⬇ Excel</a>
       </div>
       <details class="filtros">
         <summary>Filtros <span class="sub" id="filtros-activos"></span></summary>
@@ -542,7 +556,7 @@
           <button type="button" data-metrica="total" aria-pressed="true">Por dinero</button>
           <button type="button" data-metrica="cirugias" aria-pressed="false">Por cirugías</button>
         </div>
-        <a class="boton" id="r-excel" href="/api/cirugias.xlsx" style="flex:0 0 auto">⬇ Excel</a>
+        <a class="boton excel" id="r-excel" href="/api/cirugias.xlsx" style="flex:0 0 auto">⬇ Excel</a>
       </div>
     </section>
     <div id="reporte"><p class="sub">Cargando…</p></div>
@@ -634,6 +648,15 @@
 
   <p class="sub" id="version" style="text-align:center"></p>
 </main>
+<div id="visor" class="oculto" role="dialog" aria-modal="true" aria-labelledby="visor-titulo">
+  <div class="visor-barra">
+    <button type="button" id="visor-cerrar" aria-label="Cerrar">✕ Cerrar</button>
+    <strong id="visor-titulo"></strong>
+    <button type="button" id="visor-compartir" class="oculto" aria-label="Guardar o enviar">📤</button>
+  </div>
+  <div class="visor-asa" aria-hidden="true"></div>
+  <div id="visor-cuerpo"></div>
+</div>
 
 <script>
 const $ = (sel) => document.querySelector(sel);
@@ -772,9 +795,9 @@ function llenarFormulario(datos) {
   const paginas = (modo.tipo === "documento" ? modo.paginas : datos.paginas) || 1;
   $("#ver-original").classList.toggle("oculto", !docId);
   if (docId) $("#ver-original").innerHTML = paginas === 1
-    ? `<a href="/api/documentos/${docId}/archivo" target="_blank" rel="noopener">📄 Ver la orden original</a>`
+    ? `<a href="/api/documentos/${docId}/archivo" data-visor="Orden original">📄 Ver la orden original</a>`
     : `📄 Orden original: ${Array.from({ length: paginas }, (_, i) =>
-        `<a href="/api/documentos/${docId}/archivo?pagina=${i + 1}" target="_blank" rel="noopener">página ${i + 1}</a>`).join(" · ")}`;
+        `<a href="/api/documentos/${docId}/archivo?pagina=${i + 1}" data-visor="Orden original · página ${i + 1}">página ${i + 1}</a>`).join(" · ")}`;
 
   const avisos = [];
   if (datos.confianza !== undefined && datos.confianza < 0.8)
@@ -1698,7 +1721,7 @@ $("#rel-excel").onclick = () => {
   const p = consultaRelacion();
   elegidas.forEach((f) => p.append("ids", f.cirugia_id));
   p.append("mes", $("#rel-mes").value);
-  window.location.href = `/api/relacion.xlsx?${p}`;
+  abrirVisor(`/api/relacion.xlsx?${p}`, "Relación de órdenes");
 };
 
 // ---------------------------------------------------------------- filtros
@@ -1918,7 +1941,7 @@ function pintarReportePago(rep) {
   $("#detalle-pago").innerHTML = `<section class="card">
     <h2>${escapar(rep.pagador || "Reporte de pagos")}</h2>
     <p class="sub">Proceso: ${escapar(rep.fecha_proceso || "—")} · Periodo: ${escapar(rep.periodo_desde || "—")} a ${escapar(rep.periodo_hasta || "—")}
-      · <a href="/api/pagos/${rep.reporte_id}/archivo" target="_blank" rel="noopener">📄 Ver original</a></p>
+      · <a href="/api/pagos/${rep.reporte_id}/archivo" data-visor="Reporte de pagos">📄 Ver original</a></p>
     ${cuadre}
     <p>${plural(cuenta("COINCIDE"), "pago encontrado en tus cirugías", "pagos encontrados en tus cirugías")} ·
        ${plural(cuenta("SIN_CIRUGIA"), "sin cirugía en la app", "sin cirugía en la app")} ·
@@ -2132,6 +2155,127 @@ function exigirCambioClave() {
 }
 $("#ir-clave").onclick = () => { $("#menu-cuenta").open = false; mostrarPestana("clave"); };
 $("#ir-usuarios").onclick = () => { $("#menu-cuenta").open = false; mostrarPestana("usuarios"); };
+// ---------------------------------------------------------------- visor de archivos
+// En el iPhone la app instalada no tiene botón de "atrás": abrir una foto, un PDF o un Excel como página
+// deja al usuario atrapado. Todo se muestra aquí, con ✕ para cerrar (o deslizando hacia abajo).
+const PDFJS = "/static/pdfjs/";  // pdf.js 3.11.174 (Apache 2.0), dibuja todas las hojas del PDF
+let visorArchivo = null, visorUrl = null;
+function nombreDeArchivo(r, porDefecto) {
+  const cd = r.headers.get("Content-Disposition") || "";
+  const m = cd.match(/filename\*=UTF-8''([^;]+)/i) || cd.match(/filename="?([^";]+)"?/i);
+  if (m) return decodeURIComponent(m[1]);
+  const ext = { "application/pdf": ".pdf", "image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp", "image/heic": ".heic" }[
+    (r.headers.get("Content-Type") || "").split(";")[0]] || "";
+  return porDefecto + ext;
+}
+function cargarScript(src) {
+  return new Promise((ok, falla) => {
+    if (document.querySelector(`script[src="${src}"]`)) return ok();
+    const s = document.createElement("script");
+    s.src = src; s.onload = ok; s.onerror = falla;
+    document.head.appendChild(s);
+  });
+}
+async function pintarPdf(blob, cont) {
+  await cargarScript(PDFJS + "pdf.min.js");
+  pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS + "pdf.worker.min.js";
+  const pdf = await pdfjsLib.getDocument({ data: await blob.arrayBuffer() }).promise;
+  const ancho = Math.min(cont.clientWidth - 16, 900), escala = window.devicePixelRatio || 1;
+  for (let n = 1; n <= pdf.numPages; n++) {
+    const pagina = await pdf.getPage(n);
+    const base = pagina.getViewport({ scale: 1 }), vista = pagina.getViewport({ scale: ancho / base.width * escala });
+    const lienzo = document.createElement("canvas");
+    lienzo.width = vista.width; lienzo.height = vista.height;
+    lienzo.style.width = `${ancho}px`;
+    cont.appendChild(lienzo);
+    await pagina.render({ canvasContext: lienzo.getContext("2d"), viewport: vista }).promise;
+  }
+}
+async function abrirVisor(url, titulo) {
+  const visor = $("#visor"), cuerpo = $("#visor-cuerpo");
+  $("#visor-titulo").textContent = titulo || "Archivo";
+  cuerpo.innerHTML = `<div class="cargando" style="margin:24px">Abriendo…</div>`;
+  $("#visor-compartir").classList.add("oculto");
+  visor.classList.remove("oculto");
+  document.body.classList.add("sin-scroll");
+  history.pushState({ visor: true }, "");
+  try {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(mensajeError(await r.json().catch(() => null), "No se pudo abrir el archivo."));
+    const blob = await r.blob();
+    if (visor.classList.contains("oculto")) return;  // lo cerraron mientras cargaba
+    visorArchivo = new File([blob], nombreDeArchivo(r, titulo || "archivo"), { type: blob.type });
+    if (visorUrl) URL.revokeObjectURL(visorUrl);
+    visorUrl = URL.createObjectURL(blob);
+    $("#visor-compartir").classList.remove("oculto");
+    cuerpo.innerHTML = "";
+    if (blob.type.startsWith("image/")) {
+      cuerpo.innerHTML = `<img src="${visorUrl}" alt="${escapar(titulo || "Imagen")}">`;
+    } else if (blob.type === "application/pdf") {
+      try { await pintarPdf(blob, cuerpo); }
+      catch (e) { cuerpo.innerHTML = `<iframe src="${visorUrl}" title="${escapar(titulo || "PDF")}"></iframe>`; }
+    } else {  // Excel u otro: se guarda o se envía con la hoja de compartir del teléfono
+      cuerpo.innerHTML = `<div class="visor-descarga"><div style="font-size:3rem">📊</div>
+        <p><strong>${escapar(visorArchivo.name)}</strong></p>
+        <p class="sub">Toca «Guardar o enviar» para guardarlo en Archivos o mandarlo por WhatsApp o correo.</p>
+        <button type="button" class="primario grande" id="visor-guardar">📤 Guardar o enviar</button>
+        <p><a href="${visorUrl}" download="${escapar(visorArchivo.name)}">o descargarlo aquí</a></p></div>`;
+      $("#visor-guardar").onclick = compartirArchivo;
+    }
+  } catch (e) {
+    cuerpo.innerHTML = `<div class="aviso err" style="margin:16px">${escapar(e.message || "No se pudo abrir el archivo.")}</div>`;
+  }
+}
+async function compartirArchivo() {
+  if (!visorArchivo) return;
+  if (navigator.canShare && navigator.canShare({ files: [visorArchivo] })) {
+    try { await navigator.share({ files: [visorArchivo], title: visorArchivo.name }); } catch (e) { /* canceló */ }
+    return;
+  }
+  const a = document.createElement("a");
+  a.href = visorUrl; a.download = visorArchivo.name;
+  document.body.appendChild(a); a.click(); a.remove();
+}
+function cerrarVisor(desdeHistorial = false) {
+  const visor = $("#visor");
+  if (visor.classList.contains("oculto")) return;
+  visor.classList.add("oculto");
+  visor.style.transform = "";
+  document.body.classList.remove("sin-scroll");
+  $("#visor-cuerpo").innerHTML = "";
+  visorArchivo = null;
+  if (!desdeHistorial && history.state && history.state.visor) history.back();
+}
+$("#visor-cerrar").onclick = () => cerrarVisor();
+$("#visor-compartir").onclick = compartirArchivo;
+window.addEventListener("popstate", () => cerrarVisor(true));
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") cerrarVisor(); });
+// Deslizar hacia abajo (desde arriba del contenido) cierra el visor
+(() => {
+  const visor = $("#visor"), cuerpo = $("#visor-cuerpo");
+  let y0 = null, dy = 0;
+  visor.addEventListener("touchstart", (e) => {
+    y0 = e.touches.length === 1 && cuerpo.scrollTop <= 0 ? e.touches[0].clientY : null; dy = 0;
+  }, { passive: true });
+  visor.addEventListener("touchmove", (e) => {
+    if (y0 === null || e.touches.length !== 1) return;
+    dy = Math.max(0, e.touches[0].clientY - y0);
+    if (window.visualViewport && window.visualViewport.scale > 1.05) { dy = 0; return; }  // está haciendo zoom
+    visor.style.transform = dy ? `translateY(${dy}px)` : "";
+  }, { passive: true });
+  visor.addEventListener("touchend", () => {
+    if (y0 !== null && dy > 110) cerrarVisor(); else visor.style.transform = "";
+    y0 = null; dy = 0;
+  });
+})();
+// Los enlaces a archivos (orden original, reportes, Excel) se abren en el visor
+document.addEventListener("click", (e) => {
+  const a = e.target.closest("a[data-visor], a.excel");
+  if (!a || !a.getAttribute("href")) return;
+  e.preventDefault();
+  abrirVisor(a.getAttribute("href"), a.dataset.visor || "Excel");
+});
+
 $("#salir").onclick = async () => { await fetch("/api/logout", { method: "POST" }); location.href = "/login"; };
 
 $("#form-clave").onsubmit = async (ev) => {
