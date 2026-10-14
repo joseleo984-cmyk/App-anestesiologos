@@ -1410,7 +1410,7 @@ function pintarFase2(f) {
          <td class="v"><strong>${pesos(m.te_llega)}</strong></td></tr>`).join("")}</table>
        <p class="sub">Estimado con lo que AP te ha pagado: unos ${pesos(pc.valor_promedio)} por paciente y ${pc.rezago_dias} días
          desde la cirugía hasta el pago. No incluye pagos globales (como honorarios de una IPS) ni lo que pueda glosarse.
-         ${pc.atrasadas ? `<br>⚠ ${pc.atrasadas} cirugía${pc.atrasadas === 1 ? "" : "s"} de hace más de 6 meses sigue${pc.atrasadas === 1 ? "" : "n"} sin pago: revísala${pc.atrasadas === 1 ? "" : "s"} en Cirugías → pendientes.` : ""}</p>`;
+         ${pc.atrasadas ? `<br>⚠ ${pc.atrasadas} cirugía${pc.atrasadas === 1 ? "" : "s"} de hace más de 9 meses sigue${pc.atrasadas === 1 ? "" : "n"} sin pago: revísala${pc.atrasadas === 1 ? "" : "s"} en Cirugías → pendientes.` : ""}</p>`;
   if (pc && pc.meses.length) graficaColumnas($("#fin-grafica-viene"), { titulo: "Lo que te llegaría por mes",
     puntos: pc.meses.map((m) => ({ periodo: m.periodo, valores: [m.te_llega],
       detalle: `${m.cirugias} cirugía${m.cirugias === 1 ? "" : "s"} · recaudo ${pesos(m.recaudo)}` })),

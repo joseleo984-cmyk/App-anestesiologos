@@ -329,7 +329,7 @@ def estado(conn, anestesiologo_id: int, hoy: Optional[date] = None, mes: Optiona
 
 # ------------------------------------------------------------------ fase 2
 REZAGO_DIAS_DEFECTO = 60          # si aún no hay pagos para medir cuánto tarda AP en pagar una cirugía
-DIAS_PENDIENTE_MAX = 180          # cirugías más viejas sin pagar no se proyectan: se reportan como atrasadas
+DIAS_PENDIENTE_MAX = 270          # más viejas sin pagar se reportan como atrasadas (hay clínicas que pagan a ~250 días)
 
 
 def _sumar_meses(d: date, n: int) -> date:
