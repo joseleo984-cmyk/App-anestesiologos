@@ -210,3 +210,33 @@ def test_fuentes_iniciales_se_cargan_una_vez(db_url, conn):
     conn.commit()
     inicio.preparar_base_de_datos()
     assert conn.execute("SELECT count(*) AS n FROM noticia_fuente").fetchone()["n"] == 9
+
+
+@pytest.mark.parametrize("texto,ingles", [
+    ("Sugammadex versus neostigmine and postoperative pulmonary complications in patients", True),
+    ("In 2,400 patients, sugammadex reduced complications from 12% to 9%.", True),
+    ("Sugammadex frente a neostigmina y complicaciones pulmonares en pacientes", False),
+    ("Ensayo en 2.400 pacientes: el sugammadex redujo las complicaciones del 12 % al 9 %.", False),
+    ("Remimazolam", False),
+])
+def test_detecta_resumen_en_ingles(texto, ingles):
+    assert noticias.parece_ingles(texto) is ingles
+
+
+def test_resumenes_en_ingles_se_traducen(admin, conn, monkeypatch):
+    conn.execute("INSERT INTO noticia_fuente (nombre, tipo, url) VALUES ('Revista', 'RSS', 'https://rss.revista.org/feed')")
+    conn.execute("""INSERT INTO noticia (fuente_id, guid, titulo, estado, titulo_es, resumen_es, temas, listo_en) VALUES
+        (1, 'x1', 'Trial A', 'LISTA', 'Sugammadex and pulmonary complications', 'In 2,400 patients the rate was lower with sugammadex.', '{GENERAL}', now()),
+        (1, 'x2', 'Trial B', 'LISTA', 'Guía de vía aérea', 'La sociedad actualiza el algoritmo de la vía aérea difícil.', '{GENERAL}', now())""")
+    conn.commit()
+    pedidas = []
+
+    def traducir_falso(lote):
+        pedidas.extend(n["noticia_id"] for n in lote)
+        return {n["noticia_id"]: {"id": n["noticia_id"], "titulo_es": "Sugammadex y complicaciones pulmonares",
+                                  "resumen_es": "En 2.400 pacientes la tasa fue menor con sugammadex."} for n in lote}
+    monkeypatch.setattr(noticias, "traducir", traducir_falso)
+    assert noticias.resumir_pendientes(conn) == 0
+    filas = {r["guid"]: r["titulo_es"] for r in conn.execute("SELECT guid, titulo_es FROM noticia")}
+    assert filas == {"x1": "Sugammadex y complicaciones pulmonares", "x2": "Guía de vía aérea"}
+    assert len(pedidas) == 1  # solo la que estaba en inglés
