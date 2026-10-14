@@ -96,7 +96,22 @@
   .pestanas button { flex: 1; border: 0; background: transparent; padding: 9px 4px; font-weight: 600; color: var(--muted);
                      font-size: .95rem; }
   .pestanas button[aria-selected="true"] { background: var(--accent); color: var(--accent-text); }
-  @media (max-width: 430px) { .pestanas button { font-size: .8rem; padding: 9px 2px; } }
+  @media (max-width: 430px) { .pestanas { gap: 2px; padding: 3px; } .pestanas button { font-size: .72rem; padding: 9px 1px; letter-spacing: -.01em; } }
+  .pestanas button { position: relative; }
+  .globo { position: absolute; top: 1px; right: 1px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px;
+    background: #d03b3b; color: #fff; font-size: .65rem; line-height: 16px; font-weight: 700; text-align: center; }
+  .noticia { border-top: 1px solid var(--line); padding: 12px 0; }
+  .noticia:first-child { border-top: 0; }
+  .noticia h3 { margin: 4px 0; font-size: 1rem; line-height: 1.35; }
+  .noticia .original { font-size: .78rem; color: var(--muted); font-style: italic; margin: 0 0 6px; }
+  .noticia .resumen { margin: 6px 0; font-size: .92rem; }
+  .noticia .acciones { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .noticia .acciones a.boton { text-decoration: none; }
+  .noticia .acciones > * { padding: 7px 10px; font-size: .85rem; min-height: 36px; }
+  .noticia.leida-ahora { opacity: .45; transition: opacity .3s; }
+  .tema-chip { display: inline-block; font-size: .72rem; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line);
+    color: var(--muted); margin: 2px 4px 0 0; }
+  .temas-elegir { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
   /* Relación de órdenes */
   .chips { display: flex; flex-wrap: wrap; gap: 6px; }
   .opcion-filtro { display: inline-flex; align-items: center; gap: 8px; margin: 0; padding: 8px 12px;
@@ -260,6 +275,7 @@
     <button type="button" role="tab" data-pestana="reportes" aria-selected="false">Reportes</button>
     <button type="button" role="tab" data-pestana="relacion" aria-selected="false">Relación</button>
     <button type="button" role="tab" data-pestana="finanzas" aria-selected="false">Finanzas</button>
+    <button type="button" role="tab" data-pestana="noticias" aria-selected="false">Noticias<span class="globo oculto" id="not-globo"></span></button>
   </nav>
 
   <div id="pestana-nueva" class="pestana">
@@ -382,6 +398,51 @@
         <button type="button" class="primario" id="rel-imprimir">🖨 Imprimir / PDF</button>
         <button type="button" id="rel-excel">⬇ Excel</button>
       </div>
+    </section>
+  </div>
+
+  <div id="pestana-noticias" class="pestana oculto">
+    <section class="card">
+      <div class="item-cab"><h2>Noticias de anestesia</h2>
+        <button type="button" id="not-btn-temas" style="flex:0 0 auto">⚙ Mis temas</button></div>
+      <p class="sub">Lo nuevo de fuentes científicas y gremiales seleccionadas, resumido en español.</p>
+      <div id="not-temas" class="oculto">
+        <p class="sub" style="margin-bottom:0">Elige los temas que quieres ver (sin ninguno marcado ves todos):</p>
+        <div class="temas-elegir" id="not-temas-lista"></div>
+        <button type="button" class="primario" id="not-guardar-temas">Guardar mis temas</button>
+        <div id="not-estado-temas"></div>
+      </div>
+      <div class="barra-acciones" style="margin:12px 0 0">
+        <div class="segmentado" id="not-ver" role="group" aria-label="Qué noticias ver">
+          <button type="button" data-ver="nuevas" aria-pressed="true">Nuevas</button>
+          <button type="button" data-ver="anteriores" aria-pressed="false">Leídas</button>
+          <button type="button" data-ver="favoritas" aria-pressed="false">★ Guardadas</button>
+        </div>
+        <button type="button" id="not-leer-todo" style="flex:0 0 auto">✓ Marcar todo como leído</button>
+      </div>
+      <div id="not-estado" class="sub" style="margin-top:8px"></div>
+    </section>
+    <section class="card"><div id="not-lista"><p class="sub">Cargando…</p></div></section>
+    <p class="sub" style="margin:0 4px 16px">Los resúmenes los hace la IA a partir del resumen público de cada
+      publicación. Son informativos: antes de cambiar una conducta clínica, lee el artículo original.</p>
+    <section class="card oculto" id="not-admin">
+      <h2>Fuentes de noticias (administrador)</h2>
+      <p class="sub">Solo se leen las fuentes activas. «Probar» revisa la dirección sin guardar nada.
+        Para PubMed se escribe la búsqueda, por ejemplo <code>anesthesia[MeSH] AND (guideline[pt] OR meta-analysis[pt])</code>.</p>
+      <div id="not-fuentes"></div>
+      <form id="not-form-fuente" novalidate>
+        <div class="fila">
+          <div><label for="not-f-nombre">Nombre</label><input id="not-f-nombre" placeholder="Ej: British Journal of Anaesthesia"></div>
+          <div style="flex:0 1 130px"><label for="not-f-tipo">Tipo</label>
+            <select id="not-f-tipo"><option value="RSS">RSS</option><option value="PUBMED">PubMed</option></select></div>
+        </div>
+        <div class="fila"><div><label for="not-f-url" id="not-f-url-label">Dirección del RSS</label>
+          <input id="not-f-url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://…"></div></div>
+        <div class="atajos"><button type="button" id="not-probar">🔎 Probar</button>
+          <button type="submit" class="primario">Agregar fuente</button>
+          <button type="button" id="not-revisar">↻ Revisar ahora</button></div>
+        <div id="not-estado-fuente"></div>
+      </form>
     </section>
   </div>
 
@@ -1022,6 +1083,7 @@ function mostrarPestana(nombre) {
   if (nombre === "usuarios") cargarUsuarios();
   if (nombre === "relacion") abrirRelacion();
   if (nombre === "finanzas") cargarFinanzas();
+  if (nombre === "noticias") cargarNoticias();
 }
 document.querySelectorAll("[data-pestana]").forEach((b) => b.onclick = () => {
   if (modo.tipo === "editar") modo = { tipo: "manual" };
@@ -1604,6 +1666,150 @@ function retomarExtracto() {
   try { id = localStorage.getItem("extracto"); } catch (e) {}
   if (id && !extActual && !extTemporizador) seguirExtracto(id);
 }
+
+// ---------------------------------------------------------------- noticias de anestesia
+let esAdmin = false, notVer = "nuevas", notDatos = null, notReintentos = 0;
+const TIPO_NOTICIA = { GUIA: "Guía", ESTUDIO: "Estudio", REVISION: "Revisión", ALERTA: "⚠ Alerta", NOTICIA: "Noticia",
+  NORMATIVA: "Normativa", OTRO: "" };
+function ponerGlobo(n) {
+  $("#not-globo").textContent = n > 99 ? "99+" : String(n);
+  $("#not-globo").classList.toggle("oculto", !n);
+}
+async function actualizarGlobo() {
+  const r = await fetch("/api/noticias/sin-leer").catch(() => null);
+  if (r && r.ok) ponerGlobo((await r.json()).sin_leer);
+}
+const fechaCorta = (iso) => iso ? new Date(iso).toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" }) : "";
+async function cargarNoticias() {
+  const r = await fetch(`/api/noticias?ver=${notVer}`);
+  if (!r.ok) return;
+  const d = notDatos = await r.json();
+  ponerGlobo(d.sin_leer);
+  const nombres = Object.fromEntries(d.temas.map((t) => [t.clave, t.nombre]));
+  if (!$("#not-temas-lista").children.length || $("#not-temas").classList.contains("oculto"))
+    $("#not-temas-lista").innerHTML = d.temas.map((t) => `<label class="opcion-filtro"><input type="checkbox" value="${t.clave}"${
+      (d.mis_temas || []).includes(t.clave) ? " checked" : ""}>${escapar(t.nombre)}</label>`).join("");
+  $("#not-btn-temas").textContent = d.mis_temas ? `⚙ Mis temas (${d.mis_temas.length})` : "⚙ Mis temas";
+  $("#not-leer-todo").classList.toggle("oculto", notVer !== "nuevas" || !d.noticias.length);
+  $("#not-estado").textContent = d.revisando ? "Buscando novedades en las fuentes…"
+    : d.revisadas_en ? `Fuentes revisadas: ${new Date(d.revisadas_en).toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short" })}` : "";
+  const vacio = !d.hay_fuentes ? "Aún no hay fuentes de noticias activas." + (esAdmin ? " Agrégalas abajo, en «Fuentes de noticias»." : " El administrador las está configurando.")
+    : notVer === "nuevas" ? (d.revisando ? "Buscando novedades…" : "✓ Estás al día: no hay noticias nuevas" + (d.mis_temas ? " en tus temas." : "."))
+    : notVer === "favoritas" ? "No has guardado noticias. Toca ☆ Guardar en una noticia para tenerla aquí." : "Aún no has leído noticias.";
+  $("#not-lista").innerHTML = d.noticias.length ? d.noticias.map((n) => `<article class="noticia" data-noticia="${n.noticia_id}">
+      <div class="sub">${escapar(n.fuente)} · ${fechaCorta(n.publicado_en || n.listo_en)}${TIPO_NOTICIA[n.tipo] ? ` · <span class="chip">${TIPO_NOTICIA[n.tipo]}</span>` : ""}</div>
+      <h3>${escapar(n.titulo_es || n.titulo)}</h3>
+      ${n.titulo_es && n.titulo_es !== n.titulo ? `<p class="original">${escapar(n.titulo)}</p>` : ""}
+      <p class="resumen">${escapar(n.resumen_es || "")}</p>
+      <div>${n.temas.map((t) => `<span class="tema-chip">${escapar(nombres[t] || t)}</span>`).join("")}</div>
+      <div class="acciones">
+        ${n.enlace ? `<a class="boton" href="${escapar(n.enlace)}" target="_blank" rel="noopener" data-accion="abrir">Leer el artículo ↗</a>` : ""}
+        ${notVer === "nuevas" ? `<button type="button" data-accion="leida">✓ Leída</button>` : n.leida ? `<button type="button" data-accion="no-leida">Marcar como nueva</button>` : ""}
+        <button type="button" data-accion="favorita" aria-pressed="${n.favorita}">${n.favorita ? "★ Guardada" : "☆ Guardar"}</button>
+      </div></article>`).join("") : `<p class="sub">${vacio}</p>`;
+  document.querySelectorAll("[data-noticia] [data-accion]").forEach((b) => b.onclick = () => accionNoticia(b));
+  if (d.revisando && notReintentos < 4) { notReintentos++; setTimeout(cargarNoticias, 8000); } else if (!d.revisando) notReintentos = 0;
+  if (esAdmin) cargarFuentes();
+}
+async function accionNoticia(b) {
+  const art = b.closest("[data-noticia]"), id = art.dataset.noticia, accion = b.dataset.accion;
+  if (accion === "favorita") {
+    const fav = b.getAttribute("aria-pressed") !== "true";
+    const r = await fetch(`/api/noticias/${id}/favorita`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ favorita: fav }) });
+    if (r.ok) { b.setAttribute("aria-pressed", fav); b.textContent = fav ? "★ Guardada" : "☆ Guardar"; if (notVer === "favoritas" && !fav) art.remove(); }
+    return;
+  }
+  if (accion === "abrir") {  // abrir el artículo también la marca como leída (sin esperar)
+    fetch(`/api/noticias/${id}/leida`, { method: "POST", keepalive: true }).then(actualizarGlobo);
+    if (notVer === "nuevas") art.classList.add("leida-ahora");
+    return;
+  }
+  const r = await fetch(`/api/noticias/${id}/leida${accion === "no-leida" ? "?leida=false" : ""}`, { method: "POST" });
+  if (!r.ok) return;
+  art.classList.add("leida-ahora");
+  setTimeout(() => { art.remove(); if (!document.querySelector("#not-lista [data-noticia]")) cargarNoticias(); }, 300);
+  actualizarGlobo();
+}
+document.querySelectorAll("#not-ver [data-ver]").forEach((b) => b.onclick = () => {
+  notVer = b.dataset.ver;
+  document.querySelectorAll("#not-ver [data-ver]").forEach((x) => x.setAttribute("aria-pressed", x === b));
+  cargarNoticias();
+});
+$("#not-btn-temas").onclick = () => $("#not-temas").classList.toggle("oculto");
+$("#not-guardar-temas").onclick = async () => {
+  const temas = [...document.querySelectorAll("#not-temas-lista input:checked")].map((i) => i.value);
+  const r = await fetch("/api/noticias/temas", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ temas }) });
+  if (!r.ok) return aviso($("#not-estado-temas"), "err", "No se pudieron guardar los temas.");
+  aviso($("#not-estado-temas"), "", "");
+  $("#not-temas").classList.add("oculto");
+  cargarNoticias();
+};
+$("#not-leer-todo").onclick = async () => {
+  if (!confirm("¿Marcar todas las noticias nuevas como leídas?")) return;
+  await fetch("/api/noticias/leer-todo", { method: "POST" });
+  cargarNoticias();
+};
+
+// fuentes (solo el administrador)
+async function cargarFuentes() {
+  $("#not-admin").classList.remove("oculto");
+  const r = await fetch("/api/noticias/fuentes");
+  if (!r.ok) return;
+  const d = await r.json();
+  $("#not-fuentes").innerHTML = d.fuentes.length ? d.fuentes.map((f) => `<div class="fin-item" data-fuente="${f.fuente_id}">
+      <div class="item-cab"><strong>${escapar(f.nombre)}</strong><span class="chip ${f.activa ? "" : "CANCELADA"}">${f.activa ? f.tipo : "INACTIVA"}</span></div>
+      <div class="sub" style="overflow-wrap:anywhere">${escapar(f.url)}</div>
+      <div class="sub">${f.noticias} noticia${f.noticias === 1 ? "" : "s"}${f.revisada_en ? ` · revisada ${fechaCorta(f.revisada_en)}` : " · aún sin revisar"}</div>
+      ${f.ultimo_error ? `<div class="aviso err" style="margin-top:4px">${escapar(f.ultimo_error)}</div>` : ""}
+      <div class="acciones"><button type="button" data-accion="activa">${f.activa ? "Desactivar" : "Activar"}</button>
+        <button type="button" data-accion="quitar">Quitar</button></div></div>`).join("")
+    : `<p class="sub">Aún no hay fuentes. Agrega la primera: prueba la dirección y luego «Agregar fuente».</p>`;
+  document.querySelectorAll("[data-fuente] button").forEach((b) => b.onclick = async () => {
+    const id = b.closest("[data-fuente]").dataset.fuente, f = d.fuentes.find((x) => String(x.fuente_id) === id);
+    if (b.dataset.accion === "quitar") {
+      if (!confirm(`¿Quitar «${f.nombre}» y sus noticias?`)) return;
+      await fetch(`/api/noticias/fuentes/${id}`, { method: "DELETE" });
+    } else {
+      await fetch(`/api/noticias/fuentes/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nombre: f.nombre, tipo: f.tipo, url: f.url, activa: !f.activa }) });
+    }
+    cargarFuentes();
+  });
+}
+const datosFuente = () => ({ nombre: $("#not-f-nombre").value.trim(), tipo: $("#not-f-tipo").value, url: $("#not-f-url").value.trim() });
+$("#not-f-tipo").onchange = () => {
+  const pubmed = $("#not-f-tipo").value === "PUBMED";
+  $("#not-f-url-label").textContent = pubmed ? "Búsqueda de PubMed" : "Dirección del RSS";
+  $("#not-f-url").placeholder = pubmed ? "anesthesia[MeSH] AND guideline[pt]" : "https://…";
+};
+$("#not-probar").onclick = async () => {
+  const estado = $("#not-estado-fuente"), f = datosFuente();
+  if (!f.url) return aviso(estado, "err", "Escribe la dirección o la búsqueda.");
+  estado.innerHTML = `<div class="cargando">Probando la fuente…</div>`;
+  const r = await fetch("/api/noticias/fuentes/probar", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...f, nombre: f.nombre || "Prueba" }) });
+  const c = await r.json().catch(() => null);
+  if (!r.ok) return aviso(estado, "err", mensajeError(c, "No se pudo leer la fuente."));
+  estado.innerHTML = `<div class="aviso ok">✓ Funciona: ${c.encontradas} publicacion${c.encontradas === 1 ? "" : "es"} encontrada${c.encontradas === 1 ? "" : "s"}.
+    ${c.ejemplos.length ? `<ul style="margin:6px 0 0;padding-left:18px">${c.ejemplos.map((e) => `<li>${escapar(e.titulo)}${e.publicado_en ? ` <span class="sub">(${fechaCorta(e.publicado_en)})</span>` : ""}</li>`).join("")}</ul>` : ""}</div>`;
+};
+$("#not-form-fuente").onsubmit = async (e) => {
+  e.preventDefault();
+  const estado = $("#not-estado-fuente"), f = datosFuente();
+  if (!f.nombre || !f.url) return aviso(estado, "err", "Escribe el nombre y la dirección o búsqueda.");
+  const r = await fetch("/api/noticias/fuentes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(f) });
+  const c = await r.json().catch(() => null);
+  if (!r.ok) return aviso(estado, "err", mensajeError(c, "No se pudo agregar la fuente."));
+  aviso(estado, "ok", `«${f.nombre}» agregada. Sus noticias aparecen en unos minutos.`);
+  ["#not-f-nombre", "#not-f-url"].forEach((id) => $(id).value = "");
+  cargarNoticias();
+};
+$("#not-revisar").onclick = async () => {
+  await fetch("/api/noticias/revisar", { method: "POST" });
+  aviso($("#not-estado-fuente"), "ok", "Revisando las fuentes; las novedades aparecen en unos minutos.");
+  notReintentos = 0;
+  setTimeout(cargarNoticias, 4000);
+};
 
 // ---------------------------------------------------------------- relación de órdenes
 const TIPOS = [["EPS", "EPS"], ["PREPAGADA", "Prepagada"], ["POLIZA", "Póliza"], ["PARTICULAR", "Particular"]];
@@ -2350,6 +2556,8 @@ fetch("/api/yo").then((r) => r.ok ? r.json() : null).then((u) => {
   ciudadPorDefecto = u.ciudad_por_defecto;
   $("#version").textContent = `Versión ${u.version}`;
   $("#ir-usuarios").classList.toggle("oculto", !u.es_admin);
+  esAdmin = !!u.es_admin;
+  actualizarGlobo();
   if (u.debe_cambiar_clave) exigirCambioClave(); else cargarOpciones();
 });
 </script>

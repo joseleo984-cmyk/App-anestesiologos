@@ -22,9 +22,9 @@ from pydantic import BaseModel, Field
 from rapidfuzz import fuzz
 
 from app import (almacenamiento, auth, catalogo, config, exportar, extraccion, extractos, finanzas, inicio, liquidacion,
-                 repositorio)
-from app.modelos import (CompromisoEntrada, CuentaEntrada, ImportacionConfirmada, MetaEntrada, MovimientoEntrada,
-                         OrdenConfirmada, PartidaEntrada, Sugerencia)
+                 noticias, repositorio)
+from app.modelos import (CompromisoEntrada, CuentaEntrada, Favorita, FuenteNoticias, ImportacionConfirmada, MetaEntrada,
+                         MovimientoEntrada, OrdenConfirmada, PartidaEntrada, Sugerencia, TemasNoticias)
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 log = logging.getLogger(__name__)
@@ -787,6 +787,113 @@ def borrar_meta(meta_id: int, conn=Depends(get_conn), anestesiologo_id=Depends(a
         raise HTTPException(404, "No encontrado.")
     conn.commit()
     return Response(status_code=204)
+
+
+# ---------------------------------------------------------------- noticias de anestesia
+@app.get("/api/noticias")
+def ver_noticias(tareas: BackgroundTasks, ver: Literal["nuevas", "anteriores", "favoritas"] = "nuevas",
+                 tema: Optional[str] = Query(default=None, max_length=20), conn=Depends(get_conn),
+                 anestesiologo_id=Depends(anestesiologo_actual)):
+    """Noticias de los temas del anestesiólogo. Si hace rato no se revisan las fuentes, se revisan en segundo plano."""
+    revisando = noticias.toca_revisar(conn)
+    if revisando:
+        tareas.add_task(noticias.revisar_en_segundo_plano)
+    return {"noticias": noticias.listar(conn, anestesiologo_id, ver, tema),
+            "sin_leer": noticias.sin_leer(conn, anestesiologo_id),
+            "mis_temas": noticias.mis_temas(conn, anestesiologo_id),
+            "temas": [{"clave": c, "nombre": n} for c, n in noticias.TEMAS],
+            "hay_fuentes": bool(conn.execute("SELECT 1 FROM noticia_fuente WHERE activa LIMIT 1").fetchone()),
+            "revisadas_en": noticias.ultima_revision(conn), "revisando": revisando}
+
+
+@app.get("/api/noticias/sin-leer")
+def noticias_sin_leer(conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+    return {"sin_leer": noticias.sin_leer(conn, anestesiologo_id)}
+
+
+@app.put("/api/noticias/temas")
+def elegir_temas(t: TemasNoticias, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+    noticias.fijar_temas(conn, anestesiologo_id, t.temas)
+    conn.commit()
+    return {"temas": t.temas}
+
+
+@app.post("/api/noticias/leer-todo", status_code=204)
+def leer_todo(conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+    noticias.marcar_todo_leido(conn, anestesiologo_id)
+    conn.commit()
+    return Response(status_code=204)
+
+
+@app.post("/api/noticias/{noticia_id}/leida", status_code=204)
+def leer_noticia(noticia_id: int, leida: bool = True, conn=Depends(get_conn),
+                 anestesiologo_id=Depends(anestesiologo_actual)):
+    if not noticias.marcar_leida(conn, anestesiologo_id, noticia_id, leida):
+        raise HTTPException(404, "No encontrada.")
+    conn.commit()
+    return Response(status_code=204)
+
+
+@app.put("/api/noticias/{noticia_id}/favorita")
+def noticia_favorita(noticia_id: int, f: Favorita, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+    if not noticias.marcar_favorita(conn, anestesiologo_id, noticia_id, f.favorita):
+        raise HTTPException(404, "No encontrada.")
+    conn.commit()
+    return {"favorita": f.favorita}
+
+
+@app.get("/api/noticias/fuentes")
+def fuentes_de_noticias(conn=Depends(get_conn), _=Depends(admin_actual)):
+    return {"fuentes": noticias.listar_fuentes(conn), "revisadas_en": noticias.ultima_revision(conn)}
+
+
+@app.post("/api/noticias/fuentes/probar")
+def probar_fuente(f: FuenteNoticias, _=Depends(admin_actual)):
+    """Lee la fuente sin guardar nada (ni gastar IA), para comprobar la dirección antes de agregarla."""
+    try:
+        with noticias._cliente() as cliente:
+            entradas = noticias.leer_fuente(cliente, f.tipo, f.url)
+    except noticias.FuenteError as e:
+        raise HTTPException(422, {"mensaje": str(e)})
+    return {"encontradas": len(entradas),
+            "ejemplos": [{"titulo": e["titulo"], "publicado_en": e["publicado_en"]} for e in entradas[:5]]}
+
+
+@app.post("/api/noticias/fuentes", status_code=201)
+def agregar_fuente(f: FuenteNoticias, conn=Depends(get_conn), _=Depends(admin_actual)):
+    fuente_id = conn.execute("""INSERT INTO noticia_fuente (nombre, tipo, url, activa) VALUES (%s, %s, %s, %s)
+                                RETURNING fuente_id""", (f.nombre, f.tipo, f.url, f.activa)).fetchone()["fuente_id"]
+    # la próxima vez que alguien abra Noticias se revisa, sin esperar las 6 horas
+    conn.execute("DELETE FROM noticia_revision WHERE clave = 'fuentes'")
+    conn.commit()
+    return {"fuente_id": fuente_id}
+
+
+@app.put("/api/noticias/fuentes/{fuente_id}")
+def cambiar_fuente(fuente_id: int, f: FuenteNoticias, conn=Depends(get_conn), _=Depends(admin_actual)):
+    if not conn.execute("UPDATE noticia_fuente SET nombre = %s, tipo = %s, url = %s, activa = %s WHERE fuente_id = %s",
+                        (f.nombre, f.tipo, f.url, f.activa, fuente_id)).rowcount:
+        raise HTTPException(404, "No encontrada.")
+    if f.activa:
+        conn.execute("DELETE FROM noticia_revision WHERE clave = 'fuentes'")
+    conn.commit()
+    return {"fuente_id": fuente_id}
+
+
+@app.delete("/api/noticias/fuentes/{fuente_id}", status_code=204)
+def quitar_fuente(fuente_id: int, conn=Depends(get_conn), _=Depends(admin_actual)):
+    """Quita la fuente y sus noticias (las favoritas de alguien también se van)."""
+    conn.execute("DELETE FROM noticia_fuente WHERE fuente_id = %s", (fuente_id,))
+    conn.commit()
+    return Response(status_code=204)
+
+
+@app.post("/api/noticias/revisar", status_code=202)
+def revisar_ahora(tareas: BackgroundTasks, conn=Depends(get_conn), _=Depends(admin_actual)):
+    conn.execute("DELETE FROM noticia_revision WHERE clave = 'fuentes'")
+    conn.commit()
+    tareas.add_task(noticias.revisar_en_segundo_plano)
+    return {"revisando": True}
 
 
 @app.post("/api/pagos/{reporte_id}/aplicar")

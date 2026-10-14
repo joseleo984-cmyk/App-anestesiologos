@@ -392,3 +392,38 @@ class ImportacionConfirmada(_Base):
             if i.incluir and i.categoria not in validas:
                 raise ValueError(f"elige la categoría de la fila {i.indice + 1}")
         return self
+
+
+class TemasNoticias(_Base):
+    """Temas de noticias que el anestesiólogo quiere ver (null o vacío: todos)."""
+    temas: Optional[list[str]] = None
+
+    @field_validator("temas")
+    @classmethod
+    def _validos(cls, v):
+        from app.noticias import CLAVES_TEMAS
+        if not v:
+            return None
+        malos = [t for t in v if t not in CLAVES_TEMAS]
+        if malos:
+            raise ValueError(f"tema inválido: {malos[0]}")
+        return list(dict.fromkeys(v))
+
+
+class FuenteNoticias(_Base):
+    nombre: str = Field(min_length=2, max_length=120)
+    tipo: Literal["RSS", "PUBMED"]
+    url: str = Field(min_length=3, max_length=600)
+    activa: bool = True
+
+    @model_validator(mode="after")
+    def _direccion(self):
+        from app.noticias import direccion_permitida
+        self.url = self.url.strip()
+        if self.tipo == "RSS" and not direccion_permitida(self.url):
+            raise ValueError("la dirección del RSS debe empezar por https:// y ser pública")
+        return self
+
+
+class Favorita(_Base):
+    favorita: bool

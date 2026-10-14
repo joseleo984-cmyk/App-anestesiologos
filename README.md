@@ -191,6 +191,20 @@ Cada anestesiólogo ve solo las suyas (ni el administrador las ve). `app/finanza
   meses anteriores. El usuario revisa, cambia categorías y confirma; las categorías corregidas se recuerdan
   por comercio. Varias cuentas y tarjetas por anestesiólogo; el archivo del banco no se guarda.
 
+## Noticias de anestesia
+
+`app/noticias.py`. Fuentes curadas que administra el administrador (pestaña Noticias, al final): RSS de
+revistas y sociedades o una búsqueda guardada de PubMed. Con «Probar» se revisa la dirección sin guardar nada.
+
+- La primera vez que alguien abre Noticias, si pasaron más de 6 horas, las fuentes se revisan en segundo plano
+  (así funciona aunque el servidor gratis se duerma). Solo se traen publicaciones de los últimos 30 días y la
+  misma publicación que llega por dos fuentes entra una sola vez.
+- La IA resume cada publicación una vez (2 o 3 frases en español), la clasifica por tema y tipo, y descarta lo que
+  no sirve (fe de erratas, índices…). El texto original se borra después de resumir; se muestra el título, el
+  resumen propio y el enlace al original.
+- Cada anestesiólogo elige sus temas, marca como leída (una o todas), guarda favoritas y ve las leídas aparte.
+  La pestaña muestra cuántas nuevas tiene. Las noticias de más de 180 días se borran, menos las guardadas.
+
 ## Pagos: depurar pendientes
 
 La relación de pacientes pagados (p. ej. "Reporte de pagos a prestadores" de la asociación) se sube en

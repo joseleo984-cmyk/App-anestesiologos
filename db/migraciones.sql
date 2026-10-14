@@ -192,3 +192,52 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_fin_mov_huella ON fin_movimiento (anestesi
 ALTER TABLE paciente DROP CONSTRAINT IF EXISTS paciente_tipo_documento_check;
 ALTER TABLE paciente ADD CONSTRAINT paciente_tipo_documento_check
     CHECK (tipo_documento IN ('CC','TI','CE','RC','PA','PPT','CN','MS','AS'));
+
+-- 18. Noticias de anestesia: fuentes curadas (RSS o búsqueda de PubMed), noticias resumidas por la IA y lo que cada uno leyó
+CREATE TABLE IF NOT EXISTS noticia_fuente (
+    fuente_id          BIGSERIAL PRIMARY KEY,
+    nombre             VARCHAR(120) NOT NULL,
+    tipo               VARCHAR(10) NOT NULL CHECK (tipo IN ('RSS', 'PUBMED')),
+    url                VARCHAR(600) NOT NULL,          -- dirección del RSS, o la búsqueda de PubMed
+    activa             BOOLEAN NOT NULL DEFAULT TRUE,
+    revisada_en        TIMESTAMPTZ,
+    ultimo_error       TEXT,
+    creado_en          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS noticia (
+    noticia_id         BIGSERIAL PRIMARY KEY,
+    fuente_id          BIGINT NOT NULL REFERENCES noticia_fuente(fuente_id) ON DELETE CASCADE,
+    guid               VARCHAR(600) NOT NULL,
+    titulo             TEXT NOT NULL,
+    enlace             TEXT,
+    publicado_en       TIMESTAMPTZ,
+    contenido          TEXT,                           -- resumen original; se borra después de resumir
+    estado             VARCHAR(12) NOT NULL DEFAULT 'PENDIENTE' CHECK (estado IN ('PENDIENTE', 'LISTA', 'DESCARTADA')),
+    tipo               VARCHAR(12),
+    temas              TEXT[] NOT NULL DEFAULT '{}',
+    titulo_es          TEXT,
+    resumen_es         TEXT,
+    intentos           INTEGER NOT NULL DEFAULT 0,
+    listo_en           TIMESTAMPTZ,
+    creado_en          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (fuente_id, guid)
+);
+CREATE INDEX IF NOT EXISTS idx_noticia_lista ON noticia (estado, listo_en);
+CREATE TABLE IF NOT EXISTS noticia_lectura (
+    anestesiologo_id   BIGINT NOT NULL REFERENCES anestesiologo(anestesiologo_id) ON DELETE CASCADE,
+    noticia_id         BIGINT NOT NULL REFERENCES noticia(noticia_id) ON DELETE CASCADE,
+    leida_en           TIMESTAMPTZ,
+    favorita           BOOLEAN NOT NULL DEFAULT FALSE,
+    PRIMARY KEY (anestesiologo_id, noticia_id)
+);
+CREATE TABLE IF NOT EXISTS noticia_revision (
+    clave              VARCHAR(20) PRIMARY KEY,
+    revisada_en        TIMESTAMPTZ NOT NULL
+);
+ALTER TABLE anestesiologo ADD COLUMN IF NOT EXISTS noticias_temas TEXT[];          -- null: todos los temas
+ALTER TABLE anestesiologo ADD COLUMN IF NOT EXISTS noticias_leido_hasta TIMESTAMPTZ; -- «marcar todo como leído»
+-- Título normalizado para no repetir una publicación que llega por dos fuentes
+CREATE OR REPLACE FUNCTION clave_titulo(t TEXT) RETURNS TEXT LANGUAGE sql IMMUTABLE AS
+$$ SELECT left(regexp_replace(lower(t), '[^a-z0-9]+', '', 'g'), 200) $$;
+CREATE INDEX IF NOT EXISTS idx_noticia_clave_titulo ON noticia (clave_titulo(titulo));
+CREATE INDEX IF NOT EXISTS idx_noticia_enlace ON noticia (enlace);
