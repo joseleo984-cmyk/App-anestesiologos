@@ -1759,7 +1759,7 @@ async function cargarFuentes() {
   $("#not-fuentes").innerHTML = d.fuentes.length ? d.fuentes.map((f) => `<div class="fin-item" data-fuente="${f.fuente_id}">
       <div class="item-cab"><strong>${escapar(f.nombre)}</strong><span class="chip ${f.activa ? "" : "CANCELADA"}">${f.activa ? f.tipo : "INACTIVA"}</span></div>
       <div class="sub" style="overflow-wrap:anywhere">${escapar(f.url)}</div>
-      <div class="sub">${f.noticias} noticia${f.noticias === 1 ? "" : "s"}${f.revisada_en ? ` · revisada ${fechaCorta(f.revisada_en)}` : " · aún sin revisar"}</div>
+      <div class="sub">${f.noticias} noticia${f.noticias === 1 ? "" : "s"}${f.por_resumir ? ` · ${f.por_resumir} por resumir` : ""}${f.revisada_en ? ` · revisada ${fechaCorta(f.revisada_en)}` : " · aún sin revisar"}</div>
       ${f.ultimo_error ? `<div class="aviso err" style="margin-top:4px">${escapar(f.ultimo_error)}</div>` : ""}
       <div class="acciones"><button type="button" data-accion="activa">${f.activa ? "Desactivar" : "Activar"}</button>
         <button type="button" data-accion="quitar">Quitar</button></div></div>`).join("")

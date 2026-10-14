@@ -421,7 +421,8 @@ def marcar_favorita(conn, anestesiologo_id: int, noticia_id: int, favorita: bool
 def listar_fuentes(conn) -> list[dict]:
     return conn.execute(
         """SELECT f.fuente_id, f.nombre, f.tipo, f.url, f.activa, f.revisada_en, f.ultimo_error,
-                  (SELECT count(*) FROM noticia n WHERE n.fuente_id = f.fuente_id AND n.estado = 'LISTA') AS noticias
+                  (SELECT count(*) FROM noticia n WHERE n.fuente_id = f.fuente_id AND n.estado = 'LISTA') AS noticias,
+                  (SELECT count(*) FROM noticia n WHERE n.fuente_id = f.fuente_id AND n.estado = 'PENDIENTE') AS por_resumir
              FROM noticia_fuente f ORDER BY f.activa DESC, f.nombre""").fetchall()
 
 

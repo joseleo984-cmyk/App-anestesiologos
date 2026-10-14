@@ -166,7 +166,7 @@ def test_flujo_completo(admin, conn):
     assert otro.post("/api/noticias/fuentes", json={"nombre": "X", "tipo": "PUBMED", "url": "anesthesia"}).status_code == 403
 
     fuentes = c.get("/api/noticias/fuentes").json()["fuentes"]
-    assert {f["nombre"]: f["noticias"] for f in fuentes} == {"Revista": 1, "Sociedad": 1}
+    assert {f["nombre"]: (f["noticias"], f["por_resumir"]) for f in fuentes} == {"Revista": (1, 0), "Sociedad": (1, 0)}
 
 
 def test_fuente_caida_y_ia_que_falla(admin, conn, monkeypatch):
