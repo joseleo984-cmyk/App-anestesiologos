@@ -463,6 +463,11 @@ def clinicas_registradas(conn=Depends(get_conn), _=Depends(anestesiologo_actual)
     return repositorio.listar_clinicas(conn)
 
 
+@app.get("/api/sugerencias")
+def aseguradoras_y_cirujanos(conn=Depends(get_conn), _=Depends(anestesiologo_actual)):
+    return repositorio.catalogos_para_sugerir(conn)
+
+
 @app.get("/api/opciones")
 def opciones_de_filtro(conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
     return repositorio.opciones_filtro(conn, anestesiologo_id)

@@ -107,6 +107,12 @@ def _upsert_paciente(conn, p) -> int:
 
 
 def _upsert_aseguradora(conn, a) -> int:
+    # La misma aseguradora escrita con o sin tildes o puntos ("S.A" / "S.A.") no se duplica
+    clave = clave_nombre(a.nombre)
+    for fila in conn.execute("SELECT aseguradora_id, nombre FROM aseguradora WHERE tipo = %s ORDER BY aseguradora_id",
+                             (a.tipo,)):
+        if clave_nombre(fila["nombre"]) == clave:
+            return fila["aseguradora_id"]
     return conn.execute(
         """INSERT INTO aseguradora (nombre, tipo) VALUES (%s, %s)
            ON CONFLICT (nombre, tipo) DO UPDATE SET nombre = EXCLUDED.nombre
@@ -159,6 +165,14 @@ def cargar_clinicas_base(conn, filas: list[dict]) -> int:
     return nuevas
 
 
+def catalogos_para_sugerir(conn) -> dict:
+    """Aseguradoras y cirujanos registrados, para sugerirlos al escribir (como las clínicas)."""
+    return {
+        "aseguradoras": conn.execute("SELECT aseguradora_id AS id, nombre, tipo FROM aseguradora ORDER BY nombre").fetchall(),
+        "cirujanos": conn.execute("SELECT cirujano_id AS id, nombre FROM cirujano ORDER BY nombre").fetchall(),
+    }
+
+
 def listar_clinicas(conn) -> list[dict]:
     """Todas las clínicas registradas (son las mismas para todos los anestesiólogos)."""
     return conn.execute("SELECT clinica_id AS id, nombre, ciudad FROM clinica ORDER BY nombre, ciudad").fetchall()
@@ -190,6 +204,10 @@ def _obtener_o_crear_cirujano(conn, nombre: Optional[str]) -> Optional[int]:
     nombre = _nombre_cirujano(nombre) if nombre else ""
     if not nombre:
         return None
+    clave = clave_nombre(nombre)  # "José Pérez" y "JOSE PEREZ" son el mismo cirujano
+    for fila in conn.execute("SELECT cirujano_id, nombre FROM cirujano ORDER BY cirujano_id"):
+        if clave_nombre(fila["nombre"]) == clave:
+            return fila["cirujano_id"]
     return conn.execute(
         """INSERT INTO cirujano (nombre) VALUES (%s)
            ON CONFLICT (nombre) DO UPDATE SET nombre = EXCLUDED.nombre

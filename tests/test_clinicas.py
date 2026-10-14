@@ -82,3 +82,16 @@ def test_listado_base_sin_duplicar_las_existentes(cliente, monkeypatch):
     assert leer(cliente, monkeypatch, "Clinica La Asuncion", n=2)["clinica"]["nombre"] == "CLÍNICA LA ASUNCIÓN"
     assert leer(cliente, monkeypatch, "Clínica Portoazul", n=3)["clinica"]["nombre"] == "CLÍNICA PORTOAZUL (AUNA)"
     assert leer(cliente, monkeypatch, "CECAC", n=4)["clinica"]["nombre"] == "CENTRO CANCEROLÓGICO DEL CARIBE (CECAC)"
+
+
+def test_aseguradoras_y_cirujanos_no_se_duplican_y_se_sugieren(cliente):
+    for aseg, cirujano in [("Seguros de Vida Suramericana S.A", "Dr. José Pérez"),
+                           ("SEGUROS DE VIDA SURAMERICANA S.A.", "JOSE PEREZ"),
+                           ("Seguros de vida Suramericana S. A.", "Jose  Pérez")]:
+        r = cliente.post("/api/cirugias", json={**CONFIRMAR, "aseguradora": {"nombre": aseg, "tipo": "PREPAGADA"},
+                                                "cirujano": cirujano})
+        assert r.status_code == 201, r.text
+    s = cliente.get("/api/sugerencias").json()
+    assert [a["nombre"] for a in s["aseguradoras"]] == ["SEGUROS DE VIDA SURAMERICANA S.A"]
+    assert s["aseguradoras"][0]["tipo"] == "PREPAGADA"
+    assert [c["nombre"] for c in s["cirujanos"]] == ["JOSÉ PÉREZ"]

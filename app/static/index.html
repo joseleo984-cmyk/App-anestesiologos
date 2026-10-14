@@ -653,8 +653,9 @@
             <option value="">Particular</option><option value="EPS">EPS</option>
             <option value="PREPAGADA">Prepagada</option><option value="POLIZA">Póliza</option>
           </select></div>
-        <div><label for="aseguradora.nombre">Nombre</label><input id="aseguradora.nombre"></div>
+        <div><label for="aseguradora.nombre">Nombre</label><input id="aseguradora.nombre" autocomplete="off"></div>
       </div>
+      <div class="sugerencias" id="sug-aseguradora"></div>
       <div class="fila">
         <div><label for="aseguradora.numero_poliza">Nº póliza / afiliación</label><input id="aseguradora.numero_poliza"></div>
         <div><label for="aseguradora.plan">Plan</label><input id="aseguradora.plan"></div>
@@ -677,8 +678,8 @@
       <div id="procedimientos" style="margin-top:12px"></div>
       <button type="button" id="agregar-proc">+ Agregar procedimiento</button>
       <label for="cirujano">Cirujano</label>
-      <input id="cirujano" list="lista-cirujanos" placeholder="Nombre del cirujano" autocomplete="off">
-      <datalist id="lista-cirujanos"></datalist>
+      <input id="cirujano" placeholder="Nombre del cirujano" autocomplete="off">
+      <div class="sugerencias" id="sug-cirujano"></div>
       <label for="numero_orden">Nº de orden / autorización</label>
       <input id="numero_orden" autocomplete="off" placeholder="Opcional: puede quedar en blanco">
     </fieldset>
@@ -1944,8 +1945,8 @@ async function cargarOpciones() {
   llenar("#f-cirujano", o.cirujanos, "Todos");
   llenar("#f-clinica", o.clinicas, "Todas");
   llenar("#f-aseguradora", o.aseguradoras, "Todas", `<option value="PARTICULAR">Particular</option>`);
-  $("#lista-cirujanos").innerHTML = o.cirujanos.map((c) => `<option value="${escapar(c.nombre)}">`).join("");
   cargarClinicas();
+  cargarSugerencias();
 }
 
 // ---------------------------------------------------------------- clínicas predictivas
@@ -1956,28 +1957,54 @@ async function cargarClinicas() {
   const r = await fetch("/api/clinicas");
   if (r.ok) clinicas = await r.json();
 }
-function sugerirClinicas() {
-  const caja = $("#sug-clinica"), texto = sinTildes(campo("clinica.nombre").value);
-  if (texto.length < 2) { caja.innerHTML = ""; return; }
-  // cada palabra escrita debe estar en el nombre: "caribe" encuentra "CLÍNICA DEL CARIBE"
-  const palabras = texto.split(" ");
-  const encontradas = clinicas.filter((c) => palabras.every((p) => sinTildes(c.nombre).includes(p))).slice(0, 6);
-  if (encontradas.some((c) => sinTildes(c.nombre) === texto)) { caja.innerHTML = ""; return; }
-  if (!encontradas.length) {
-    caja.innerHTML = `<p class="sub" style="margin:6px 0 4px">Clínica nueva: se guardará con este nombre. Revisa que esté bien escrito.</p>`;
-    return;
-  }
-  caja.innerHTML = `<p class="sub" style="margin:6px 0 4px">Clínicas registradas:</p>` + encontradas.map((c, i) =>
-    `<button type="button" class="opcion" data-i="${i}"><strong>${escapar(c.nombre)}</strong>${c.ciudad ? ` <span class="sub">· ${escapar(c.ciudad)}</span>` : ""}</button>`).join("");
-  caja.querySelectorAll(".opcion").forEach((b) => b.onclick = () => {
-    const c = encontradas[Number(b.dataset.i)];
-    campo("clinica.nombre").value = c.nombre;
-    if (c.ciudad) campo("clinica.ciudad").value = c.ciudad;
-    campo("clinica.nombre").classList.remove("dudoso");
-    caja.innerHTML = "";
-  });
+// Sugerencias al escribir (clínicas, aseguradoras y cirujanos): cada palabra escrita debe estar en el nombre,
+// sin importar tildes ni mayúsculas ("caribe" encuentra "CLÍNICA DEL CARIBE", "perez" encuentra "JOSÉ PÉREZ")
+function predictivo({ input, caja, items, titulo, nuevo, detalle = () => "", elegir }) {
+  const sugerir = () => {
+    const texto = sinTildes(input.value);
+    if (texto.length < 2) { caja.innerHTML = ""; return; }
+    const palabras = texto.split(" ");
+    const encontradas = items().filter((c) => palabras.every((p) => sinTildes(c.nombre).includes(p))).slice(0, 6);
+    if (encontradas.some((c) => sinTildes(c.nombre) === texto)) { caja.innerHTML = ""; return; }
+    if (!encontradas.length) { caja.innerHTML = `<p class="sub" style="margin:6px 0 4px">${nuevo}</p>`; return; }
+    caja.innerHTML = `<p class="sub" style="margin:6px 0 4px">${titulo}</p>` + encontradas.map((c, i) =>
+      `<button type="button" class="opcion" data-i="${i}"><strong>${escapar(c.nombre)}</strong>${detalle(c)}</button>`).join("");
+    caja.querySelectorAll(".opcion").forEach((b) => b.onclick = () => {
+      const c = encontradas[Number(b.dataset.i)];
+      input.value = c.nombre;
+      input.classList.remove("dudoso");
+      if (elegir) elegir(c);
+      caja.innerHTML = "";
+    });
+  };
+  input.addEventListener("input", sugerir);
+  return sugerir;
 }
-campo("clinica.nombre").addEventListener("input", sugerirClinicas);
+const sugerirClinicas = predictivo({
+  input: campo("clinica.nombre"), caja: $("#sug-clinica"), items: () => clinicas,
+  titulo: "Clínicas registradas:", nuevo: "Clínica nueva: se guardará con este nombre. Revisa que esté bien escrito.",
+  detalle: (c) => c.ciudad ? ` <span class="sub">· ${escapar(c.ciudad)}</span>` : "",
+  elegir: (c) => { if (c.ciudad) campo("clinica.ciudad").value = c.ciudad; },
+});
+let sugerencias = { aseguradoras: [], cirujanos: [] };
+async function cargarSugerencias() {
+  const r = await fetch("/api/sugerencias");
+  if (r.ok) sugerencias = await r.json();
+}
+const TIPO_ASEG = { EPS: "EPS", PREPAGADA: "Prepagada", POLIZA: "Póliza" };
+predictivo({
+  input: campo("aseguradora.nombre"), caja: $("#sug-aseguradora"),
+  // primero las del tipo elegido
+  items: () => [...sugerencias.aseguradoras].sort((a, b) =>
+    (b.tipo === campo("aseguradora.tipo").value) - (a.tipo === campo("aseguradora.tipo").value)),
+  titulo: "Aseguradoras registradas:", nuevo: "Aseguradora nueva: se guardará con este nombre. Revisa que esté bien escrito.",
+  detalle: (a) => ` <span class="sub">· ${TIPO_ASEG[a.tipo] || a.tipo}</span>`,
+  elegir: (a) => { campo("aseguradora.tipo").value = a.tipo; },
+});
+predictivo({
+  input: campo("cirujano"), caja: $("#sug-cirujano"), items: () => sugerencias.cirujanos,
+  titulo: "Cirujanos registrados:", nuevo: "Cirujano nuevo: se guardará con este nombre. Revisa que esté bien escrito.",
+});
 
 function filtrosLista() {
   const f = { q: $("#f-q").value.trim(), desde: $("#f-desde").value, hasta: $("#f-hasta").value,
