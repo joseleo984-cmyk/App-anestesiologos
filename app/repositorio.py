@@ -594,7 +594,10 @@ def cambiar_activo(conn, anestesiologo_id: int, activo: bool) -> bool:
 
 
 # ------------------------------------------------------------ reportes de pago
-DIAS_TOLERANCIA = 15  # diferencia máxima entre la fecha del pago y la de la cirugía
+# La fecha de servicio del reporte puede ser muy posterior a la cirugía (radicación): algunas clínicas pagan
+# 215 días después de radicado. Se busca la cirugía del paciente hasta DIAS_ANTES antes de esa fecha (o hasta
+# DIAS_DESPUES después) y nunca posterior al pago; si hay varias, la más cercana.
+DIAS_ANTES, DIAS_DESPUES = 300, 30
 
 
 def buscar_reporte_por_hash(conn, anestesiologo_id: int, hash_sha256: str) -> Optional[dict]:
@@ -626,8 +629,9 @@ def crear_reporte(conn, anestesiologo_id: int, url_archivo: str, hash_sha256: st
 
 
 def conciliar(conn, anestesiologo_id: int, reporte_id: int) -> None:
-    """Busca la cirugía de cada línea: mismo documento del paciente y la fecha más cercana
-    (hasta DIAS_TOLERANCIA días). Una cirugía no se asigna a dos líneas."""
+    """Busca la cirugía de cada línea: mismo documento del paciente y la fecha más cercana dentro de la
+    ventana (DIAS_ANTES / DIAS_DESPUES), sin pasar de la fecha del pago. Una cirugía no se asigna a dos líneas."""
+    pago = conn.execute("SELECT fecha_proceso FROM reporte_pago WHERE reporte_id = %s", (reporte_id,)).fetchone()
     filas = conn.execute(
         """SELECT d.detalle_id, d.documento_paciente, d.fecha_servicio, d.cirugia_id, c.estado
              FROM pago_detalle d LEFT JOIN cirugia c ON c.cirugia_id = d.cirugia_id
@@ -648,14 +652,16 @@ def conciliar(conn, anestesiologo_id: int, reporte_id: int) -> None:
                 WHERE c.anestesiologo_id = %(anest)s AND c.estado <> 'CANCELADA'
                   AND doc_norm(p.numero_documento) = doc_norm(%(doc)s)
                   AND (%(fecha)s::date IS NULL
-                       OR abs(c.fecha_procedimiento - %(fecha)s::date) <= %(tol)s)
+                       OR c.fecha_procedimiento BETWEEN %(fecha)s::date - %(antes)s AND %(fecha)s::date + %(despues)s)
+                  AND (%(pago)s::date IS NULL OR c.fecha_procedimiento <= %(pago)s::date)
                   -- no tomar cirugías ya pagadas por otro reporte aplicado
                   AND NOT EXISTS (SELECT 1 FROM pago_detalle d JOIN reporte_pago r USING (reporte_id)
                                    WHERE d.cirugia_id = c.cirugia_id AND r.estado = 'APLICADO'
                                      AND r.reporte_id <> %(rep)s)
                 ORDER BY distancia, c.fecha_procedimiento DESC""",
             {"fecha": f["fecha_servicio"], "anest": anestesiologo_id, "doc": f["documento_paciente"],
-             "tol": DIAS_TOLERANCIA, "rep": reporte_id},
+             "antes": DIAS_ANTES, "despues": DIAS_DESPUES, "pago": pago["fecha_proceso"] if pago else None,
+             "rep": reporte_id},
         ).fetchall()
         elegida = next((c["cirugia_id"] for c in candidatas if c["cirugia_id"] not in usadas), None)
         if elegida:

@@ -101,9 +101,10 @@ def test_dos_cirugias_del_mismo_paciente(con_reporte):
     assert rep["cuadra"] is None
 
 
-def test_fuera_de_tolerancia_no_se_cruza(con_reporte):
+def test_fuera_de_la_ventana_no_se_cruza(con_reporte):
     c = con_reporte
-    crear(c, "72000730", "2026-06-01")  # más de 15 días antes
+    crear(c, "72000730", "2025-10-01")  # más de 300 días antes del servicio (2026-08-14)
+    crear(c, "72000730", "2026-09-23")  # más de 30 días después del servicio
     assert subir(c).json()["filas"][0]["resultado"] == "SIN_CIRUGIA"
 
 
@@ -200,3 +201,24 @@ def test_volver_a_cruzar_todos(con_reporte):
     assert r == {"reportes": 1, "lineas": 3, "encontradas": 1, "nuevas": 1, "marcadas_pagadas": 0}
     assert c.get(f"/api/pagos/{rep['reporte_id']}").json()["filas"][0]["cirugia_id"] == uno
     assert c.get(f"/api/cirugias/{uno}").json()["estado"] == "PROGRAMADA"  # leído, no aplicado: no se marca pagada
+
+
+def test_pago_hasta_300_dias_despues_de_la_cirugia(con_reporte):
+    c = con_reporte
+    # la fecha de servicio del reporte es la de radicación: la cirugía fue 210 días antes
+    c.poner_reporte({**REPORTE, "fecha_proceso": "2026-10-07", "filas": [
+        {**REPORTE["filas"][0], "fecha_servicio": "2026-08-14"},
+        {**REPORTE["filas"][1], "fecha_servicio": "2026-07-27"}]})
+    vieja = crear(c, "72000730", "2026-01-16")      # 210 días antes: se cruza
+    crear(c, "32622878", "2026-10-20")              # posterior al pago (7 de octubre): no puede ser esa
+    filas = subir(c).json()["filas"]
+    assert filas[0]["cirugia_id"] == vieja
+    assert filas[1]["cirugia_id"] is None
+
+
+def test_con_varias_cirugias_toma_la_mas_cercana(con_reporte):
+    c = con_reporte
+    c.poner_reporte({**REPORTE, "filas": [REPORTE["filas"][0]]})   # servicio 2026-08-14
+    crear(c, "72000730", "2026-02-01")
+    cercana = crear(c, "72000730", "2026-07-30")
+    assert subir(c).json()["filas"][0]["cirugia_id"] == cercana
