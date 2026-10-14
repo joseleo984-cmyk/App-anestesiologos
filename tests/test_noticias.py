@@ -71,7 +71,8 @@ def transporte(rutas: dict):
     return httpx.Client(transport=httpx.MockTransport(responder))
 
 
-def test_lee_pubmed():
+def test_lee_pubmed(monkeypatch):
+    monkeypatch.setattr(noticias, "PAUSA_PUBMED", 0)
     with transporte({"esearch": ESEARCH, "efetch": EFETCH}) as c:
         arts = noticias.leer_pubmed(c, "anesthesia[MeSH] AND guideline[pt]")
     assert [a["guid"] for a in arts] == ["pmid:111", "pmid:222"]
@@ -196,3 +197,16 @@ def test_no_repite_la_misma_publicacion_de_dos_fuentes(admin, conn):
         r = noticias.revisar_fuentes(conn, cli)
     assert r["nuevas"] == 2  # Sugammadex y Erratum una sola vez (la vieja no entra)
     assert conn.execute("SELECT count(*) AS n FROM noticia").fetchone()["n"] == 2
+
+
+def test_fuentes_iniciales_se_cargan_una_vez(db_url, conn):
+    from app import inicio
+    inicio.preparar_base_de_datos()
+    fuentes = conn.execute("SELECT nombre, tipo FROM noticia_fuente ORDER BY fuente_id").fetchall()
+    assert len(fuentes) == 10 and fuentes[1]["nombre"] == "Anesthesiology (ASA)"
+    assert {f["tipo"] for f in fuentes} == {"PUBMED", "RSS"}
+    # si el administrador quita una, no vuelve a aparecer al reiniciar
+    conn.execute("DELETE FROM noticia_fuente WHERE nombre = 'Anaesthesia'")
+    conn.commit()
+    inicio.preparar_base_de_datos()
+    assert conn.execute("SELECT count(*) AS n FROM noticia_fuente").fetchone()["n"] == 9

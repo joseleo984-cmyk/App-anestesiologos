@@ -1,0 +1,11 @@
+nombre,tipo,url
+Guías y consensos de anestesia (PubMed),PUBMED,(anesthesia[mh] OR anesthesiology[mh] OR anesthesia[tiab] OR anaesthesia[tiab] OR perioperative[tiab]) AND (guideline[pt] OR practice guideline[pt] OR consensus development conference[pt] OR consensus[ti] OR recommendations[ti]) NOT (letter[pt] OR comment[pt] OR editorial[pt] OR published erratum[pt] OR retraction of publication[pt])
+Anesthesiology (ASA),PUBMED,"""Anesthesiology""[ta] NOT (letter[pt] OR comment[pt] OR editorial[pt] OR published erratum[pt] OR retraction of publication[pt])"
+British Journal of Anaesthesia,PUBMED,"""Br J Anaesth""[ta] NOT (letter[pt] OR comment[pt] OR editorial[pt] OR published erratum[pt] OR retraction of publication[pt])"
+Anesthesia & Analgesia,PUBMED,"""Anesth Analg""[ta] NOT (letter[pt] OR comment[pt] OR editorial[pt] OR published erratum[pt] OR retraction of publication[pt])"
+Anaesthesia,PUBMED,"""Anaesthesia""[ta] NOT (letter[pt] OR comment[pt] OR editorial[pt] OR published erratum[pt] OR retraction of publication[pt])"
+Regional Anesthesia & Pain Medicine,PUBMED,"""Reg Anesth Pain Med""[ta] NOT (letter[pt] OR comment[pt] OR editorial[pt] OR published erratum[pt] OR retraction of publication[pt])"
+European Journal of Anaesthesiology (ESAIC),PUBMED,"""Eur J Anaesthesiol""[ta] NOT (letter[pt] OR comment[pt] OR editorial[pt] OR published erratum[pt] OR retraction of publication[pt])"
+Revista Colombiana de Anestesiología,PUBMED,"""Colomb J Anesthesiol""[ta] OR ""Rev Colomb Anestesiol""[ta]"
+Revisiones sistemáticas y metaanálisis en anestesia (PubMed),PUBMED,(anesthesia[mh] OR anesthesiology[mh]) AND (meta-analysis[pt] OR systematic review[pt])
+APSF - Seguridad del paciente en anestesia,RSS,https://www.apsf.org/feed/

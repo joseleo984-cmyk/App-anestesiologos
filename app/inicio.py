@@ -16,6 +16,7 @@ log = logging.getLogger(__name__)
 ESQUEMA = Path(__file__).resolve().parent.parent / "db" / "schema.sql"
 MIGRACIONES = ESQUEMA.with_name("migraciones.sql")
 CLINICAS_BASE = ESQUEMA.parent / "seeds" / "clinicas.csv"
+FUENTES_NOTICIAS = ESQUEMA.parent / "seeds" / "fuentes_noticias.csv"
 
 
 def preparar_base_de_datos() -> None:
@@ -42,6 +43,15 @@ def preparar_base_de_datos() -> None:
             nuevas = repositorio.cargar_clinicas_base(conn, list(csv.DictReader(archivo)))
         if nuevas:
             log.info("Clínicas del listado base agregadas: %s", nuevas)
+
+        # Fuentes de noticias propuestas: se cargan una sola vez; después las administra el administrador
+        if not conn.execute("SELECT 1 FROM noticia_revision WHERE clave = 'semilla'").fetchone():
+            with open(FUENTES_NOTICIAS, encoding="utf-8") as archivo:
+                for f in csv.DictReader(archivo):
+                    conn.execute("""INSERT INTO noticia_fuente (nombre, tipo, url) SELECT %(nombre)s, %(tipo)s, %(url)s::varchar
+                                    WHERE NOT EXISTS (SELECT 1 FROM noticia_fuente WHERE url = %(url)s::varchar)""", f)
+            conn.execute("INSERT INTO noticia_revision (clave, revisada_en) VALUES ('semilla', now())")
+            log.info("Fuentes de noticias iniciales cargadas")
 
         if config.ADMIN_EMAIL and config.ADMIN_PASSWORD:
             if len(config.ADMIN_PASSWORD) < 10:

@@ -204,6 +204,12 @@ revistas y sociedades o una búsqueda guardada de PubMed. Con «Probar» se revi
   resumen propio y el enlace al original.
 - Cada anestesiólogo elige sus temas, marca como leída (una o todas), guarda favoritas y ve las leídas aparte.
   La pestaña muestra cuántas nuevas tiene. Las noticias de más de 180 días se borran, menos las guardadas.
+- Fuentes iniciales (`db/seeds/fuentes_noticias.csv`, se cargan una sola vez): búsquedas de PubMed para guías y
+  consensos, revisiones sistemáticas, y las revistas Anesthesiology, BJA, Anesthesia & Analgesia, Anaesthesia,
+  RAPM, European Journal of Anaesthesiology y la Revista Colombiana de Anestesiología (sin cartas, comentarios,
+  editoriales ni fe de erratas), más el RSS de la APSF.
+- `NOTICIAS_MODEL` (opcional, en Render): modelo para resumir noticias, por ejemplo `claude-sonnet-5-5`, distinto
+  del de las órdenes. Sin ella se usa `CLAUDE_MODEL`.
 
 ## Pagos: depurar pendientes
 

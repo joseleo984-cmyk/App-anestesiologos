@@ -158,17 +158,18 @@ Archivo = tuple[bytes, str]  # (contenido, tipo MIME)
 
 
 def _llamar_claude(archivos: list[Archivo], instrucciones: str, esquema: dict, pedido: str,
-                   esfuerzo: str, client: anthropic.Anthropic | None) -> dict:
+                   esfuerzo: str, client: anthropic.Anthropic | None, modelo: str | None = None) -> dict:
     """Envía el documento (una o varias páginas) a Claude y devuelve el JSON que cumple el esquema."""
     client = client or anthropic.Anthropic()
     # Si un filtro de seguridad rechaza la solicitud, la API la reintenta con otro modelo.
     # Haiku no tiene ese reintento: con Haiku la opción no se envía.
-    reintento = {} if "haiku" in config.CLAUDE_MODEL else {
+    modelo = modelo or config.CLAUDE_MODEL
+    reintento = {} if "haiku" in modelo else {
         "betas": ["server-side-fallback-2026-07-01"], "fallbacks": "default"}
     try:
         # Streaming: los reportes con muchas filas pueden tardar y no deben cortarse por tiempo
         with client.beta.messages.stream(
-            model=config.CLAUDE_MODEL,
+            model=modelo,
             max_tokens=64000,
             system=instrucciones,
             messages=[{
