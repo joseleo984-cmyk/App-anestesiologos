@@ -21,6 +21,10 @@ FUENTES_NOTICIAS = ESQUEMA.parent / "seeds" / "fuentes_noticias.csv"
 
 def preparar_base_de_datos() -> None:
     with repositorio.conectar() as conn:
+        # Si una tabla está bloqueada por otra conexión, fallar con un mensaje claro en vez de quedarse esperando
+        # (Render mostraría la app "inicializando" sin fin)
+        conn.execute("SET lock_timeout = '30s'")
+        log.info("Preparando la base de datos…")
         # Evita que dos procesos creen las tablas al mismo tiempo
         conn.execute("SELECT pg_advisory_xact_lock(4207001)")
         if conn.execute("SELECT to_regclass('public.anestesiologo') AS t").fetchone()["t"] is None:
@@ -75,3 +79,4 @@ def preparar_base_de_datos() -> None:
                 {"nombre": config.ADMIN_NOMBRE, "email": config.ADMIN_EMAIL.strip().lower(),
                  "hash": auth.hash_password(config.ADMIN_PASSWORD), "huella": huella},
             )
+    log.info("Base de datos lista")
