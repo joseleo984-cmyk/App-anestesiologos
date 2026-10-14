@@ -21,9 +21,9 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from rapidfuzz import fuzz
 
-from app import (almacenamiento, auth, catalogo, config, exportar, extraccion, extractos, finanzas, inicio, liquidacion,
-                 noticias, repositorio)
-from app.modelos import (CompromisoEntrada, CuentaEntrada, Favorita, FuenteNoticias, ImportacionConfirmada, MetaEntrada,
+from app import (almacenamiento, auth, catalogo, config, copia, exportar, extraccion, extractos, finanzas, inicio,
+                 liquidacion, noticias, repositorio)
+from app.modelos import (ClaveCopia, CompromisoEntrada, CuentaEntrada, Favorita, FuenteNoticias, ImportacionConfirmada, MetaEntrada,
                          MovimientoEntrada, OrdenConfirmada, PartidaEntrada, Sugerencia, TemasNoticias)
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -461,6 +461,17 @@ def relacion_en_excel(filtros: FiltrosRelacion = Depends(), ids: list[int] = Que
 @app.get("/api/clinicas")
 def clinicas_registradas(conn=Depends(get_conn), _=Depends(anestesiologo_actual)):
     return repositorio.listar_clinicas(conn)
+
+
+@app.post("/api/copia-seguridad")
+def copia_de_seguridad(c: ClaveCopia, conn=Depends(get_conn), admin=Depends(admin_actual)):
+    """Toda la base de datos en un .zip cifrado con la clave que escoge el administrador (POST: la clave no
+    queda en la dirección). Se restaura con db/mantenimiento/restaurar_copia.py."""
+    datos, resumen = copia.crear_copia(conn, c.clave)
+    log.info("Copia de seguridad descargada por %s: %s filas", admin["email"], sum(resumen["tablas"].values()))
+    return Response(datos, media_type="application/zip", headers={
+        "Content-Disposition": f'attachment; filename="copia-auditorias-ap-{date.today()}.zip"',
+        "Cache-Control": "private, no-store"})
 
 
 @app.get("/api/sugerencias")

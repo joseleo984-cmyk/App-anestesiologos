@@ -211,6 +211,18 @@ revistas y sociedades o una búsqueda guardada de PubMed. Con «Probar» se revi
 - `NOTICIAS_MODEL` (opcional, en Render): modelo para resumir noticias, por ejemplo `claude-sonnet-5-5`, distinto
   del de las órdenes. Sin ella se usa `CLAUDE_MODEL`.
 
+## Copia de seguridad
+
+El administrador la descarga en Cuenta → Anestesiólogos (cuentas) → «Copia de seguridad»: todas las tablas en CSV
+dentro de un .zip cifrado (AES-256) con una clave de al menos 10 caracteres que escoge al descargarla. Sin la clave
+no se abre. Las fotos y PDF de las órdenes (Supabase Storage) no van en la copia.
+
+Para restaurar (en un computador con Python y `pip install -r requirements.txt`), sobre una base con el esquema:
+
+    DATABASE_URL="postgresql://..." python db/mantenimiento/restaurar_copia.py copia-auditorias-ap-AAAA-MM-DD.zip
+
+La clave se pide al correrlo. Con `--vaciar` borra primero los datos de la base de destino (pide escribir BORRAR).
+
 ## Pagos: depurar pendientes
 
 La relación de pacientes pagados (p. ej. "Reporte de pagos a prestadores" de la asociación) se sube en

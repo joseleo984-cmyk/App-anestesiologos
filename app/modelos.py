@@ -427,3 +427,7 @@ class FuenteNoticias(_Base):
 
 class Favorita(_Base):
     favorita: bool
+
+
+class ClaveCopia(_Base):
+    clave: str = Field(min_length=10, max_length=200)

@@ -9,6 +9,7 @@ python-multipart==0.0.32
 httpx==0.28.1
 openpyxl==3.1.5
 pypdf==6.19.0
+pyzipper==0.4.0
 rapidfuzz==3.14.6
 # pruebas
 pytest==9.1.1

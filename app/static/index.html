@@ -598,6 +598,19 @@
       <p class="sub">Cada anestesiólogo ve solo sus propias cirugías, pagos y reportes.</p>
       <div id="lista-usuarios"><p class="sub">Cargando…</p></div>
     </section>
+    <form class="card" id="form-copia" novalidate>
+      <h2>Copia de seguridad</h2>
+      <p class="sub">Descarga toda la base de datos (cirugías, pacientes, pagos, finanzas, noticias…) en un archivo
+        cifrado. Guárdalo en tu Drive o en tu computador. Hazla al menos una vez por semana.</p>
+      <p class="sub">🔒 Escoge una clave de al menos 10 caracteres y <strong>anótala en un lugar seguro</strong>: sin ella
+        la copia no se puede abrir ni restaurar. Las fotos y PDF de las órdenes no van en este archivo.</p>
+      <div class="fila">
+        <div><label for="copia-clave">Clave de la copia</label><input id="copia-clave" type="password" autocomplete="new-password"></div>
+        <div><label for="copia-clave2">Repite la clave</label><input id="copia-clave2" type="password" autocomplete="new-password"></div>
+      </div>
+      <button type="submit" class="primario" style="margin-top:12px">⬇ Descargar copia de seguridad</button>
+      <div id="estado-copia"></div>
+    </form>
   </div>
 
   <div id="pestana-reportes" class="pestana oculto">
@@ -2424,7 +2437,7 @@ async function pintarPdf(blob, cont) {
     await pagina.render({ canvasContext: lienzo.getContext("2d"), viewport: vista }).promise;
   }
 }
-async function abrirVisor(url, titulo) {
+async function abrirVisor(url, titulo, peticion) {
   const visor = $("#visor"), cuerpo = $("#visor-cuerpo");
   $("#visor-titulo").textContent = titulo || "Archivo";
   cuerpo.innerHTML = `<div class="cargando" style="margin:24px">Abriendo…</div>`;
@@ -2433,7 +2446,7 @@ async function abrirVisor(url, titulo) {
   document.body.classList.add("sin-scroll");
   history.pushState({ visor: true }, "");
   try {
-    const r = await fetch(url);
+    const r = await fetch(url, peticion);
     if (!r.ok) throw new Error(mensajeError(await r.json().catch(() => null), "No se pudo abrir el archivo."));
     const blob = await r.blob();
     if (visor.classList.contains("oculto")) return;  // lo cerraron mientras cargaba
@@ -2448,7 +2461,7 @@ async function abrirVisor(url, titulo) {
       try { await pintarPdf(blob, cuerpo); }
       catch (e) { cuerpo.innerHTML = `<iframe src="${visorUrl}" title="${escapar(titulo || "PDF")}"></iframe>`; }
     } else {  // Excel u otro: se guarda o se envía con la hoja de compartir del teléfono
-      cuerpo.innerHTML = `<div class="visor-descarga"><div style="font-size:3rem">📊</div>
+      cuerpo.innerHTML = `<div class="visor-descarga"><div style="font-size:3rem">${blob.type === "application/zip" ? "🗄️" : "📊"}</div>
         <p><strong>${escapar(visorArchivo.name)}</strong></p>
         <p class="sub">Toca «Guardar o enviar» para guardarlo en Archivos o mandarlo por WhatsApp o correo.</p>
         <button type="button" class="primario grande" id="visor-guardar">📤 Guardar o enviar</button>
@@ -2509,6 +2522,16 @@ document.addEventListener("click", (e) => {
   abrirVisor(a.getAttribute("href"), a.dataset.visor || "Excel");
 });
 
+$("#form-copia").onsubmit = (e) => {
+  e.preventDefault();
+  const clave = $("#copia-clave").value, estado = $("#estado-copia");
+  if (clave.length < 10) return aviso(estado, "err", "La clave debe tener al menos 10 caracteres.");
+  if (clave !== $("#copia-clave2").value) return aviso(estado, "err", "Las dos claves no coinciden.");
+  aviso(estado, "ok", "Guarda el archivo y anota la clave: sin ella no se puede abrir.");
+  abrirVisor("/api/copia-seguridad", "Copia de seguridad", { method: "POST",
+    headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clave }) });
+  $("#copia-clave").value = ""; $("#copia-clave2").value = "";
+};
 $("#salir").onclick = async () => { await fetch("/api/logout", { method: "POST" }); location.href = "/login"; };
 
 $("#form-clave").onsubmit = async (ev) => {
