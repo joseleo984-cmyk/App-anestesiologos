@@ -157,3 +157,10 @@ def test_recien_nacido_con_certificado_de_nacido_vivo(cliente):
     r = cliente.post("/api/cirugias", json={**CONFIRMAR, "paciente": paciente})
     assert r.status_code == 201, r.text
     assert cliente.get(f"/api/cirugias/{r.json()['cirugia_id']}").json()["paciente"]["tipo_documento"] == "CN"
+
+
+def test_reporte_dice_cuantas_cirugias_hay_registradas(cliente):
+    for fecha in ("2026-10-15", "2026-09-02"):
+        cliente.post("/api/cirugias", json={**CONFIRMAR, "fecha_procedimiento": fecha})
+    d = cliente.get("/api/reportes", params={"desde": "2026-10-01", "hasta": "2026-10-31"}).json()
+    assert d["totales"]["cirugias"] == 1 and d["registradas"] == 2

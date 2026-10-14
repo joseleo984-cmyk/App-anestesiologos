@@ -478,8 +478,11 @@ def reporte(conn, anestesiologo_id: int, filtros: Optional[dict] = None) -> dict
         f"""SELECT {metricas}, COUNT(*) FILTER (WHERE c.estado = 'CANCELADA') AS canceladas,
                   COUNT(*) FILTER (WHERE c.estado NOT IN ('PAGADA', 'CANCELADA')) AS pendientes
             {_DESDE} WHERE {where}""", params).fetchone()
+    registradas = conn.execute("SELECT COUNT(*) AS n FROM cirugia WHERE anestesiologo_id = %s",
+                               (anestesiologo_id,)).fetchone()["n"]
     return {
         "totales": totales,
+        "registradas": registradas,  # todas las del anestesiólogo, sin filtro de periodo
         "por_cirujano": agrupar("COALESCE(ci.nombre, 'SIN CIRUJANO')"),
         "por_clinica": agrupar("cl.nombre"),
         "por_aseguradora": agrupar("COALESCE(a.nombre, 'PARTICULAR')"),

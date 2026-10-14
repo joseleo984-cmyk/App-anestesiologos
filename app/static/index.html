@@ -538,7 +538,7 @@
         <div class="oculto r-otro"><label for="r-hasta">Hasta</label><input id="r-hasta" type="date"></div>
       </div>
       <div class="barra-acciones" style="margin:12px 0 0">
-        <div class="segmentado" role="group" aria-label="Ordenar por">
+        <div class="segmentado" id="r-metrica" role="group" aria-label="Ordenar por">
           <button type="button" data-metrica="total" aria-pressed="true">Por dinero</button>
           <button type="button" data-metrica="cirugias" aria-pressed="false">Por cirugías</button>
         </div>
@@ -1987,7 +1987,19 @@ function verPendientes() {
 $("#ver-pendientes").onclick = verPendientes;
 
 // ---------------------------------------------------------------- reportes
-let metrica = "total";
+let metrica = "total", metricaVista = "total", reporteConValores = true;
+// Nombre del periodo elegido, para que se sepa qué está contando el reporte
+function nombrePeriodo() {
+  const hoy = new Date(), sel = $("#r-periodo").value;
+  const nombres = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+  const mesDe = (d) => `${nombres[d.getMonth()]} ${d.getFullYear()}`;
+  if (sel === "mes") { const t = mesDe(hoy); return t[0].toUpperCase() + t.slice(1); }
+  if (sel === "mes-anterior") { const t = mesDe(new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1)); return t[0].toUpperCase() + t.slice(1); }
+  if (sel === "3meses") return `De ${mesDe(new Date(hoy.getFullYear(), hoy.getMonth() - 2, 1))} a ${mesDe(hoy)}`;
+  if (sel === "anio") return `Año ${hoy.getFullYear()}`;
+  if (sel === "otro") { const p = periodo(); return `Del ${p.desde ? p.desde.split("-").reverse().join("/") : "el inicio"} a ${p.hasta ? p.hasta.split("-").reverse().join("/") : "hoy"}`; }
+  return "Todas las fechas";
+}
 const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 function periodo() {
   const hoy = new Date(), a = hoy.getFullYear(), m = hoy.getMonth();
@@ -2013,15 +2025,16 @@ document.querySelectorAll("[data-metrica]").forEach((b) => b.onclick = () => {
 
 function ranking(titulo, filas, enTarjeta = true) {
   if (!filas.length) return "";
-  const valor = (f) => Number(f[metrica]);
+  const valor = (f) => Number(f[metricaVista]);
   const ordenadas = titulo === "Por mes" ? filas : [...filas].sort((x, y) => valor(y) - valor(x) || y.cirugias - x.cirugias);
-  const max = Math.max(...ordenadas.map(valor), 1);
-  const texto = (f) => metrica === "total" ? pesos(f.total) : `${f.cirugias} cirugía${f.cirugias === 1 ? "" : "s"}`;
+  const max = Math.max(...ordenadas.map(valor), 1), suma = Math.max(1, filas.reduce((a, f) => a + f.cirugias, 0));
+  const texto = (f) => metricaVista === "total" ? pesos(f.total) : `${f.cirugias} cirugía${f.cirugias === 1 ? "" : "s"}`;
   const lista = `<ul class="ranking">${ordenadas.map((f) => `
     <li title="${escapar(f.nombre)}: ${f.cirugias} cirugías · total ${pesos(f.total)} · pagado ${pesos(f.pagado)} · por cobrar ${pesos(f.por_cobrar)}">
       <div class="nombre"><span>${escapar(f.nombre)}</span><span class="valor">${texto(f)}</span></div>
       <div class="pista"><div class="barra" style="width:${Math.max(valor(f) / max * 100, 0.5)}%"></div></div>
-      <div class="detalle">${metrica === "total" ? `${f.cirugias} cirugía${f.cirugias === 1 ? "" : "s"} · ` : `${pesos(f.total)} · `}pagado ${pesos(f.pagado)} · por cobrar ${pesos(f.por_cobrar)}${f.sin_valor ? ` · ${f.sin_valor} sin valor` : ""}</div>
+      <div class="detalle">${!reporteConValores ? `${Math.round(f.cirugias / suma * 100)} % de las cirugías`
+        : `${metricaVista === "total" ? `${f.cirugias} cirugía${f.cirugias === 1 ? "" : "s"} · ` : `${pesos(f.total)} · `}pagado ${pesos(f.pagado)} · por cobrar ${pesos(f.por_cobrar)}${f.sin_valor ? ` · ${f.sin_valor} sin valor` : ""}`}</div>
     </li>`).join("")}</ul>`;
   return enTarjeta ? `<section class="card"><h2>${titulo}</h2>${lista}</section>` : lista;
 }
@@ -2068,16 +2081,24 @@ async function cargarReporte() {
       cont.innerHTML = `<section class="card"><p class="sub">No hay cirugías en este periodo.</p></section>${seccionGlosas(g)}`;
       return;
     }
+    // En AP el valor lo pone la asociación: si ninguna cirugía tiene valor, el reporte se hace por cantidad
+    const conValores = Number(t.total) > 0;
+    metricaVista = conValores ? metrica : "cirugias";
+    reporteConValores = conValores;
+    $("#r-metrica").classList.toggle("oculto", !conValores);
+    const contadas = t.cirugias + t.canceladas;
     cont.innerHTML = `
+      <p class="sub" style="margin:0 4px 10px"><strong>${escapar(nombrePeriodo())}</strong> · ${contadas === d.registradas
+        ? `todas tus ${d.registradas} cirugías registradas`
+        : `${contadas} de tus ${d.registradas} cirugías registradas; las demás tienen otra fecha (elige «Todo» en el periodo para verlas)`}</p>
       <div class="kpis">
-        <div class="kpi destacado"><div class="etiqueta">Total generado</div><div class="cifra">${pesos(t.total)}</div></div>
-        <div class="kpi"><div class="etiqueta">Cirugías</div><div class="cifra">${t.cirugias}</div></div>
-        <div class="kpi"><div class="etiqueta">Pagado</div><div class="cifra">${pesos(t.pagado)}</div></div>
-        <div class="kpi"><div class="etiqueta">Por cobrar</div><div class="cifra">${pesos(t.por_cobrar)}</div></div>
+        ${conValores ? `<div class="kpi destacado"><div class="etiqueta">Total generado</div><div class="cifra">${pesos(t.total)}</div></div>` : ""}
+        <div class="kpi${conValores ? "" : " destacado"}"><div class="etiqueta">Cirugías</div><div class="cifra">${t.cirugias}</div></div>
+        ${conValores ? `<div class="kpi"><div class="etiqueta">Pagado</div><div class="cifra">${pesos(t.pagado)}</div></div>
+        <div class="kpi"><div class="etiqueta">Por cobrar</div><div class="cifra">${pesos(t.por_cobrar)}</div></div>` : ""}
         <div class="kpi clic" id="kpi-pendientes" title="Ver las cirugías pendientes de pago"><div class="etiqueta">Pendientes de pago ›</div><div class="cifra">${t.pendientes}</div></div>
         <div class="kpi"><div class="etiqueta">Canceladas</div><div class="cifra">${t.canceladas}</div></div>
       </div>
-      ${t.sin_valor ? `<div class="aviso warn">${t.sin_valor} cirugía${t.sin_valor > 1 ? "s no tienen" : " no tiene"} valor de honorarios: ábrela${t.sin_valor > 1 ? "s" : ""} en «Cirugías» y agrégalo para que los totales estén completos.</div>` : ""}
       ${ranking("Por cirujano", d.por_cirujano)}
       ${ranking("Por clínica", d.por_clinica)}
       ${ranking("Por aseguradora", d.por_aseguradora)}
@@ -2086,12 +2107,12 @@ async function cargarReporte() {
         : ranking("Por mes", d.por_mes)}
       ${seccionGlosas(g)}`;
     $("#kpi-pendientes").onclick = verPendientes;
-    const enPesos = metrica === "total";
+    const enPesos = metricaVista === "total";
     graficaColumnas($("#r-grafica-mes"), { titulo: "Por mes",
       puntos: [...d.por_mes].reverse().map((m) => ({ periodo: `${m.nombre}-01`,
         valores: enPesos ? [m.pagado, m.por_cobrar] : [m.cirugias],
         detalle: enPesos ? `${m.cirugias} cirugía${m.cirugias === 1 ? "" : "s"}${m.sin_valor ? ` · ${m.sin_valor} sin valor` : ""}`
-                         : `${pesos(m.total)} · pagado ${pesos(m.pagado)}` })),
+                         : Number(m.total) ? `${pesos(m.total)} · pagado ${pesos(m.pagado)}` : "" })),
       series: enPesos ? [{ nombre: "Pagado", color: "var(--serie-1)" }, { nombre: "Por cobrar", color: "var(--serie-2)" }]
                       : [{ nombre: "Cirugías", color: "var(--serie-1)" }],
       formato: enPesos ? pesos : (v) => `${v} cirugía${Number(v) === 1 ? "" : "s"}`,
