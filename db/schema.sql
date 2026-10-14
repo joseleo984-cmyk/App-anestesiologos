@@ -26,7 +26,7 @@ CREATE TABLE anestesiologo (
 CREATE TABLE paciente (
     paciente_id        BIGSERIAL PRIMARY KEY,
     tipo_documento     VARCHAR(5)   NOT NULL DEFAULT 'CC'
-                       CHECK (tipo_documento IN ('CC','TI','CE','RC','PA','PPT','MS','AS')),
+                       CHECK (tipo_documento IN ('CC','TI','CE','RC','PA','PPT','CN','MS','AS')),
     numero_documento   VARCHAR(20)  NOT NULL,
     nombres            VARCHAR(100) NOT NULL,
     apellidos          VARCHAR(100) NOT NULL,

@@ -150,3 +150,10 @@ def test_icono_y_manifiesto_sin_sesion(db_url):
             assert anonimo.get(icono["src"]).headers["content-type"] == "image/png"
         assert anonimo.get("/static/apple-touch-icon.png").status_code == 200
         assert 'rel="apple-touch-icon"' in anonimo.get("/login").text
+
+
+def test_recien_nacido_con_certificado_de_nacido_vivo(cliente):
+    paciente = {"tipo_documento": "CN", "numero_documento": "202610140001", "nombres": "Recién nacido", "apellidos": "Ficticio"}
+    r = cliente.post("/api/cirugias", json={**CONFIRMAR, "paciente": paciente})
+    assert r.status_code == 201, r.text
+    assert cliente.get(f"/api/cirugias/{r.json()['cirugia_id']}").json()["paciente"]["tipo_documento"] == "CN"

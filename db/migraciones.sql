@@ -187,3 +187,8 @@ CREATE TABLE IF NOT EXISTS fin_regla_categoria (
 ALTER TABLE fin_movimiento ADD COLUMN IF NOT EXISTS cuenta_id BIGINT REFERENCES fin_cuenta(cuenta_id) ON DELETE SET NULL;
 ALTER TABLE fin_movimiento ADD COLUMN IF NOT EXISTS huella VARCHAR(64);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_fin_mov_huella ON fin_movimiento (anestesiologo_id, huella) WHERE huella IS NOT NULL;
+
+-- 17. Tipo de documento CN (certificado de nacido vivo)
+ALTER TABLE paciente DROP CONSTRAINT IF EXISTS paciente_tipo_documento_check;
+ALTER TABLE paciente ADD CONSTRAINT paciente_tipo_documento_check
+    CHECK (tipo_documento IN ('CC','TI','CE','RC','PA','PPT','CN','MS','AS'));

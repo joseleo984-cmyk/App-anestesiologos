@@ -11,7 +11,7 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-TipoDocumento = Literal["CC", "TI", "CE", "RC", "PA", "PPT", "MS", "AS"]
+TipoDocumento = Literal["CC", "TI", "CE", "RC", "PA", "PPT", "CN", "MS", "AS"]
 TipoAseguradora = Literal["EPS", "PREPAGADA", "POLIZA"]
 EstadoCirugia = Literal["PROGRAMADA", "REALIZADA", "CANCELADA", "FACTURADA", "PAGADA"]
 

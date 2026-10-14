@@ -35,7 +35,7 @@ ESQUEMA = {
         "paciente": {
             "type": "object",
             "properties": {
-                "tipo_documento": _nullable({"type": "string", "enum": ["CC", "TI", "CE", "RC", "PA", "PPT", "MS", "AS"]}),
+                "tipo_documento": _nullable({"type": "string", "enum": ["CC", "TI", "CE", "RC", "PA", "PPT", "CN", "MS", "AS"]}),
                 "numero_documento": _nullable(_TEXTO),
                 "nombres": _nullable(_TEXTO),
                 "apellidos": _nullable(_TEXTO),
@@ -91,7 +91,8 @@ INSTRUCCIONES = """Eres un asistente que lee órdenes quirúrgicas, autorizacion
 de Colombia para un anestesiólogo. Extrae del documento:
 
 - Paciente: tipo de documento (CC cédula de ciudadanía, TI tarjeta de identidad, CE cédula de \
-extranjería, RC registro civil, PA pasaporte, PPT permiso por protección temporal, MS menor sin \
+extranjería, RC registro civil, PA pasaporte, PPT permiso por protección temporal, CN certificado de nacido vivo (recién nacido \
+sin registro civil aún), MS menor sin \
 identificación, AS adulto sin identificación), número de documento, nombres y apellidos por separado.
 - Aseguradora: nombre de la entidad que paga y su tipo: EPS (régimen contributivo o subsidiado), \
 PREPAGADA (medicina prepagada o plan complementario) o POLIZA (póliza de salud de una aseguradora). \
