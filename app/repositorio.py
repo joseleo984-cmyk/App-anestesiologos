@@ -274,6 +274,7 @@ def guardar_orden(conn, anestesiologo_id: int, orden: OrdenConfirmada, documento
 
     if documento_id is not None:
         conn.execute("UPDATE documento_fuente SET estado = 'VALIDADO' WHERE documento_id = %s", (documento_id,))
+    cruzar_paciente(conn, anestesiologo_id, r["paciente_id"])
     return cirugia_id
 
 
@@ -297,6 +298,7 @@ def actualizar_orden(conn, anestesiologo_id: int, cirugia_id: int, orden: OrdenC
          orden.fecha_pago, orden.observaciones, orden.numero_orden, cirugia_id),
     )
     _guardar_procedimientos(conn, cirugia_id, orden)
+    cruzar_paciente(conn, anestesiologo_id, r["paciente_id"])
     if existe["clinica_id"] != r["clinica_id"]:
         # Si se corrigió el nombre de la clínica, el nombre viejo no queda suelto en las sugerencias
         conn.execute("""DELETE FROM clinica WHERE clinica_id = %s
@@ -644,7 +646,7 @@ def conciliar(conn, anestesiologo_id: int, reporte_id: int) -> None:
                            ELSE abs(c.fecha_procedimiento - %(fecha)s::date) END AS distancia
                  FROM cirugia c JOIN paciente p ON p.paciente_id = c.paciente_id
                 WHERE c.anestesiologo_id = %(anest)s AND c.estado <> 'CANCELADA'
-                  AND upper(regexp_replace(p.numero_documento, '[^A-Za-z0-9]', '', 'g')) = %(doc)s
+                  AND doc_norm(p.numero_documento) = doc_norm(%(doc)s)
                   AND (%(fecha)s::date IS NULL
                        OR abs(c.fecha_procedimiento - %(fecha)s::date) <= %(tol)s)
                   -- no tomar cirugías ya pagadas por otro reporte aplicado
@@ -659,6 +661,42 @@ def conciliar(conn, anestesiologo_id: int, reporte_id: int) -> None:
         if elegida:
             usadas.add(elegida)
         conn.execute("UPDATE pago_detalle SET cirugia_id = %s WHERE detalle_id = %s", (elegida, f["detalle_id"]))
+
+
+def cruzar_paciente(conn, anestesiologo_id: int, paciente_id: int) -> int:
+    """Al registrar o corregir una cirugía, la busca en los reportes de pago ya subidos (los pagos suelen
+    llegar antes de que se registre la cirugía). En un reporte ya aplicado, la marca pagada de una vez."""
+    reportes = conn.execute(
+        """SELECT DISTINCT r.reporte_id, r.estado FROM pago_detalle d
+             JOIN reporte_pago r USING (reporte_id) JOIN paciente p ON p.paciente_id = %s
+            WHERE r.anestesiologo_id = %s AND d.es_paciente AND d.cirugia_id IS NULL
+              AND doc_norm(d.documento_paciente) = doc_norm(p.numero_documento)""",
+        (paciente_id, anestesiologo_id)).fetchall()
+    marcadas = 0
+    for r in reportes:
+        conciliar(conn, anestesiologo_id, r["reporte_id"])
+        if r["estado"] == "APLICADO":
+            marcadas += aplicar_reporte(conn, anestesiologo_id, r["reporte_id"])
+    return marcadas
+
+
+def recruzar_todos(conn, anestesiologo_id: int) -> dict:
+    """Vuelve a cruzar todos los reportes del anestesiólogo. En los ya aplicados marca pagadas las nuevas."""
+    reportes = conn.execute("SELECT reporte_id, estado FROM reporte_pago WHERE anestesiologo_id = %s ORDER BY reporte_id",
+                            (anestesiologo_id,)).fetchall()
+    contar = """SELECT count(*) AS n FROM pago_detalle d JOIN reporte_pago r USING (reporte_id)
+                 WHERE r.anestesiologo_id = %s AND d.cirugia_id IS NOT NULL"""
+    antes = conn.execute(contar, (anestesiologo_id,)).fetchone()["n"]
+    marcadas = 0
+    for r in reportes:
+        conciliar(conn, anestesiologo_id, r["reporte_id"])
+        if r["estado"] == "APLICADO":
+            marcadas += aplicar_reporte(conn, anestesiologo_id, r["reporte_id"])
+    despues = conn.execute(contar, (anestesiologo_id,)).fetchone()["n"]
+    lineas = conn.execute("""SELECT count(*) AS n FROM pago_detalle d JOIN reporte_pago r USING (reporte_id)
+                              WHERE r.anestesiologo_id = %s AND d.es_paciente""", (anestesiologo_id,)).fetchone()["n"]
+    return {"reportes": len(reportes), "lineas": lineas, "encontradas": despues,
+            "nuevas": despues - antes, "marcadas_pagadas": marcadas}
 
 
 def obtener_reporte(conn, anestesiologo_id: int, reporte_id: int) -> Optional[dict]:

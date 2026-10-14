@@ -341,3 +341,11 @@ CREATE OR REPLACE FUNCTION clave_titulo(t TEXT) RETURNS TEXT LANGUAGE sql IMMUTA
 $$ SELECT left(regexp_replace(lower(t), '[^a-z0-9]+', '', 'g'), 200) $$;
 CREATE INDEX IF NOT EXISTS idx_noticia_clave_titulo ON noticia (clave_titulo(titulo));
 CREATE INDEX IF NOT EXISTS idx_noticia_enlace ON noticia (enlace);
+
+-- Documento normalizado para cruzar pagos con cirugías: sin puntos ni espacios, sin "CC"/"TI"… delante
+--     y sin ceros a la izquierda ("CC 01.063.074.207" = "1063074207")
+CREATE OR REPLACE FUNCTION doc_norm(t TEXT) RETURNS TEXT LANGUAGE sql IMMUTABLE AS $$
+  SELECT CASE WHEN d ~ '^[0-9]+$' THEN ltrim(d, '0') ELSE d END
+    FROM (SELECT regexp_replace(upper(regexp_replace(coalesce(t, ''), '[^A-Za-z0-9]', '', 'g')),
+                                '^(CC|TI|CE|RC|PA|PPT|CN|MS|AS|NUIP)(?=[0-9])', '') AS d) x
+$$;

@@ -139,11 +139,12 @@ def test_volver_a_cruzar_tras_registrar_el_faltante(con_reporte):
     rep = subir(c).json()
     c.post(f"/api/pagos/{rep['reporte_id']}/aplicar")
     assert rep["filas"][3]["resultado"] == "SIN_CIRUGIA"
-    faltante = crear(c, "555000", "2026-08-20")               # se registra el paciente que faltaba
+    # se registra el paciente que faltaba: se cruza al guardarlo y, como el reporte ya estaba aplicado, queda pagado
+    faltante = crear(c, "555000", "2026-08-20")
     rep = c.post(f"/api/pagos/{rep['reporte_id']}/cruzar").json()
     assert rep["filas"][0]["cirugia_id"] == uno                # lo ya pagado se conserva
-    assert rep["filas"][3]["cirugia_id"] == faltante and rep["filas"][3]["estado_cirugia"] == "PROGRAMADA"
-    assert c.post(f"/api/pagos/{rep['reporte_id']}/aplicar").json() == {"marcadas": 1}
+    assert rep["filas"][3]["cirugia_id"] == faltante and rep["filas"][3]["estado_cirugia"] == "PAGADA"
+    assert c.post(f"/api/pagos/{rep['reporte_id']}/aplicar").json() == {"marcadas": 0}
     assert c.get(f"/api/cirugias/{faltante}").json()["valor_honorarios"] == 128400
 
 
@@ -163,3 +164,39 @@ def test_reporte_de_glosas(con_reporte):
     import io
     wb = load_workbook(io.BytesIO(c.get("/api/cirugias.xlsx").content))
     assert wb["Glosas"].max_row == 4
+
+
+def test_cirugia_registrada_despues_del_reporte_se_cruza_sola(con_reporte):
+    c = con_reporte
+    # el reporte se sube primero, sin cirugías registradas; se aplica (lo que había)
+    rep = subir(c).json()
+    assert [f["resultado"] for f in rep["filas"]] == ["SIN_CIRUGIA", "SIN_CIRUGIA", "OTRO_CONCEPTO", "SIN_CIRUGIA"]
+    c.post(f"/api/pagos/{rep['reporte_id']}/aplicar")
+    # luego se registran las cirugías: se cruzan al guardarlas y, como el reporte ya estaba aplicado, quedan pagadas
+    uno = crear(c, "72000730", "2026-08-14")
+    assert c.get(f"/api/cirugias/{uno}").json()["estado"] == "PAGADA"
+    filas = c.get(f"/api/pagos/{rep['reporte_id']}").json()["filas"]
+    assert filas[0]["cirugia_id"] == uno and filas[0]["resultado"] == "COINCIDE"
+
+
+def test_documento_con_prefijo_ceros_y_puntos(con_reporte):
+    c = con_reporte
+    c.poner_reporte({**REPORTE, "filas": [{**REPORTE["filas"][0], "documento_paciente": "CC 0072.000.730"}]})
+    uno = crear(c, "72000730", "2026-08-14")
+    rep = subir(c).json()
+    assert rep["filas"][0]["cirugia_id"] == uno
+
+
+def test_volver_a_cruzar_todos(con_reporte):
+    c = con_reporte
+    rep = subir(c).json()  # reporte leído (sin aplicar) antes de registrar las cirugías
+    # se borra el cruce (como si las cirugías se hubieran registrado antes de esta versión): «cruzar todos» lo rehace
+    from app.repositorio import conectar
+    uno = crear(c, "72000730", "2026-08-14")
+    with conectar() as conn:
+        conn.execute("UPDATE pago_detalle SET cirugia_id = NULL")
+        conn.commit()
+    r = c.post("/api/pagos/cruzar-todos").json()
+    assert r == {"reportes": 1, "lineas": 3, "encontradas": 1, "nuevas": 1, "marcadas_pagadas": 0}
+    assert c.get(f"/api/pagos/{rep['reporte_id']}").json()["filas"][0]["cirugia_id"] == uno
+    assert c.get(f"/api/cirugias/{uno}").json()["estado"] == "PROGRAMADA"  # leído, no aplicado: no se marca pagada

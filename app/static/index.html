@@ -368,6 +368,10 @@
     <section class="card">
       <div class="item-cab"><h2>Reportes subidos</h2>
         <button type="button" id="ver-pendientes" style="flex:0 0 auto">Ver pendientes de pago</button></div>
+      <div class="atajos"><button type="button" id="cruzar-todos">↻ Volver a cruzar todos los reportes</button></div>
+      <p class="sub">Úsalo después de registrar cirugías que ya venían en reportes subidos antes (las cirugías nuevas
+        se cruzan solas al guardarlas).</p>
+      <div id="estado-cruzar"></div>
       <div id="lista-pagos"><p class="sub">Cargando…</p></div>
     </section>
   </div>
@@ -2274,6 +2278,17 @@ function verPendientes() {
   mostrarPestana("cirugias");
 }
 $("#ver-pendientes").onclick = verPendientes;
+$("#cruzar-todos").onclick = async () => {
+  const estado = $("#estado-cruzar");
+  estado.innerHTML = `<div class="cargando">Cruzando todos los reportes con tus cirugías…</div>`;
+  const r = await fetch("/api/pagos/cruzar-todos", { method: "POST" });
+  const c = await r.json().catch(() => null);
+  if (!r.ok) return aviso(estado, "err", mensajeError(c, "No se pudo cruzar."));
+  aviso(estado, c.nuevas ? "ok" : "warn", `${c.encontradas} de ${c.lineas} pagos de pacientes encontrados en tus cirugías` +
+    (c.nuevas ? ` (${c.nuevas} nuevo${c.nuevas === 1 ? "" : "s"} ahora)` : " (ninguno nuevo)") +
+    (c.marcadas_pagadas ? `; ${c.marcadas_pagadas} cirugía${c.marcadas_pagadas === 1 ? "" : "s"} marcada${c.marcadas_pagadas === 1 ? "" : "s"} como pagada${c.marcadas_pagadas === 1 ? "" : "s"}.` : "."));
+  cargarReportesPago();
+};
 
 // ---------------------------------------------------------------- reportes
 let metrica = "total", metricaVista = "total", reporteConValores = true;
