@@ -12,13 +12,20 @@
 <meta name="apple-mobile-web-app-title" content="Auditorías AP">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#0b6bcb">
+<script>
+  // Apariencia elegida (Automático / Claro / Oscuro): se aplica antes de pintar, sin parpadeo
+  try { const t = localStorage.getItem("tema"); if (t === "claro" || t === "oscuro") document.documentElement.dataset.tema = t; } catch (e) {}
+</script>
 <style>
   :root { --bg: #f6f7f9; --card: #ffffff; --text: #1b1f24; --muted: #5b6470; --line: #d9dde3;
           --accent: #0b6bcb; --accent-text: #ffffff; --err-bg: #fde8e8; --err-text: #a61b1b; }
+  :root { color-scheme: light; }
   @media (prefers-color-scheme: dark) {
-    :root { --bg: #12151a; --card: #1b2028; --text: #e7eaee; --muted: #9aa4b1; --line: #313844;
+    :root:not([data-tema="claro"]) { color-scheme: dark; --bg: #12151a; --card: #1b2028; --text: #e7eaee; --muted: #9aa4b1; --line: #313844;
             --accent: #4b9cf0; --accent-text: #0b0f14; --err-bg: #3d1c1c; --err-text: #f1a3a3; }
   }
+  :root[data-tema="oscuro"] { color-scheme: dark; --bg: #12151a; --card: #1b2028; --text: #e7eaee; --muted: #9aa4b1; --line: #313844;
+            --accent: #4b9cf0; --accent-text: #0b0f14; --err-bg: #3d1c1c; --err-text: #f1a3a3; }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text);
          font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }

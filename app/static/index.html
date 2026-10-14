@@ -12,6 +12,10 @@
 <meta name="apple-mobile-web-app-title" content="Auditorías AP">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#0b6bcb">
+<script>
+  // Apariencia elegida (Automático / Claro / Oscuro): se aplica antes de pintar, sin parpadeo
+  try { const t = localStorage.getItem("tema"); if (t === "claro" || t === "oscuro") document.documentElement.dataset.tema = t; } catch (e) {}
+</script>
 <style>
   :root {
     --bg: #f6f7f9; --card: #ffffff; --text: #1b1f24; --muted: #5b6470; --line: #d9dde3;
@@ -19,14 +23,21 @@
     --ok-bg: #e5f5ea; --ok-text: #1d6b35; --err-bg: #fde8e8; --err-text: #a61b1b;
     --serie-1: #2a78d6; --serie-2: #eb6834; --serie-3: #1baf7a; --rejilla: #e8eaee; --eje: #c3c7ce; --libre: #e3e6ea;
   }
+  :root { color-scheme: light; }
   @media (prefers-color-scheme: dark) {
-    :root {
+    :root:not([data-tema="claro"]) { color-scheme: dark;
       --bg: #12151a; --card: #1b2028; --text: #e7eaee; --muted: #9aa4b1; --line: #313844;
       --accent: #4b9cf0; --accent-text: #0b0f14; --warn-bg: #3a3014; --warn-line: #c99a1a;
       --ok-bg: #173323; --ok-text: #8fd9a8; --err-bg: #3d1c1c; --err-text: #f1a3a3;
       --serie-1: #3987e5; --serie-2: #d95926; --serie-3: #199e70; --rejilla: #262c36; --eje: #3a424f; --libre: #2a313c;
     }
   }
+  :root[data-tema="oscuro"] { color-scheme: dark;
+      --bg: #12151a; --card: #1b2028; --text: #e7eaee; --muted: #9aa4b1; --line: #313844;
+      --accent: #4b9cf0; --accent-text: #0b0f14; --warn-bg: #3a3014; --warn-line: #c99a1a;
+      --ok-bg: #173323; --ok-text: #8fd9a8; --err-bg: #3d1c1c; --err-text: #f1a3a3;
+      --serie-1: #3987e5; --serie-2: #d95926; --serie-3: #199e70; --rejilla: #262c36; --eje: #3a424f; --libre: #2a313c;
+    }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text);
          font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
@@ -85,6 +96,9 @@
                    gap: 4px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 6px;
                    min-width: 220px; box-shadow: 0 6px 20px rgba(0,0,0,.15); }
   .menu-opciones button { text-align: left; border: 0; }
+  .menu-tema { padding: 6px 10px 8px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  .menu-tema .segmentado { display: flex; margin-top: 4px; }
+  .menu-tema .segmentado button { flex: 1; text-align: center; white-space: nowrap; }
   .clave-temporal { font: 600 1.3rem ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .05em;
                     padding: 10px; border: 1px dashed var(--accent); border-radius: 8px; text-align: center; margin: 8px 0; }
   .cargando { text-align: center; padding: 24px 0; color: var(--muted); }
@@ -263,6 +277,12 @@
       <div class="menu-opciones">
         <button type="button" id="ir-clave">Cambiar contraseña</button>
         <button type="button" id="ir-usuarios" class="oculto">Anestesiólogos (cuentas)</button>
+        <div class="menu-tema"><span class="sub">Apariencia</span>
+          <div class="segmentado" id="tema" role="group" aria-label="Apariencia">
+            <button type="button" data-tema="auto" aria-pressed="false" title="Como el teléfono">Auto</button>
+            <button type="button" data-tema="claro" aria-pressed="false">☀️ Claro</button>
+            <button type="button" data-tema="oscuro" aria-pressed="false">🌙 Oscuro</button>
+          </div></div>
         <button type="button" id="salir">Salir</button>
       </div>
     </details>
@@ -2532,6 +2552,18 @@ $("#form-copia").onsubmit = (e) => {
     headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clave }) });
   $("#copia-clave").value = ""; $("#copia-clave2").value = "";
 };
+// ---------------------------------------------------------------- apariencia (claro / oscuro / como el teléfono)
+function aplicarTema(tema) {
+  if (tema === "claro" || tema === "oscuro") document.documentElement.dataset.tema = tema;
+  else delete document.documentElement.dataset.tema;
+  try { tema === "auto" ? localStorage.removeItem("tema") : localStorage.setItem("tema", tema); } catch (e) {}
+  document.querySelectorAll("#tema [data-tema]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.tema === tema));
+  // las gráficas leen los colores al dibujarse: se vuelven a dibujar
+  graficasVivas.forEach((opts, cont) => cont.isConnected && graficaColumnas(cont, opts));
+}
+document.querySelectorAll("#tema [data-tema]").forEach((b) => b.onclick = () => aplicarTema(b.dataset.tema));
+aplicarTema(document.documentElement.dataset.tema || "auto");
+
 $("#salir").onclick = async () => { await fetch("/api/logout", { method: "POST" }); location.href = "/login"; };
 
 $("#form-clave").onsubmit = async (ev) => {
