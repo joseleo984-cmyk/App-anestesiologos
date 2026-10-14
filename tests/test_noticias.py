@@ -240,3 +240,20 @@ def test_resumenes_en_ingles_se_traducen(admin, conn, monkeypatch):
     filas = {r["guid"]: r["titulo_es"] for r in conn.execute("SELECT guid, titulo_es FROM noticia")}
     assert filas == {"x1": "Sugammadex y complicaciones pulmonares", "x2": "Guía de vía aérea"}
     assert len(pedidas) == 1  # solo la que estaba en inglés
+
+
+def test_la_conexion_se_cierra_antes_de_la_tarea_en_segundo_plano(cliente, monkeypatch):
+    """Si la consulta dejara su transacción abierta mientras se resumen noticias (minutos), bloquearía tablas
+    y la versión nueva de la app no podría arrancar."""
+    import psycopg
+    from tests.conftest import TEST_DATABASE_URL
+    vistas = []
+
+    def tarea():
+        with psycopg.connect(TEST_DATABASE_URL) as c:
+            vistas.append(c.execute(
+                """SELECT count(*) FROM pg_stat_activity WHERE datname = current_database()
+                   AND state = 'idle in transaction' AND pid <> pg_backend_pid()""").fetchone()[0])
+    monkeypatch.setattr(noticias, "revisar_en_segundo_plano", tarea)
+    assert cliente.get("/api/noticias").status_code == 200
+    assert vistas == [0]

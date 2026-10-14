@@ -46,11 +46,14 @@ EXTENSIONES = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp",
 
 
 def get_conn():
+    # Se usa con scope="function": la conexión se cierra apenas responde el endpoint, no después de las tareas
+    # en segundo plano (resumir noticias, leer extractos), que pueden tardar minutos. Si quedara abierta, su
+    # transacción bloquearía tablas y la versión nueva de la app no podría arrancar (Render: 502).
     with repositorio.conectar() as conn:
         yield conn
 
 
-def cuenta_sesion(sesion: str | None = Cookie(default=None), conn=Depends(get_conn)) -> dict:
+def cuenta_sesion(sesion: str | None = Cookie(default=None), conn=Depends(get_conn, scope="function")) -> dict:
     """Cuenta de la sesión: la cookie debe ser válida, la cuenta estar activa y la sesión
     no haber sido cerrada (cambio de clave o desactivación suben la versión)."""
     datos = auth.leer_sesion(sesion)
@@ -128,7 +131,7 @@ def pagina_prueba_archivo():
 
 
 @app.get("/salud", include_in_schema=False)
-def salud(conn=Depends(get_conn)):
+def salud(conn=Depends(get_conn, scope="function")):
     conn.execute("SELECT 1")
     return {"estado": "ok"}
 
@@ -139,7 +142,7 @@ class Credenciales(BaseModel):
 
 
 @app.post("/api/login")
-def iniciar_sesion(datos: Credenciales, response: Response, conn=Depends(get_conn)):
+def iniciar_sesion(datos: Credenciales, response: Response, conn=Depends(get_conn, scope="function")):
     usuario = repositorio.buscar_anestesiologo_por_email(conn, datos.email)
     if (not usuario or not usuario["activo"]
             or not auth.verificar_password(datos.password, usuario["password_hash"])):
@@ -168,7 +171,7 @@ class CambioClave(BaseModel):
 
 
 @app.post("/api/cambiar-clave")
-def cambiar_mi_clave(datos: CambioClave, response: Response, conn=Depends(get_conn),
+def cambiar_mi_clave(datos: CambioClave, response: Response, conn=Depends(get_conn, scope="function"),
                      cuenta: dict = Depends(cuenta_sesion)):
     if not auth.verificar_password(datos.actual, cuenta["password_hash"]):
         time.sleep(1)
@@ -193,12 +196,12 @@ class EstadoUsuario(BaseModel):
 
 
 @app.get("/api/usuarios")
-def listar_usuarios(conn=Depends(get_conn), _=Depends(admin_actual)):
+def listar_usuarios(conn=Depends(get_conn, scope="function"), _=Depends(admin_actual)):
     return repositorio.listar_usuarios(conn)
 
 
 @app.post("/api/usuarios", status_code=201)
-def crear_usuario(datos: NuevoUsuario, conn=Depends(get_conn), _=Depends(admin_actual)):
+def crear_usuario(datos: NuevoUsuario, conn=Depends(get_conn, scope="function"), _=Depends(admin_actual)):
     """Crea la cuenta con una clave temporal que se muestra una sola vez."""
     clave = auth.clave_temporal()
     try:
@@ -212,7 +215,7 @@ def crear_usuario(datos: NuevoUsuario, conn=Depends(get_conn), _=Depends(admin_a
 
 
 @app.put("/api/usuarios/{usuario_id}")
-def activar_usuario(usuario_id: int, datos: EstadoUsuario, conn=Depends(get_conn), admin=Depends(admin_actual)):
+def activar_usuario(usuario_id: int, datos: EstadoUsuario, conn=Depends(get_conn, scope="function"), admin=Depends(admin_actual)):
     if usuario_id == admin["anestesiologo_id"] and not datos.activo:
         raise HTTPException(400, "No puedes desactivar tu propia cuenta.")
     if not repositorio.cambiar_activo(conn, usuario_id, datos.activo):
@@ -222,7 +225,7 @@ def activar_usuario(usuario_id: int, datos: EstadoUsuario, conn=Depends(get_conn
 
 
 @app.post("/api/usuarios/{usuario_id}/restablecer")
-def restablecer_clave(usuario_id: int, conn=Depends(get_conn), admin=Depends(admin_actual)):
+def restablecer_clave(usuario_id: int, conn=Depends(get_conn, scope="function"), admin=Depends(admin_actual)):
     """Nueva clave temporal (se muestra una sola vez); cierra las sesiones abiertas de esa cuenta."""
     if usuario_id == admin["anestesiologo_id"]:
         raise HTTPException(400, "Para tu propia cuenta usa «Cambiar contraseña».")
@@ -293,7 +296,7 @@ def completar_codigos(orden) -> None:
 
 @app.post("/api/documentos", status_code=201)
 def subir_documento(archivos: list[UploadFile] = File(default=[]), archivo: Optional[UploadFile] = None,
-                    conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+                    conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
     """Sube una orden en uno o varios archivos (fotos o páginas de la misma orden) y la lee con la IA.
     Función normal (no async): FastAPI la ejecuta en otro hilo, así la lectura con la IA
     no bloquea al servidor mientras atiende otras solicitudes."""
@@ -353,7 +356,7 @@ def subir_documento(archivos: list[UploadFile] = File(default=[]), archivo: Opti
 
 
 @app.get("/api/documentos/{documento_id}")
-def ver_documento(documento_id: int, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+def ver_documento(documento_id: int, conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
     doc = repositorio.obtener_documento(conn, documento_id, anestesiologo_id)
     if doc is None:
         raise HTTPException(404, "Documento no encontrado.")
@@ -362,7 +365,7 @@ def ver_documento(documento_id: int, conn=Depends(get_conn), anestesiologo_id=De
 
 @app.post("/api/documentos/{documento_id}/confirmar", status_code=201)
 def confirmar_documento(documento_id: int, orden: OrdenConfirmada,
-                        conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+                        conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
     try:
         cirugia_id = repositorio.guardar_orden(conn, anestesiologo_id, orden, documento_id)
     except repositorio.DocumentoNoEncontrado:
@@ -377,7 +380,7 @@ def confirmar_documento(documento_id: int, orden: OrdenConfirmada,
 
 @app.get("/api/documentos/{documento_id}/archivo")
 def ver_archivo_original(documento_id: int, pagina: int = Query(default=1, ge=1, le=MAX_PAGINAS),
-                         conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+                         conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
     """Una foto o PDF original de la orden (solo para su dueño)."""
     doc = repositorio.obtener_archivo(conn, documento_id, anestesiologo_id, pagina)
     if doc is None:
@@ -405,7 +408,7 @@ class Filtros:
 
 
 @app.post("/api/cirugias", status_code=201)
-def crear_cirugia_manual(orden: OrdenConfirmada, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+def crear_cirugia_manual(orden: OrdenConfirmada, conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
     """Registro sin foto, escribiendo los datos a mano."""
     cirugia_id = repositorio.guardar_orden(conn, anestesiologo_id, orden)
     conn.commit()
@@ -414,12 +417,12 @@ def crear_cirugia_manual(orden: OrdenConfirmada, conn=Depends(get_conn), anestes
 
 @app.get("/api/cirugias")
 def listar_cirugias(limite: int = 100, filtros: Filtros = Depends(),
-                    conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+                    conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
     return repositorio.listar_cirugias(conn, anestesiologo_id, min(max(limite, 1), 500), filtros.valores)
 
 
 @app.get("/api/cirugias.xlsx")
-def exportar_excel(filtros: Filtros = Depends(), conn=Depends(get_conn),
+def exportar_excel(filtros: Filtros = Depends(), conn=Depends(get_conn, scope="function"),
                    anestesiologo_id=Depends(anestesiologo_actual)):
     cirugias = repositorio.listar_cirugias(conn, anestesiologo_id, 100_000, filtros.valores)
     glosas = repositorio.reporte_glosas(conn, anestesiologo_id, filtros.valores["desde"], filtros.valores["hasta"])
@@ -441,14 +444,14 @@ class FiltrosRelacion:
 
 
 @app.get("/api/relacion")
-def relacion_de_ordenes(filtros: FiltrosRelacion = Depends(), conn=Depends(get_conn),
+def relacion_de_ordenes(filtros: FiltrosRelacion = Depends(), conn=Depends(get_conn, scope="function"),
                         anestesiologo_id=Depends(anestesiologo_actual)):
     return repositorio.relacion_ordenes(conn, anestesiologo_id, **filtros.valores)
 
 
 @app.get("/api/relacion.xlsx")
 def relacion_en_excel(filtros: FiltrosRelacion = Depends(), ids: list[int] = Query(default=[]),
-                      mes: str = Query(default="", max_length=40), conn=Depends(get_conn),
+                      mes: str = Query(default="", max_length=40), conn=Depends(get_conn, scope="function"),
                       anestesiologo_id=Depends(anestesiologo_actual)):
     """Excel de la relación; con ids solo salen las filas seleccionadas en pantalla."""
     filas = repositorio.relacion_ordenes(conn, anestesiologo_id, **filtros.valores, ids=ids or None)
@@ -459,12 +462,12 @@ def relacion_en_excel(filtros: FiltrosRelacion = Depends(), ids: list[int] = Que
 
 
 @app.get("/api/clinicas")
-def clinicas_registradas(conn=Depends(get_conn), _=Depends(anestesiologo_actual)):
+def clinicas_registradas(conn=Depends(get_conn, scope="function"), _=Depends(anestesiologo_actual)):
     return repositorio.listar_clinicas(conn)
 
 
 @app.post("/api/copia-seguridad")
-def copia_de_seguridad(c: ClaveCopia, conn=Depends(get_conn), admin=Depends(admin_actual)):
+def copia_de_seguridad(c: ClaveCopia, conn=Depends(get_conn, scope="function"), admin=Depends(admin_actual)):
     """Toda la base de datos en un .zip cifrado con la clave que escoge el administrador (POST: la clave no
     queda en la dirección). Se restaura con db/mantenimiento/restaurar_copia.py."""
     datos, resumen = copia.crear_copia(conn, c.clave)
@@ -475,17 +478,17 @@ def copia_de_seguridad(c: ClaveCopia, conn=Depends(get_conn), admin=Depends(admi
 
 
 @app.get("/api/sugerencias")
-def aseguradoras_y_cirujanos(conn=Depends(get_conn), _=Depends(anestesiologo_actual)):
+def aseguradoras_y_cirujanos(conn=Depends(get_conn, scope="function"), _=Depends(anestesiologo_actual)):
     return repositorio.catalogos_para_sugerir(conn)
 
 
 @app.get("/api/opciones")
-def opciones_de_filtro(conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+def opciones_de_filtro(conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
     return repositorio.opciones_filtro(conn, anestesiologo_id)
 
 
 @app.get("/api/reportes")
-def reportes(filtros: Filtros = Depends(), conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+def reportes(filtros: Filtros = Depends(), conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
     return repositorio.reporte(conn, anestesiologo_id, filtros.valores)
 
 
@@ -498,12 +501,12 @@ def buscar_procedimientos(q: str = Query(min_length=2, max_length=120), _=Depend
 
 @app.get("/api/glosas")
 def reporte_de_glosas(desde: Optional[date] = None, hasta: Optional[date] = None,
-                      conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+                      conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
     return repositorio.reporte_glosas(conn, anestesiologo_id, desde, hasta)
 
 
 @app.get("/api/cirugias/{cirugia_id}")
-def ver_cirugia(cirugia_id: int, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+def ver_cirugia(cirugia_id: int, conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
     cirugia = repositorio.obtener_cirugia(conn, anestesiologo_id, cirugia_id)
     if cirugia is None:
         raise HTTPException(404, "Cirugía no encontrada.")
@@ -512,7 +515,7 @@ def ver_cirugia(cirugia_id: int, conn=Depends(get_conn), anestesiologo_id=Depend
 
 @app.put("/api/cirugias/{cirugia_id}")
 def corregir_cirugia(cirugia_id: int, orden: OrdenConfirmada,
-                     conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+                     conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
     if not repositorio.actualizar_orden(conn, anestesiologo_id, cirugia_id, orden):
         conn.rollback()
         raise HTTPException(404, "Cirugía no encontrada.")
@@ -522,7 +525,7 @@ def corregir_cirugia(cirugia_id: int, orden: OrdenConfirmada,
 
 # ---------------------------------------------------------------- reportes de pago
 @app.post("/api/pagos", status_code=201)
-def subir_reporte_pago(archivo: UploadFile, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+def subir_reporte_pago(archivo: UploadFile, conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
     """Sube la relación de pacientes pagados, la lee con la IA y la cruza con las cirugías."""
     datos, tipo = _leer_subida(archivo)
     hash_sha256 = hashlib.sha256(datos).hexdigest()
@@ -546,12 +549,12 @@ def subir_reporte_pago(archivo: UploadFile, conn=Depends(get_conn), anestesiolog
 
 
 @app.get("/api/pagos")
-def listar_reportes_pago(conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+def listar_reportes_pago(conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
     return repositorio.listar_reportes(conn, anestesiologo_id)
 
 
 @app.get("/api/pagos/{reporte_id}")
-def ver_reporte_pago(reporte_id: int, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+def ver_reporte_pago(reporte_id: int, conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
     reporte = repositorio.obtener_reporte(conn, anestesiologo_id, reporte_id)
     if reporte is None:
         raise HTTPException(404, "Reporte no encontrado.")
@@ -566,7 +569,7 @@ def _liquidacion_de(reporte: dict) -> dict:
 
 
 @app.get("/api/pagos/{reporte_id}/liquidacion")
-def liquidacion_del_reporte(reporte_id: int, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+def liquidacion_del_reporte(reporte_id: int, conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
     reporte = repositorio.obtener_reporte(conn, anestesiologo_id, reporte_id)
     if reporte is None:
         raise HTTPException(404, "Reporte no encontrado.")
@@ -574,7 +577,7 @@ def liquidacion_del_reporte(reporte_id: int, conn=Depends(get_conn), anestesiolo
 
 
 @app.post("/api/pagos/{reporte_id}/volante")
-def comparar_volante(reporte_id: int, archivo: UploadFile, conn=Depends(get_conn),
+def comparar_volante(reporte_id: int, archivo: UploadFile, conn=Depends(get_conn, scope="function"),
                      anestesiologo_id=Depends(anestesiologo_actual)):
     """Lee el volante que entregó AP y lo compara con la liquidación calculada (no se guarda)."""
     reporte = repositorio.obtener_reporte(conn, anestesiologo_id, reporte_id)
@@ -609,7 +612,7 @@ def comparar_volante(reporte_id: int, archivo: UploadFile, conn=Depends(get_conn
 
 # ---------------------------------------------------------------- finanzas personales
 @app.get("/api/finanzas")
-def estado_financiero(mes: Optional[date] = None, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+def estado_financiero(mes: Optional[date] = None, conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
     """Solo del anestesiólogo que consulta: ni el administrador ve las finanzas de otros.
     `mes` (cualquier día del mes) elige el mes de los gastos reales y aportes; por defecto, el actual."""
     return {**finanzas.estado(conn, anestesiologo_id, mes=mes), "cuentas": extractos.listar_cuentas(conn, anestesiologo_id),
@@ -619,14 +622,14 @@ def estado_financiero(mes: Optional[date] = None, conn=Depends(get_conn), aneste
 
 # ---------------------------------------------------------------- cuentas y extractos bancarios
 @app.post("/api/finanzas/cuentas", status_code=201)
-def crear_cuenta(c: CuentaEntrada, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+def crear_cuenta(c: CuentaEntrada, conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
     cuenta_id = extractos.crear_cuenta(conn, anestesiologo_id, c)
     conn.commit()
     return {"cuenta_id": cuenta_id}
 
 
 @app.put("/api/finanzas/cuentas/{cuenta_id}")
-def actualizar_cuenta(cuenta_id: int, c: CuentaEntrada, conn=Depends(get_conn),
+def actualizar_cuenta(cuenta_id: int, c: CuentaEntrada, conn=Depends(get_conn, scope="function"),
                       anestesiologo_id=Depends(anestesiologo_actual)):
     if not extractos.actualizar_cuenta(conn, anestesiologo_id, cuenta_id, c):
         raise HTTPException(404, "No encontrado.")
@@ -635,7 +638,7 @@ def actualizar_cuenta(cuenta_id: int, c: CuentaEntrada, conn=Depends(get_conn),
 
 
 @app.delete("/api/finanzas/cuentas/{cuenta_id}", status_code=204)
-def borrar_cuenta(cuenta_id: int, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+def borrar_cuenta(cuenta_id: int, conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
     if not extractos.borrar_cuenta(conn, anestesiologo_id, cuenta_id):
         raise HTTPException(404, "No encontrado.")
     conn.commit()
@@ -644,7 +647,7 @@ def borrar_cuenta(cuenta_id: int, conn=Depends(get_conn), anestesiologo_id=Depen
 
 @app.post("/api/finanzas/importaciones", status_code=202)
 def importar_extracto(tareas: BackgroundTasks, archivos: list[UploadFile] = File(...),
-                      clave_pdf: Optional[str] = Form(default=None), conn=Depends(get_conn),
+                      clave_pdf: Optional[str] = Form(default=None), conn=Depends(get_conn, scope="function"),
                       anestesiologo_id=Depends(anestesiologo_actual)):
     """Recibe el extracto (PDF de muchas hojas, fotos, o Excel/CSV del banco) y lo lee en segundo plano.
     La pantalla consulta el avance con GET /api/finanzas/importaciones/{id}."""
@@ -673,7 +676,7 @@ def importar_extracto(tareas: BackgroundTasks, archivos: list[UploadFile] = File
 
 
 @app.get("/api/finanzas/importaciones/{importacion_id}")
-def ver_importacion(importacion_id: int, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+def ver_importacion(importacion_id: int, conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
     imp = extractos.obtener(conn, anestesiologo_id, importacion_id)
     if imp is None:
         raise HTTPException(404, "No encontrado.")
@@ -681,7 +684,7 @@ def ver_importacion(importacion_id: int, conn=Depends(get_conn), anestesiologo_i
 
 
 @app.post("/api/finanzas/importaciones/{importacion_id}/confirmar")
-def confirmar_importacion(importacion_id: int, datos: ImportacionConfirmada, conn=Depends(get_conn),
+def confirmar_importacion(importacion_id: int, datos: ImportacionConfirmada, conn=Depends(get_conn, scope="function"),
                           anestesiologo_id=Depends(anestesiologo_actual)):
     try:
         resumen = extractos.confirmar(conn, anestesiologo_id, importacion_id, datos)
@@ -696,7 +699,7 @@ def confirmar_importacion(importacion_id: int, datos: ImportacionConfirmada, con
 
 
 @app.delete("/api/finanzas/importaciones/{importacion_id}", status_code=204)
-def descartar_importacion(importacion_id: int, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+def descartar_importacion(importacion_id: int, conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
     """Descarta la lectura (los gastos ya anotados no se tocan)."""
     conn.execute("DELETE FROM fin_importacion WHERE importacion_id = %s AND anestesiologo_id = %s",
                  (importacion_id, anestesiologo_id))
@@ -705,7 +708,7 @@ def descartar_importacion(importacion_id: int, conn=Depends(get_conn), anestesio
 
 
 @app.post("/api/finanzas/movimientos", status_code=201)
-def registrar_movimiento(m: MovimientoEntrada, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+def registrar_movimiento(m: MovimientoEntrada, conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
     try:
         movimiento_id = finanzas.crear_movimiento(conn, anestesiologo_id, m)
     except finanzas.MovimientoInvalido as e:
@@ -716,7 +719,7 @@ def registrar_movimiento(m: MovimientoEntrada, conn=Depends(get_conn), anestesio
 
 
 @app.delete("/api/finanzas/movimientos/{movimiento_id}", status_code=204)
-def borrar_movimiento(movimiento_id: int, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+def borrar_movimiento(movimiento_id: int, conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
     if not finanzas.borrar_movimiento(conn, anestesiologo_id, movimiento_id):
         raise HTTPException(404, "No encontrado.")
     conn.commit()
@@ -724,7 +727,7 @@ def borrar_movimiento(movimiento_id: int, conn=Depends(get_conn), anestesiologo_
 
 
 @app.put("/api/finanzas/metas/{meta_id}/compromiso")
-def comprometerse(meta_id: int, c: CompromisoEntrada, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+def comprometerse(meta_id: int, c: CompromisoEntrada, conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
     """Compromiso de ahorro mensual para la meta (null lo quita)."""
     if not finanzas.fijar_compromiso(conn, anestesiologo_id, meta_id, c.compromiso_mensual):
         raise HTTPException(404, "No encontrado.")
@@ -733,7 +736,7 @@ def comprometerse(meta_id: int, c: CompromisoEntrada, conn=Depends(get_conn), an
 
 
 @app.post("/api/volantes", status_code=201)
-def subir_volante(archivo: UploadFile, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+def subir_volante(archivo: UploadFile, conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
     """Sube el volante de AP de un mes: queda como el ingreso real de ese mes."""
     datos, tipo = _leer_subida(archivo)
     try:
@@ -749,7 +752,7 @@ def subir_volante(archivo: UploadFile, conn=Depends(get_conn), anestesiologo_id=
 
 
 @app.delete("/api/volantes/{periodo}", status_code=204)
-def borrar_volante(periodo: date, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+def borrar_volante(periodo: date, conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
     conn.execute("DELETE FROM volante_pago WHERE anestesiologo_id = %s AND periodo = %s",
                  (anestesiologo_id, periodo.replace(day=1)))
     conn.commit()
@@ -757,7 +760,7 @@ def borrar_volante(periodo: date, conn=Depends(get_conn), anestesiologo_id=Depen
 
 
 @app.post("/api/finanzas/partidas", status_code=201)
-def crear_partida(p: PartidaEntrada, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+def crear_partida(p: PartidaEntrada, conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
     partida_id = finanzas.crear_partida(conn, anestesiologo_id, p.clase, p.categoria, p.nombre, p.valor_mensual,
                                         p.saldo, p.tasa_ea)
     conn.commit()
@@ -765,7 +768,7 @@ def crear_partida(p: PartidaEntrada, conn=Depends(get_conn), anestesiologo_id=De
 
 
 @app.put("/api/finanzas/partidas/{partida_id}")
-def actualizar_partida(partida_id: int, p: PartidaEntrada, conn=Depends(get_conn),
+def actualizar_partida(partida_id: int, p: PartidaEntrada, conn=Depends(get_conn, scope="function"),
                        anestesiologo_id=Depends(anestesiologo_actual)):
     if not finanzas.actualizar_partida(conn, anestesiologo_id, partida_id, p.categoria, p.nombre, p.valor_mensual,
                                        p.saldo, p.tasa_ea):
@@ -775,7 +778,7 @@ def actualizar_partida(partida_id: int, p: PartidaEntrada, conn=Depends(get_conn
 
 
 @app.delete("/api/finanzas/partidas/{partida_id}", status_code=204)
-def borrar_partida(partida_id: int, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+def borrar_partida(partida_id: int, conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
     if not finanzas.borrar_partida(conn, anestesiologo_id, partida_id):
         raise HTTPException(404, "No encontrado.")
     conn.commit()
@@ -783,14 +786,14 @@ def borrar_partida(partida_id: int, conn=Depends(get_conn), anestesiologo_id=Dep
 
 
 @app.post("/api/finanzas/metas", status_code=201)
-def crear_meta(m: MetaEntrada, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+def crear_meta(m: MetaEntrada, conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
     meta_id = finanzas.crear_meta(conn, anestesiologo_id, m)
     conn.commit()
     return {"meta_id": meta_id}
 
 
 @app.put("/api/finanzas/metas/{meta_id}")
-def actualizar_meta(meta_id: int, m: MetaEntrada, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+def actualizar_meta(meta_id: int, m: MetaEntrada, conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
     if not finanzas.actualizar_meta(conn, anestesiologo_id, meta_id, m):
         raise HTTPException(404, "No encontrado.")
     conn.commit()
@@ -798,7 +801,7 @@ def actualizar_meta(meta_id: int, m: MetaEntrada, conn=Depends(get_conn), aneste
 
 
 @app.delete("/api/finanzas/metas/{meta_id}", status_code=204)
-def borrar_meta(meta_id: int, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+def borrar_meta(meta_id: int, conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
     if not finanzas.borrar_meta(conn, anestesiologo_id, meta_id):
         raise HTTPException(404, "No encontrado.")
     conn.commit()
@@ -808,7 +811,7 @@ def borrar_meta(meta_id: int, conn=Depends(get_conn), anestesiologo_id=Depends(a
 # ---------------------------------------------------------------- noticias de anestesia
 @app.get("/api/noticias")
 def ver_noticias(tareas: BackgroundTasks, ver: Literal["nuevas", "anteriores", "favoritas"] = "nuevas",
-                 tema: Optional[str] = Query(default=None, max_length=20), conn=Depends(get_conn),
+                 tema: Optional[str] = Query(default=None, max_length=20), conn=Depends(get_conn, scope="function"),
                  anestesiologo_id=Depends(anestesiologo_actual)):
     """Noticias de los temas del anestesiólogo. Si hace rato no se revisan las fuentes, se revisan en segundo plano."""
     revisando = noticias.toca_revisar(conn)
@@ -823,26 +826,26 @@ def ver_noticias(tareas: BackgroundTasks, ver: Literal["nuevas", "anteriores", "
 
 
 @app.get("/api/noticias/sin-leer")
-def noticias_sin_leer(conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+def noticias_sin_leer(conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
     return {"sin_leer": noticias.sin_leer(conn, anestesiologo_id)}
 
 
 @app.put("/api/noticias/temas")
-def elegir_temas(t: TemasNoticias, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+def elegir_temas(t: TemasNoticias, conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
     noticias.fijar_temas(conn, anestesiologo_id, t.temas)
     conn.commit()
     return {"temas": t.temas}
 
 
 @app.post("/api/noticias/leer-todo", status_code=204)
-def leer_todo(conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+def leer_todo(conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
     noticias.marcar_todo_leido(conn, anestesiologo_id)
     conn.commit()
     return Response(status_code=204)
 
 
 @app.post("/api/noticias/{noticia_id}/leida", status_code=204)
-def leer_noticia(noticia_id: int, leida: bool = True, conn=Depends(get_conn),
+def leer_noticia(noticia_id: int, leida: bool = True, conn=Depends(get_conn, scope="function"),
                  anestesiologo_id=Depends(anestesiologo_actual)):
     if not noticias.marcar_leida(conn, anestesiologo_id, noticia_id, leida):
         raise HTTPException(404, "No encontrada.")
@@ -851,7 +854,7 @@ def leer_noticia(noticia_id: int, leida: bool = True, conn=Depends(get_conn),
 
 
 @app.put("/api/noticias/{noticia_id}/favorita")
-def noticia_favorita(noticia_id: int, f: Favorita, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+def noticia_favorita(noticia_id: int, f: Favorita, conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
     if not noticias.marcar_favorita(conn, anestesiologo_id, noticia_id, f.favorita):
         raise HTTPException(404, "No encontrada.")
     conn.commit()
@@ -859,7 +862,7 @@ def noticia_favorita(noticia_id: int, f: Favorita, conn=Depends(get_conn), anest
 
 
 @app.get("/api/noticias/fuentes")
-def fuentes_de_noticias(conn=Depends(get_conn), _=Depends(admin_actual)):
+def fuentes_de_noticias(conn=Depends(get_conn, scope="function"), _=Depends(admin_actual)):
     return {"fuentes": noticias.listar_fuentes(conn), "revisadas_en": noticias.ultima_revision(conn)}
 
 
@@ -876,7 +879,7 @@ def probar_fuente(f: FuenteNoticias, _=Depends(admin_actual)):
 
 
 @app.post("/api/noticias/fuentes", status_code=201)
-def agregar_fuente(f: FuenteNoticias, conn=Depends(get_conn), _=Depends(admin_actual)):
+def agregar_fuente(f: FuenteNoticias, conn=Depends(get_conn, scope="function"), _=Depends(admin_actual)):
     fuente_id = conn.execute("""INSERT INTO noticia_fuente (nombre, tipo, url, activa) VALUES (%s, %s, %s, %s)
                                 RETURNING fuente_id""", (f.nombre, f.tipo, f.url, f.activa)).fetchone()["fuente_id"]
     # la próxima vez que alguien abra Noticias se revisa, sin esperar las 6 horas
@@ -886,7 +889,7 @@ def agregar_fuente(f: FuenteNoticias, conn=Depends(get_conn), _=Depends(admin_ac
 
 
 @app.put("/api/noticias/fuentes/{fuente_id}")
-def cambiar_fuente(fuente_id: int, f: FuenteNoticias, conn=Depends(get_conn), _=Depends(admin_actual)):
+def cambiar_fuente(fuente_id: int, f: FuenteNoticias, conn=Depends(get_conn, scope="function"), _=Depends(admin_actual)):
     if not conn.execute("UPDATE noticia_fuente SET nombre = %s, tipo = %s, url = %s, activa = %s WHERE fuente_id = %s",
                         (f.nombre, f.tipo, f.url, f.activa, fuente_id)).rowcount:
         raise HTTPException(404, "No encontrada.")
@@ -897,7 +900,7 @@ def cambiar_fuente(fuente_id: int, f: FuenteNoticias, conn=Depends(get_conn), _=
 
 
 @app.delete("/api/noticias/fuentes/{fuente_id}", status_code=204)
-def quitar_fuente(fuente_id: int, conn=Depends(get_conn), _=Depends(admin_actual)):
+def quitar_fuente(fuente_id: int, conn=Depends(get_conn, scope="function"), _=Depends(admin_actual)):
     """Quita la fuente y sus noticias (las favoritas de alguien también se van)."""
     conn.execute("DELETE FROM noticia_fuente WHERE fuente_id = %s", (fuente_id,))
     conn.commit()
@@ -905,7 +908,7 @@ def quitar_fuente(fuente_id: int, conn=Depends(get_conn), _=Depends(admin_actual
 
 
 @app.post("/api/noticias/revisar", status_code=202)
-def revisar_ahora(tareas: BackgroundTasks, conn=Depends(get_conn), _=Depends(admin_actual)):
+def revisar_ahora(tareas: BackgroundTasks, conn=Depends(get_conn, scope="function"), _=Depends(admin_actual)):
     conn.execute("DELETE FROM noticia_revision WHERE clave = 'fuentes'")
     conn.commit()
     tareas.add_task(noticias.revisar_en_segundo_plano)
@@ -913,7 +916,7 @@ def revisar_ahora(tareas: BackgroundTasks, conn=Depends(get_conn), _=Depends(adm
 
 
 @app.post("/api/pagos/{reporte_id}/aplicar")
-def aplicar_reporte_pago(reporte_id: int, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+def aplicar_reporte_pago(reporte_id: int, conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
     try:
         marcadas = repositorio.aplicar_reporte(conn, anestesiologo_id, reporte_id)
     except repositorio.DocumentoNoEncontrado:
@@ -924,7 +927,7 @@ def aplicar_reporte_pago(reporte_id: int, conn=Depends(get_conn), anestesiologo_
 
 
 @app.post("/api/pagos/cruzar-todos")
-def cruzar_todos(conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+def cruzar_todos(conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
     """Vuelve a cruzar todos los reportes con las cirugías registradas (por ejemplo, después de subir muchas)."""
     resultado = repositorio.recruzar_todos(conn, anestesiologo_id)
     conn.commit()
@@ -932,7 +935,7 @@ def cruzar_todos(conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_
 
 
 @app.post("/api/pagos/{reporte_id}/cruzar")
-def volver_a_cruzar(reporte_id: int, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+def volver_a_cruzar(reporte_id: int, conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
     """Repite el cruce (por ejemplo, después de registrar las cirugías que faltaban)."""
     if repositorio.obtener_reporte(conn, anestesiologo_id, reporte_id) is None:
         raise HTTPException(404, "Reporte no encontrado.")
@@ -942,7 +945,7 @@ def volver_a_cruzar(reporte_id: int, conn=Depends(get_conn), anestesiologo_id=De
 
 
 @app.delete("/api/pagos/{reporte_id}", status_code=204)
-def descartar_reporte_pago(reporte_id: int, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+def descartar_reporte_pago(reporte_id: int, conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
     """Descarta un reporte leído (por ejemplo, si la lectura quedó mal). Uno aplicado no se borra."""
     borrado = conn.execute(
         "DELETE FROM reporte_pago WHERE reporte_id = %s AND anestesiologo_id = %s AND estado = 'LEIDO'",
@@ -955,7 +958,7 @@ def descartar_reporte_pago(reporte_id: int, conn=Depends(get_conn), anestesiolog
 
 
 @app.get("/api/pagos/{reporte_id}/archivo")
-def ver_reporte_original(reporte_id: int, conn=Depends(get_conn), anestesiologo_id=Depends(anestesiologo_actual)):
+def ver_reporte_original(reporte_id: int, conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
     fila = conn.execute("SELECT url_archivo FROM reporte_pago WHERE reporte_id = %s AND anestesiologo_id = %s",
                         (reporte_id, anestesiologo_id)).fetchone()
     if fila is None:

@@ -30,8 +30,18 @@ def preparar_base_de_datos() -> None:
         if conn.execute("SELECT to_regclass('public.anestesiologo') AS t").fetchone()["t"] is None:
             log.info("Base de datos vacía: creando tablas")
             conn.execute(ESQUEMA.read_text())
-        # Lleva las bases creadas con versiones anteriores al esquema actual
-        conn.execute(MIGRACIONES.read_text())
+        # Lleva las bases creadas con versiones anteriores al esquema actual. Solo corre cuando el archivo de
+        # migraciones cambió: un reinicio normal no toca (ni bloquea) ninguna tabla.
+        migraciones = MIGRACIONES.read_text()
+        huella_mig = hashlib.sha256(migraciones.encode()).hexdigest()
+        conn.execute("""CREATE TABLE IF NOT EXISTS migracion_aplicada (
+                            huella VARCHAR(64) PRIMARY KEY, aplicada_en TIMESTAMPTZ NOT NULL DEFAULT now())""")
+        if conn.execute("SELECT 1 FROM migracion_aplicada WHERE huella = %s", (huella_mig,)).fetchone():
+            log.info("Migraciones al día")
+        else:
+            conn.execute(migraciones)
+            conn.execute("INSERT INTO migracion_aplicada (huella) VALUES (%s)", (huella_mig,))
+            log.info("Migraciones aplicadas")
 
         # Supabase publica las tablas de "public" en su API REST. Con RLS activo y sin
         # políticas, esa API no ve ninguna fila; la app entra como dueña de las tablas

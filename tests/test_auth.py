@@ -73,3 +73,19 @@ def test_contrasena_corta_no_arranca(db_url, monkeypatch):
     monkeypatch.setattr(config, "ADMIN_PASSWORD", "corta")
     with pytest.raises(RuntimeError):
         inicio.preparar_base_de_datos()
+
+
+def test_las_migraciones_solo_corren_cuando_cambian(db_url, monkeypatch):
+    from app import inicio
+    from app.repositorio import conectar
+    inicio.preparar_base_de_datos()
+    with conectar() as c:
+        assert c.execute("SELECT count(*) AS n FROM migracion_aplicada").fetchone()["n"] == 1
+        # simula una conexión de otra instancia con una transacción abierta sobre anestesiologo
+        otra = conectar()
+        otra.execute("SELECT 1 FROM anestesiologo LIMIT 1")
+        try:
+            inicio.preparar_base_de_datos()  # no necesita bloquear tablas: no espera a la otra conexión
+        finally:
+            otra.close()
+        assert c.execute("SELECT count(*) AS n FROM migracion_aplicada").fetchone()["n"] == 1
