@@ -259,6 +259,29 @@
   #mazo .mazo-botones .si { color: #c98a00; }
   #mazo .vacio { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; gap: 8px; }
   #mazo .vacio b { font: 700 1.5rem var(--letra-titulo); color: var(--accent); }
+  /* Calculadora de infusiones */
+  .inf-meds { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin-bottom: 14px; }
+  .inf-meds button { text-align: left; display: grid; gap: 1px; padding: 10px 12px; border-radius: 14px; }
+  .inf-meds button strong { font-size: .95rem; }
+  .inf-meds button span { font-size: .72rem; color: var(--muted); }
+  .inf-meds button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-bg); }
+  .inf-meds button[aria-pressed="true"] strong { color: var(--accent); }
+  .inf-preps { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 4px; }
+  .inf-preps button { min-height: 36px; padding: 4px 12px; border-radius: 999px; font-size: .85rem; font-weight: 600; }
+  .inf-preps button[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  .inf-conc { font: 700 1.05rem var(--letra-titulo); color: var(--accent); font-variant-numeric: tabular-nums; }
+  .inf-doble { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 10px; align-items: end; margin-top: 4px; }
+  .inf-doble input { font: 700 1.6rem var(--letra-titulo); padding: 10px 12px; font-variant-numeric: tabular-nums; }
+  .inf-doble .flecha { font-size: 1.4rem; color: var(--muted); padding-bottom: 12px; }
+  .inf-rango { position: relative; height: 12px; border-radius: 6px; margin: 18px 0 6px; }
+  .inf-rango i { position: absolute; top: -5px; width: 4px; height: 22px; border-radius: 2px; background: var(--text); transform: translateX(-2px); }
+  .inf-escala { display: flex; justify-content: space-between; font-size: .72rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .inf-estado { margin-top: 8px; }
+  table.inf-tabla { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  table.inf-tabla th { text-align: right; font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding: 4px 6px; }
+  table.inf-tabla th:first-child, table.inf-tabla td:first-child { text-align: left; }
+  table.inf-tabla td { text-align: right; padding: 9px 6px; border-top: 1px solid var(--line); }
+  table.inf-tabla tr.actual td { background: var(--accent-bg); font-weight: 700; }
   /* Boletín semanal */
   .boletin { background: var(--card); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; margin-bottom: 14px; }
   .boletin .portada { background: linear-gradient(140deg, var(--accent), #0a4f4c); color: #fff; padding: 16px; display: grid; gap: 4px; }
@@ -676,6 +699,26 @@
     </section>
   </div>
 
+  <div id="pestana-infusiones" class="pestana oculto">
+    <div class="saludo"><span class="sub">Calculadora</span><h1>Infusiones</h1></div>
+    <section class="card">
+      <div class="fila" style="align-items:end">
+        <div><label for="inf-peso">Peso del paciente (kg)</label>
+          <input id="inf-peso" type="text" inputmode="decimal" autocomplete="off" placeholder="Ej: 70"></div>
+        <div><label>Paciente</label>
+          <div class="segmentado" id="inf-paciente" role="group" aria-label="Tipo de paciente" style="display:flex">
+            <button type="button" data-p="adulto" aria-pressed="true" style="flex:1;min-height:40px">Adulto</button>
+            <button type="button" data-p="nino" aria-pressed="false" style="flex:1;min-height:40px">Pediátrico</button></div></div>
+      </div>
+    </section>
+    <div class="inf-meds" id="inf-meds" role="group" aria-label="Medicamento"></div>
+    <section class="card" id="inf-calc"></section>
+    <section class="card oculto" id="inf-prep-peso"></section>
+    <section class="card" id="inf-tabla"></section>
+    <p class="sub" style="margin:0 4px 16px">Diluciones y rangos orientativos, pendientes de validar con el protocolo de AP. Verifica siempre
+      la preparación y la velocidad de la bomba (doble chequeo) antes de iniciar la infusión.</p>
+  </div>
+
   <div id="pestana-noticias" class="pestana oculto">
     <div class="titulo-seccion" id="not-historias-titulo" style="margin-top:4px">Lo más relevante</div>
     <div class="historias-fila" id="not-historias"></div>
@@ -1023,6 +1066,7 @@
     <button type="button" data-pestana="reportes"><strong>Reportes</strong><span class="sub">Totales, rankings y gráficas</span></button>
     <button type="button" data-pestana="relacion"><strong>Relación</strong><span class="sub">Órdenes para facturación</span></button>
     <button type="button" data-pestana="finanzas"><strong>Finanzas</strong><span class="sub">Ingresos, gastos y metas</span></button>
+    <button type="button" data-pestana="infusiones"><strong>Infusiones</strong><span class="sub">Vasopresores e inotrópicos</span></button>
     <button type="button" data-pestana="noticias"><strong>Noticias</strong><span class="sub">Novedades en anestesia</span><span class="globo oculto" id="not-globo" style="right:10px;top:10px"></span></button>
   </div>
 </div>
@@ -1040,6 +1084,7 @@
   <div id="visor-cuerpo"></div>
 </div>
 
+<script src="/static/infusiones.js"></script>
 <script>
 const $ = (sel) => document.querySelector(sel);
 const campo = (id) => document.getElementById(id);
@@ -1436,7 +1481,7 @@ window.addEventListener("drop", (e) => e.preventDefault());
 
 // ---------------------------------------------------------------- pestañas
 let pestanaActual = "inicio";
-const EN_MAS = ["reportes", "relacion", "finanzas", "noticias", "usuarios", "clave"];
+const EN_MAS = ["reportes", "relacion", "finanzas", "infusiones", "noticias", "usuarios", "clave"];
 function hojaMas(abrir) {
   $("#hoja-mas").classList.toggle("oculto", !abrir);
   $("#fondo-mas").classList.toggle("oculto", !abrir);
@@ -1453,6 +1498,7 @@ function mostrarPestana(nombre) {
   hojaMas(false);
   window.scrollTo({ top: 0 });
   if (nombre === "inicio") cargarInicio();
+  if (nombre === "infusiones") abrirInfusiones();
   if (nombre === "cirugias") { cargarCirugias(); if (!inicioDatos) cargarResumen(); }
   if (nombre === "pagos") cargarAntiguedadPagos();
   if (nombre === "reportes") cargarReporte();
@@ -2092,6 +2138,184 @@ async function cargarNoticias() {
   if (d.revisando && notReintentos < 4) { notReintentos++; setTimeout(cargarNoticias, 8000); } else if (!d.revisando) notReintentos = 0;
   if (esAdmin) cargarFuentes();
 }
+// ---------------------------------------------------------------- calculadora de infusiones (sin servidor)
+const inf = { med: "norepinefrina", paciente: "adulto", peso: null, prep: {}, dosis: null, mlh: null, ultimo: "dosis" };
+function guardarInf() {
+  try { localStorage.setItem("infusiones", JSON.stringify({ med: inf.med, paciente: inf.paciente, peso: inf.peso, prep: inf.prep })); } catch (e) {}
+}
+function leerInf() {
+  try { Object.assign(inf, JSON.parse(localStorage.getItem("infusiones") || "{}")); } catch (e) {}
+}
+const numInf = (t) => { const v = parseFloat(String(t ?? "").trim().replace(",", ".")); return isFinite(v) ? v : null; };
+// para los campos: sin separador de miles y con coma decimal
+const aCampo = (v, cifras = 4) => v == null || !isFinite(v) ? "" : String(Infusiones.redondear(v, cifras)).replace(".", ",");
+const fmtInf = (v, cifras = 3) => v == null || !isFinite(v) ? "—"
+  : Infusiones.redondear(v, cifras).toLocaleString("es-CO", { maximumFractionDigits: 6 });
+const medInf = () => Infusiones.MEDICAMENTOS.find((m) => m.id === inf.med) || Infusiones.MEDICAMENTOS[0];
+const cfgInf = () => medInf()[inf.paciente];
+function prepInf() {
+  const c = cfgInf(), guardada = inf.prep[`${inf.med}:${inf.paciente}`];
+  return guardada || { cantidad: c.p[0][0], unidad: c.p[0][1], volumen: c.p[0][2] };
+}
+function textoConc(conc, unidad) {
+  const base = Infusiones.UNIDADES[unidad].base;
+  if (conc == null) return "—";
+  if (base === "U") return `${fmtInf(conc)} U/mL`;
+  return conc >= 1000 ? `${fmtInf(conc / 1000)} mg/mL (${fmtInf(conc)} mcg/mL)` : `${fmtInf(conc)} mcg/mL`;
+}
+function abrirInfusiones() {
+  leerInf();
+  $("#inf-peso").value = inf.peso ? String(inf.peso).replace(".", ",") : "";
+  pintarInfusiones();
+}
+$("#inf-peso").addEventListener("input", () => { inf.peso = numInf($("#inf-peso").value); if (inf.dosis != null) inf.ultimo = "dosis"; guardarInf(); recalcularInf(); pintarTablaInf(); pintarPrepPesoInf(); });
+document.querySelectorAll("#inf-paciente [data-p]").forEach((b) => b.onclick = () => {
+  inf.paciente = b.dataset.p; inf.dosis = inf.mlh = null; guardarInf(); pintarInfusiones();
+});
+
+function pintarInfusiones() {
+  document.querySelectorAll("#inf-paciente [data-p]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.p === inf.paciente));
+  $("#inf-meds").innerHTML = Infusiones.MEDICAMENTOS.map((m) => `<button type="button" data-med="${m.id}" aria-pressed="${m.id === inf.med}">
+    <strong>${escapar(m.nombre)}</strong><span>${escapar(m.grupo)}</span></button>`).join("");
+  $("#inf-meds").querySelectorAll("[data-med]").forEach((b) => b.onclick = () => {
+    inf.med = b.dataset.med; inf.dosis = inf.mlh = null; guardarInf(); pintarInfusiones();
+    $("#inf-calc").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+  const m = medInf(), c = cfgInf(), p = prepInf();
+  $("#inf-calc").innerHTML = `<div class="item-cab"><h2 style="margin:0">${escapar(m.nombre)}</h2><span class="chip">${escapar(c.unidad)}</span></div>
+    <label>Preparación</label>
+    <div class="inf-preps" id="inf-preps">${c.p.map(([cant, u, vol], i) => `<button type="button" data-prep="${i}"
+      aria-pressed="${cant === p.cantidad && u === p.unidad && vol === p.volumen}">${fmtInf(cant)} ${u} / ${vol} mL</button>`).join("")}</div>
+    <div class="fila">
+      <div><label for="inf-cant">Cantidad (${escapar(p.unidad)})</label><input id="inf-cant" type="text" inputmode="decimal" value="${aCampo(p.cantidad, 6)}"></div>
+      <div><label for="inf-vol">Volumen total (mL)</label><input id="inf-vol" type="text" inputmode="decimal" value="${aCampo(p.volumen, 6)}"></div>
+    </div>
+    <p style="margin:10px 0 0">Concentración: <span class="inf-conc" id="inf-conc"></span></p>
+    <div class="inf-doble">
+      <div><label for="inf-dosis">Dosis (${escapar(c.unidad)})</label><input id="inf-dosis" type="text" inputmode="decimal" autocomplete="off" placeholder="0"></div>
+      <span class="flecha" aria-hidden="true">⇄</span>
+      <div><label for="inf-mlh">Velocidad (mL/h)</label><input id="inf-mlh" type="text" inputmode="decimal" autocomplete="off" placeholder="0"></div>
+    </div>
+    <div id="inf-rango"></div>
+    <div id="inf-estado" class="inf-estado"></div>`;
+  $("#inf-preps").querySelectorAll("[data-prep]").forEach((b) => b.onclick = () => {
+    const [cant, u, vol] = c.p[Number(b.dataset.prep)];
+    ponerPrepInf({ cantidad: cant, unidad: u, volumen: vol });
+  });
+  const cambioPrep = () => {
+    const q = prepInf();
+    inf.prep[`${inf.med}:${inf.paciente}`] = { cantidad: numInf($("#inf-cant").value), unidad: q.unidad, volumen: numInf($("#inf-vol").value) };
+    if (inf.dosis != null) inf.ultimo = "dosis";
+    guardarInf();
+    $("#inf-preps").querySelectorAll("[data-prep]").forEach((b) => b.setAttribute("aria-pressed", "false"));
+    recalcularInf(); pintarTablaInf();
+  };
+  $("#inf-cant").addEventListener("input", cambioPrep);
+  $("#inf-vol").addEventListener("input", cambioPrep);
+  $("#inf-dosis").addEventListener("input", () => { inf.ultimo = "dosis"; inf.dosis = numInf($("#inf-dosis").value); recalcularInf(); });
+  $("#inf-mlh").addEventListener("input", () => { inf.ultimo = "mlh"; inf.mlh = numInf($("#inf-mlh").value); recalcularInf(); });
+  if (inf.dosis != null) $("#inf-dosis").value = aCampo(inf.dosis);
+  if (inf.mlh != null && inf.ultimo === "mlh") $("#inf-mlh").value = aCampo(inf.mlh);
+  recalcularInf();
+  pintarTablaInf();
+  pintarPrepPesoInf();
+}
+function ponerPrepInf(prep) {
+  inf.prep[`${inf.med}:${inf.paciente}`] = prep;
+  if (inf.dosis != null) inf.ultimo = "dosis";  // al cambiar la dilución se conserva la dosis y cambia la velocidad
+  guardarInf();
+  pintarInfusiones();
+}
+function concInf() {
+  const p = prepInf();
+  return Infusiones.concentracion(p.cantidad, p.unidad, p.volumen);
+}
+function recalcularInf() {
+  const c = cfgInf(), conc = concInf(), porKg = Infusiones.UNIDADES[c.unidad].porKg;
+  $("#inf-conc").textContent = textoConc(conc, c.unidad);
+  const estado = $("#inf-estado");
+  if (porKg && !(inf.peso > 0)) {
+    aviso(estado, "warn", "Escribe el peso del paciente para calcular.");
+    $("#inf-rango").innerHTML = "";
+    return;
+  }
+  if (!conc) { aviso(estado, "err", "Revisa la preparación: la cantidad y el volumen deben ser mayores que cero."); return; }
+  if (inf.ultimo === "dosis") {
+    inf.mlh = inf.dosis == null ? null : Infusiones.mlPorHora(inf.dosis, c.unidad, inf.peso, conc);
+    if (document.activeElement !== $("#inf-mlh")) $("#inf-mlh").value = aCampo(inf.mlh, 3);
+  } else {
+    inf.dosis = inf.mlh == null ? null : Infusiones.dosisDesde(inf.mlh, c.unidad, inf.peso, conc);
+    if (document.activeElement !== $("#inf-dosis")) $("#inf-dosis").value = aCampo(inf.dosis, 3);
+  }
+  // barra de rango: debajo del usual · usual · alto · sobre el tope
+  const escala = c.tope * 1.25, pct = (v) => `${Math.min(100, v / escala * 100)}%`;
+  $("#inf-rango").innerHTML = `<div class="inf-rango" style="--a:${pct(c.r[0])};--b:${pct(c.r[1])};background:linear-gradient(90deg,
+      var(--info-bg) 0 ${pct(c.r[0])}, var(--ok-bg) ${pct(c.r[0])} ${pct(c.r[1])}, var(--warn-bg) ${pct(c.r[1])} ${pct(c.tope)}, var(--err-bg) ${pct(c.tope)} 100%)">
+      ${inf.dosis != null ? `<i style="left:${pct(inf.dosis)}"></i>` : ""}</div>
+    <div class="inf-escala"><span>0</span><span>usual ${fmtInf(c.r[0])}–${fmtInf(c.r[1])}</span><span>máx. ${fmtInf(c.tope)}</span></div>`;
+  const n = Infusiones.nivel(inf.dosis, c);
+  const textos = {
+    BAJA: ["", `Por debajo del rango usual (${fmtInf(c.r[0])}–${fmtInf(c.r[1])} ${c.unidad}).`],
+    USUAL: ["ok", `✓ Dentro del rango usual (${fmtInf(c.r[0])}–${fmtInf(c.r[1])} ${c.unidad}).`],
+    ALTA: ["warn", `⚠ Por encima del rango usual (${fmtInf(c.r[1])} ${c.unidad}). Verifica la indicación.`],
+    TOPE: ["err", `⛔ Por encima de la dosis máxima de referencia (${fmtInf(c.tope)} ${c.unidad}). Verifica antes de programar la bomba.`],
+  };
+  if (n && inf.mlh != null) aviso(estado, textos[n][0], `${textos[n][1]}${inf.mlh > 0 && inf.mlh < 1 ? " La velocidad es menor de 1 mL/h: considera una preparación más diluida." : ""}${inf.mlh > 100 ? " La velocidad es muy alta: considera una preparación más concentrada." : ""}`);
+  else aviso(estado, "", "");
+  marcarFilaInf();
+}
+function pintarTablaInf() {
+  const c = cfgInf(), conc = concInf(), cont = $("#inf-tabla"), porKg = Infusiones.UNIDADES[c.unidad].porKg;
+  if (!conc || (porKg && !(inf.peso > 0))) { cont.innerHTML = `<h2>Tabla de velocidades</h2><p class="sub" style="margin:0">Escribe el peso y la preparación para ver la tabla.</p>`; return; }
+  const pasos = Infusiones.pasosDeDosis(c);
+  cont.innerHTML = `<h2>Tabla de velocidades</h2>
+    <p class="sub" style="margin:-6px 0 8px">${porKg ? `${fmtInf(inf.peso)} kg · ` : ""}${textoConc(conc, c.unidad)}. Toca una fila para usarla.</p>
+    <table class="inf-tabla"><thead><tr><th>Dosis (${escapar(c.unidad)})</th><th>mL/h</th></tr></thead><tbody>
+    ${pasos.map((d) => `<tr data-d="${d}" style="cursor:pointer"><td>${fmtInf(d, 4)}</td><td>${fmtInf(Infusiones.mlPorHora(d, c.unidad, inf.peso, conc), 3)}</td></tr>`).join("")}
+    </tbody></table>`;
+  cont.querySelectorAll("[data-d]").forEach((tr) => tr.onclick = () => {
+    inf.ultimo = "dosis"; inf.dosis = Number(tr.dataset.d);
+    $("#inf-dosis").value = aCampo(inf.dosis);
+    recalcularInf();
+    $("#inf-calc").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+  marcarFilaInf();
+}
+function marcarFilaInf() {
+  document.querySelectorAll("#inf-tabla [data-d]").forEach((tr) =>
+    tr.classList.toggle("actual", inf.dosis != null && Math.abs(Number(tr.dataset.d) - inf.dosis) < 1e-9));
+}
+function pintarPrepPesoInf() {
+  const cont = $("#inf-prep-peso"), c = cfgInf(), m = medInf();
+  cont.classList.toggle("oculto", inf.paciente !== "nino");
+  if (inf.paciente !== "nino") return;
+  // los valores escritos se conservan mientras no se cambie de medicamento
+  const clave = `${inf.med}:${inf.paciente}`, mismo = cont.dataset.clave === clave;
+  const vol = (mismo && numInf($("#inf-pp-vol")?.value)) || 50, por = (mismo && numInf($("#inf-pp-por")?.value)) || c.porPeso;
+  cont.dataset.clave = clave;
+  const r = inf.peso > 0 ? Infusiones.preparacionPorPeso(por, c.unidad, inf.peso, vol) : null;
+  cont.innerHTML = `<h2>Preparación por peso</h2>
+    <p class="sub" style="margin:-6px 0 8px">Para que cada mL/h equivalga a una dosis fácil de recordar.</p>
+    <div class="fila">
+      <div><label for="inf-pp-vol">Volumen de la jeringa (mL)</label><input id="inf-pp-vol" type="text" inputmode="decimal" value="${aCampo(vol, 6)}"></div>
+      <div><label for="inf-pp-por">1 mL/h = (${escapar(c.unidad)})</label><input id="inf-pp-por" type="text" inputmode="decimal" value="${aCampo(por, 6)}"></div>
+    </div>
+    <div id="inf-pp-res" style="margin-top:10px">${r ? `<div class="aviso ok">Diluye <strong>${fmtInf(r.cantidad, 3)} ${r.unidad}</strong> de ${escapar(m.nombre.toLowerCase())}
+      hasta completar <strong>${fmtInf(vol)} mL</strong>: así 1 mL/h = ${fmtInf(por)} ${escapar(c.unidad)}.</div>
+      <button type="button" id="inf-pp-usar">Usar esta preparación</button>` : `<p class="sub">Escribe el peso para calcularla.</p>`}</div>`;
+  const repintar = () => {
+    const pos = document.activeElement && document.activeElement.id;
+    pintarPrepPesoInf();
+    if (pos) { const el = $("#" + pos); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }
+  };
+  $("#inf-pp-vol").addEventListener("change", repintar);
+  $("#inf-pp-por").addEventListener("change", repintar);
+  if ($("#inf-pp-usar")) $("#inf-pp-usar").onclick = () => {
+    ponerPrepInf({ cantidad: Infusiones.redondear(r.cantidad, 4), unidad: r.unidad, volumen: vol });
+    toast("Preparación aplicada");
+  };
+}
+
 // ---------------------------------------------------------------- historias y boletín semanal
 const NOMBRE_TIPO = { GUIA: "Guía", ESTUDIO: "Estudio", REVISION: "Revisión", ALERTA: "Alerta", NOTICIA: "Noticia",
   NORMATIVA: "Normativa", OTRO: "Novedad" };
