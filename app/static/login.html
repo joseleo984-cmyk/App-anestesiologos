@@ -50,6 +50,7 @@
   .trampa { position: absolute; left: -5000px; width: 1px; height: 1px; overflow: hidden; }
   .autoriza { display: flex; gap: 8px; align-items: flex-start; font-size: .82rem; color: var(--muted); margin-top: 14px; }
   .autoriza input { width: auto; margin-top: 3px; }
+  .autoriza a { color: var(--accent); }
   .nota { font-size: .8rem; margin: 6px 0 0; }
 </style>
 </head>
@@ -87,8 +88,11 @@
     <label for="r-clave">Contraseña (mínimo 10 caracteres)</label><input id="r-clave" type="password" autocomplete="new-password" required>
     <label for="r-clave2">Repite la contraseña</label><input id="r-clave2" type="password" autocomplete="new-password" required>
     <div class="trampa" aria-hidden="true"><label for="r-sitio">No llenar</label><input id="r-sitio" tabindex="-1" autocomplete="off"></div>
-    <label class="autoriza"><input type="checkbox" id="r-autoriza">
-      <span>Autorizo el tratamiento de mis datos personales para crear y administrar mi cuenta en Auditorías AP (Ley 1581 de 2012).</span></label>
+    <label class="autoriza"><input type="checkbox" id="r-terminos">
+      <span>Acepto los <a href="/terminos" target="_blank" rel="noopener">términos de uso</a>.</span></label>
+    <label class="autoriza" style="margin-top:8px"><input type="checkbox" id="r-autoriza">
+      <span>Autorizo el tratamiento de mis datos personales según la <a href="/privacidad" target="_blank" rel="noopener">política
+        de tratamiento de datos</a> (Ley 1581 de 2012), incluida su transferencia a los proveedores de la app.</span></label>
     <div id="error-registro"></div>
     <button type="submit">Enviar solicitud</button>
   </form>
@@ -138,12 +142,13 @@ $("#registro").onsubmit = async (ev) => {
   caja.innerHTML = "";
   const datos = { nombre: $("#r-nombre").value.trim(), registro_medico: $("#r-registro").value.trim(),
     email: $("#r-email").value.trim(), telefono: $("#r-telefono").value.trim() || null, password: $("#r-clave").value,
-    autoriza_datos: $("#r-autoriza").checked, sitio_web: $("#r-sitio").value || null };
+    autoriza_datos: $("#r-autoriza").checked, acepta_terminos: $("#r-terminos").checked, sitio_web: $("#r-sitio").value || null };
   if (datos.nombre.length < 5) return error(caja, "Escribe tu nombre completo.");
   if (datos.registro_medico.length < 3) return error(caja, "Escribe tu registro médico.");
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(datos.email)) return error(caja, "Revisa el correo.");
   if (datos.password.length < 10) return error(caja, "La contraseña debe tener al menos 10 caracteres.");
   if (datos.password !== $("#r-clave2").value) return error(caja, "Las contraseñas no coinciden.");
+  if (!datos.acepta_terminos) return error(caja, "Debes aceptar los términos de uso.");
   if (!datos.autoriza_datos) return error(caja, "Debes autorizar el tratamiento de tus datos.");
   boton.disabled = true;
   try {

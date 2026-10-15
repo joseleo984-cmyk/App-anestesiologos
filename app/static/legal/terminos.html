@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Términos de uso · Auditorías AP</title>
+<link rel="icon" type="image/png" href="/static/icono-192.png">
+<link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+<link rel="manifest" href="/static/manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Auditorías AP">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#0d7470">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;600;700&family=Sora:wght@700&display=swap">
+<script>
+  // Apariencia elegida (Automático / Claro / Oscuro): se aplica antes de pintar, sin parpadeo
+  try { const t = localStorage.getItem("tema"); if (t === "claro" || t === "oscuro") document.documentElement.dataset.tema = t; } catch (e) {}
+</script>
+<style>
+  :root { --bg: #f3f6f6; --card: #ffffff; --text: #14201f; --muted: #56686a; --line: #d6e0df;
+          --accent: #0d7470; --accent-text: #ffffff; --err-bg: #fde8e8; --err-text: #a61b1b; }
+  :root { color-scheme: light; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-tema="claro"]) { color-scheme: dark; --bg: #0f1514; --card: #172020; --text: #e3ecea; --muted: #93a6a3; --line: #2a3735;
+            --accent: #35b3a9; --accent-text: #06201e; --err-bg: #3d1c1c; --err-text: #f1a3a3; }
+  }
+  :root[data-tema="oscuro"] { color-scheme: dark; --bg: #0f1514; --card: #172020; --text: #e3ecea; --muted: #93a6a3; --line: #2a3735;
+            --accent: #35b3a9; --accent-text: #06201e; --err-bg: #3d1c1c; --err-text: #f1a3a3; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 16px/1.45 "Figtree", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  h1 { font-family: "Sora", "Figtree", system-ui, sans-serif; letter-spacing: -.01em; }
+  main { max-width: 720px; margin: 0 auto; padding: 48px 16px; }
+  h1 { font-size: 1.35rem; margin: 0 0 4px; }
+  p { color: var(--muted); margin: 0 0 20px; }
+  form { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
+  label { display: block; font-size: .85rem; color: var(--muted); margin: 12px 0 4px; }
+  label:first-child { margin-top: 0; }
+  input { width: 100%; font: inherit; padding: 10px; border-radius: 8px; border: 1px solid var(--line);
+          background: var(--bg); color: var(--text); }
+  button { width: 100%; margin-top: 20px; font: inherit; font-weight: 600; padding: 12px; border-radius: 10px;
+           border: 0; background: var(--accent); color: var(--accent-text); cursor: pointer; }
+  button:disabled { opacity: .6; }
+  .error { background: var(--err-bg); color: var(--err-text); padding: 10px 12px; border-radius: 8px; margin-top: 12px; }
+  .ok { background: color-mix(in srgb, var(--accent) 14%, transparent); padding: 12px; border-radius: 10px; color: var(--text); }
+  .cambiar { text-align: center; margin: 16px 0 0; }
+  .cambiar a { color: var(--accent); font-weight: 600; }
+  .oculto { display: none !important; }
+  .trampa { position: absolute; left: -5000px; width: 1px; height: 1px; overflow: hidden; }
+  .autoriza { display: flex; gap: 8px; align-items: flex-start; font-size: .82rem; color: var(--muted); margin-top: 14px; }
+  .autoriza input { width: auto; margin-top: 3px; }
+  .nota { font-size: .8rem; margin: 6px 0 0; }
+</style>
+<style>
+  .doc h2 { font-family: "Sora", "Figtree", system-ui, sans-serif; font-size: 1.05rem; margin: 22px 0 6px; color: var(--text); }
+  .doc p, .doc li { color: var(--text); margin: 0 0 10px; max-width: 68ch; }
+  .doc ul { padding-left: 1.2em; }
+  .borrador { background: color-mix(in srgb, #d39a00 18%, transparent); padding: 10px 12px; border-radius: 10px; color: var(--text); }
+  .pendiente { background: color-mix(in srgb, #d39a00 25%, transparent); padding: 0 4px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<main class="doc">
+  <p><a href="/login" style="color:var(--accent);font-weight:600">← Volver</a></p>
+  <h1>Términos de uso</h1>
+  <p style="color:var(--muted)">Versión {VERSION}</p>
+  <p class="borrador"><strong>Borrador.</strong> Este texto debe revisarlo un abogado y completarse con los datos marcados
+    en amarillo antes de abrir la app a anestesiólogos fuera de AP.</p>
+  <h2>1. Qué es Auditorías AP</h2>
+  <p>Auditorías AP es una herramienta para que anestesiólogos registren sus cirugías, controlen los pagos que reciben
+    y consulten calculadoras y contenidos de apoyo. La administra <span class="pendiente">[razón social y NIT]</span>.</p>
+  <h2>2. Quién puede usarla</h2>
+  <p>Solo médicos anestesiólogos con registro médico vigente, cuya cuenta haya aprobado el administrador. La cuenta es
+    personal: no compartas tu contraseña. Eres responsable de lo que se haga con tu cuenta.</p>
+  <h2>3. Datos de pacientes</h2>
+  <p>Las órdenes que subes contienen datos de salud de tus pacientes. Al subirlas declaras que tienes una razón legítima
+    para tratarlos (tu ejercicio profesional y el cobro de tus honorarios) y que los usas solo con esa finalidad. Cada
+    anestesiólogo ve únicamente sus propios registros.</p>
+  <h2>4. Lectura con inteligencia artificial</h2>
+  <p>La app lee órdenes, reportes y extractos con inteligencia artificial. La lectura puede tener errores: revisa siempre
+    los datos antes de guardarlos.</p>
+  <h2>5. Calculadoras y contenido clínico</h2>
+  <p>Las calculadoras de infusiones y de TIVA, la guía de anestesia regional y las noticias son <strong>apoyo
+    orientativo</strong>. No reemplazan tu juicio clínico, los protocolos de tu institución, la verificación de dosis ni
+    el monitoreo del paciente. Las decisiones clínicas son responsabilidad del médico tratante.</p>
+  <h2>6. Disponibilidad</h2>
+  <p>La app puede tener interrupciones o cambios. Haz copias de lo que necesites conservar. Podemos suspender cuentas que
+    se usen de forma indebida.</p>
+  <h2>7. Cambios a estos términos</h2>
+  <p>Si cambian, te pediremos aceptarlos de nuevo al entrar. La versión y la fecha de tu aceptación quedan registradas.</p>
+  <h2>8. Contacto</h2>
+  <p><span class="pendiente">[correo de contacto]</span></p>
+</main>
+</body>
+</html>

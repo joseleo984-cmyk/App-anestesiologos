@@ -196,6 +196,7 @@ def cerrar_sesion(response: Response):
 def usuario_actual(cuenta: dict = Depends(cuenta_sesion)):
     return {"anestesiologo_id": cuenta["anestesiologo_id"], "nombre": cuenta["nombre"], "email": cuenta["email"],
             "es_admin": cuenta["es_admin"], "debe_cambiar_clave": cuenta["debe_cambiar_clave"],
+            "debe_aceptar_terminos": cuenta["terminos_version"] != config.TERMINOS_VERSION,
             "ciudad_por_defecto": config.CIUDAD_POR_DEFECTO, "version": config.VERSION}
 
 
@@ -301,6 +302,7 @@ class Registro(BaseModel):
     telefono: Optional[str] = Field(default=None, max_length=30)
     password: str = Field(min_length=10, max_length=200)
     autoriza_datos: bool
+    acepta_terminos: bool = False
     sitio_web: Optional[str] = None  # campo trampa: invisible para las personas, los robots lo llenan
 
 
@@ -310,7 +312,30 @@ _registros_por_ip: dict[str, list[float]] = {}
 
 @app.get("/api/registro")
 def registro_disponible():
-    return {"abierto": config.REGISTRO_ABIERTO}
+    return {"abierto": config.REGISTRO_ABIERTO, "terminos_version": config.TERMINOS_VERSION}
+
+
+def _pagina_legal(nombre: str) -> Response:
+    html = (STATIC / "legal" / f"{nombre}.html").read_text(encoding="utf-8").replace("{VERSION}", config.TERMINOS_VERSION)
+    return Response(html, media_type="text/html; charset=utf-8")
+
+
+@app.get("/terminos", include_in_schema=False)
+def pagina_terminos():
+    return _pagina_legal("terminos")
+
+
+@app.get("/privacidad", include_in_schema=False)
+def pagina_privacidad():
+    return _pagina_legal("privacidad")
+
+
+@app.post("/api/aceptar-terminos")
+def aceptar_terminos(conn=Depends(get_conn, scope="function"), cuenta: dict = Depends(cuenta_sesion)):
+    """Guarda la aceptación de la versión vigente (cuentas creadas por el administrador o términos actualizados)."""
+    repositorio.aceptar_terminos(conn, cuenta["anestesiologo_id"], config.TERMINOS_VERSION)
+    conn.commit()
+    return {"ok": True, "version": config.TERMINOS_VERSION}
 
 
 @app.post("/api/registro", status_code=201)
@@ -318,8 +343,8 @@ def registrarse(datos: Registro, request: Request, conn=Depends(get_conn, scope=
     """Un anestesiólogo crea su cuenta; queda pendiente hasta que el administrador la apruebe."""
     if not config.REGISTRO_ABIERTO:
         raise HTTPException(403, "El registro está cerrado. Pide la cuenta al administrador de AP.")
-    if not datos.autoriza_datos:
-        raise HTTPException(422, "Debes autorizar el tratamiento de tus datos para registrarte.")
+    if not datos.autoriza_datos or not datos.acepta_terminos:
+        raise HTTPException(422, "Debes aceptar los términos de uso y la política de tratamiento de datos para registrarte.")
     ahora, ip = time.time(), (request.client.host if request.client else "?")
     recientes = [t for t in _registros_por_ip.get(ip, []) if ahora - t < 3600]
     if len(recientes) >= MAX_REGISTROS_HORA:
@@ -330,7 +355,7 @@ def registrarse(datos: Registro, request: Request, conn=Depends(get_conn, scope=
     try:
         repositorio.registrar_solicitud(conn, " ".join(datos.nombre.split()), datos.email,
                                         " ".join(datos.registro_medico.split()), (datos.telefono or "").strip() or None,
-                                        auth.hash_password(datos.password))
+                                        auth.hash_password(datos.password), config.TERMINOS_VERSION)
     except repositorio.EmailYaRegistrado:
         conn.rollback()
         raise HTTPException(409, "Ya existe una cuenta con ese correo o registro médico. Si es tuya, inicia sesión.")

@@ -21,6 +21,9 @@ NOTICIAS_MODEL = os.environ.get("NOTICIAS_MODEL", "").strip() or None
 MAX_ARCHIVO_MB = int(os.environ.get("MAX_ARCHIVO_MB", "20"))
 # Dirección pública de la app, para los enlaces de los correos (si falta, se toma de la solicitud)
 APP_URL = os.environ.get("APP_URL", "").strip().rstrip("/")
+# Versión vigente de los términos de uso y la política de datos (app/static/legal). Al cambiar el texto, se cambia
+# esta fecha y todos deben aceptarlos de nuevo al entrar.
+TERMINOS_VERSION = "2026-10-15"
 # Registro propio de anestesiólogos (quedan pendientes hasta que el administrador los apruebe). "no" lo cierra.
 REGISTRO_ABIERTO = os.environ.get("REGISTRO_ABIERTO", "si").strip().lower() not in ("no", "false", "0")
 # Ciudad que se usa cuando la orden no la trae y la clínica no tiene una conocida (vacío = ninguna)

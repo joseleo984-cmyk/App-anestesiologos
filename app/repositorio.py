@@ -545,7 +545,7 @@ def ciudad_conocida(conn, anestesiologo_id: int, clinica: str) -> Optional[str]:
 
 
 _CUENTA = """anestesiologo_id, nombre, email, password_hash, es_admin, activo, debe_cambiar_clave,
-             version_sesion, estado_registro, intentos_fallidos, bloqueado_hasta"""
+             version_sesion, estado_registro, intentos_fallidos, bloqueado_hasta, terminos_version"""
 
 
 def obtener_cuenta(conn, anestesiologo_id: int) -> Optional[dict]:
@@ -656,7 +656,7 @@ class DemasiadasSolicitudes(Exception):
 
 
 def registrar_solicitud(conn, nombre: str, email: str, registro_medico: str, telefono: Optional[str],
-                        password_hash: str) -> int:
+                        password_hash: str, terminos_version: str) -> int:
     """Cuenta nueva pendiente de aprobación: no puede entrar hasta que el administrador la apruebe."""
     if conn.execute("SELECT count(*) AS n FROM anestesiologo WHERE estado_registro = 'PENDIENTE'").fetchone()["n"] >= MAX_PENDIENTES:
         raise DemasiadasSolicitudes()
@@ -664,12 +664,17 @@ def registrar_solicitud(conn, nombre: str, email: str, registro_medico: str, tel
         with conn.transaction():
             return conn.execute(
                 """INSERT INTO anestesiologo (nombre, email, registro_medico, telefono, password_hash, activo,
-                                             estado_registro, autoriza_datos_en)
-                   VALUES (%s, %s, %s, %s, %s, FALSE, 'PENDIENTE', now()) RETURNING anestesiologo_id""",
-                (nombre, email.strip().lower(), registro_medico, telefono, password_hash),
+                                             estado_registro, autoriza_datos_en, terminos_version, terminos_aceptados_en)
+                   VALUES (%s, %s, %s, %s, %s, FALSE, 'PENDIENTE', now(), %s, now()) RETURNING anestesiologo_id""",
+                (nombre, email.strip().lower(), registro_medico, telefono, password_hash, terminos_version),
             ).fetchone()["anestesiologo_id"]
     except psycopg.errors.UniqueViolation as e:
         raise EmailYaRegistrado() from e
+
+
+def aceptar_terminos(conn, anestesiologo_id: int, version: str) -> None:
+    conn.execute("""UPDATE anestesiologo SET terminos_version = %s, terminos_aceptados_en = now(),
+                           autoriza_datos_en = now() WHERE anestesiologo_id = %s""", (version, anestesiologo_id))
 
 
 def aprobar_solicitud(conn, anestesiologo_id: int) -> bool:

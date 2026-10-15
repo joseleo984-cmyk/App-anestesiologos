@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Política de tratamiento de datos · Auditorías AP</title>
+<link rel="icon" type="image/png" href="/static/icono-192.png">
+<link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+<link rel="manifest" href="/static/manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Auditorías AP">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#0d7470">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;600;700&family=Sora:wght@700&display=swap">
+<script>
+  // Apariencia elegida (Automático / Claro / Oscuro): se aplica antes de pintar, sin parpadeo
+  try { const t = localStorage.getItem("tema"); if (t === "claro" || t === "oscuro") document.documentElement.dataset.tema = t; } catch (e) {}
+</script>
+<style>
+  :root { --bg: #f3f6f6; --card: #ffffff; --text: #14201f; --muted: #56686a; --line: #d6e0df;
+          --accent: #0d7470; --accent-text: #ffffff; --err-bg: #fde8e8; --err-text: #a61b1b; }
+  :root { color-scheme: light; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-tema="claro"]) { color-scheme: dark; --bg: #0f1514; --card: #172020; --text: #e3ecea; --muted: #93a6a3; --line: #2a3735;
+            --accent: #35b3a9; --accent-text: #06201e; --err-bg: #3d1c1c; --err-text: #f1a3a3; }
+  }
+  :root[data-tema="oscuro"] { color-scheme: dark; --bg: #0f1514; --card: #172020; --text: #e3ecea; --muted: #93a6a3; --line: #2a3735;
+            --accent: #35b3a9; --accent-text: #06201e; --err-bg: #3d1c1c; --err-text: #f1a3a3; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 16px/1.45 "Figtree", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  h1 { font-family: "Sora", "Figtree", system-ui, sans-serif; letter-spacing: -.01em; }
+  main { max-width: 720px; margin: 0 auto; padding: 48px 16px; }
+  h1 { font-size: 1.35rem; margin: 0 0 4px; }
+  p { color: var(--muted); margin: 0 0 20px; }
+  form { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
+  label { display: block; font-size: .85rem; color: var(--muted); margin: 12px 0 4px; }
+  label:first-child { margin-top: 0; }
+  input { width: 100%; font: inherit; padding: 10px; border-radius: 8px; border: 1px solid var(--line);
+          background: var(--bg); color: var(--text); }
+  button { width: 100%; margin-top: 20px; font: inherit; font-weight: 600; padding: 12px; border-radius: 10px;
+           border: 0; background: var(--accent); color: var(--accent-text); cursor: pointer; }
+  button:disabled { opacity: .6; }
+  .error { background: var(--err-bg); color: var(--err-text); padding: 10px 12px; border-radius: 8px; margin-top: 12px; }
+  .ok { background: color-mix(in srgb, var(--accent) 14%, transparent); padding: 12px; border-radius: 10px; color: var(--text); }
+  .cambiar { text-align: center; margin: 16px 0 0; }
+  .cambiar a { color: var(--accent); font-weight: 600; }
+  .oculto { display: none !important; }
+  .trampa { position: absolute; left: -5000px; width: 1px; height: 1px; overflow: hidden; }
+  .autoriza { display: flex; gap: 8px; align-items: flex-start; font-size: .82rem; color: var(--muted); margin-top: 14px; }
+  .autoriza input { width: auto; margin-top: 3px; }
+  .nota { font-size: .8rem; margin: 6px 0 0; }
+</style>
+<style>
+  .doc h2 { font-family: "Sora", "Figtree", system-ui, sans-serif; font-size: 1.05rem; margin: 22px 0 6px; color: var(--text); }
+  .doc p, .doc li { color: var(--text); margin: 0 0 10px; max-width: 68ch; }
+  .doc ul { padding-left: 1.2em; }
+  .borrador { background: color-mix(in srgb, #d39a00 18%, transparent); padding: 10px 12px; border-radius: 10px; color: var(--text); }
+  .pendiente { background: color-mix(in srgb, #d39a00 25%, transparent); padding: 0 4px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<main class="doc">
+  <p><a href="/login" style="color:var(--accent);font-weight:600">← Volver</a></p>
+  <h1>Política de tratamiento de datos</h1>
+  <p style="color:var(--muted)">Versión {VERSION}</p>
+  <p class="borrador"><strong>Borrador.</strong> Este texto debe revisarlo un abogado y completarse con los datos marcados
+    en amarillo antes de abrir la app a anestesiólogos fuera de AP.</p>
+  <h2>1. Responsable del tratamiento</h2>
+  <p><span class="pendiente">[razón social, NIT, dirección y correo]</span>, conforme a la Ley 1581 de 2012 y el Decreto 1377
+    de 2013 (compilado en el Decreto 1074 de 2015).</p>
+  <h2>2. Datos que tratamos</h2>
+  <ul>
+    <li><strong>De tu cuenta:</strong> nombre, registro médico, correo, celular y contraseña (guardada cifrada, nunca en texto).</li>
+    <li><strong>De tu actividad:</strong> cirugías, pagos, finanzas personales que registres y el uso de la inteligencia artificial.</li>
+    <li><strong>De tus pacientes:</strong> los que aparecen en las órdenes que subes (identificación, aseguradora, procedimiento).
+      Son <strong>datos sensibles de salud</strong>: tú los aportas en ejercicio de tu profesión y la app los trata por tu
+      cuenta, solo para las finalidades de abajo.</li>
+  </ul>
+  <h2>3. Finalidades</h2>
+  <ul>
+    <li>Crear y administrar tu cuenta y su seguridad.</li>
+    <li>Registrar tus cirugías y cruzarlas con los pagos que recibes.</li>
+    <li>Leer documentos con inteligencia artificial y mejorar esa lectura (sin usar los datos para otros fines).</li>
+    <li>Enviarte mensajes de servicio, como el enlace para restablecer la contraseña.</li>
+  </ul>
+  <h2>4. Con quién se comparten (encargados) y transferencia internacional</h2>
+  <p>Para funcionar, la app usa proveedores que guardan o procesan datos fuera de Colombia, principalmente en Estados Unidos:
+    alojamiento (Render), base de datos y archivos (Supabase), lectura con inteligencia artificial (Anthropic) y envío de
+    correos (<span class="pendiente">[proveedor de correo]</span>). Al aceptar esta política autorizas esa transferencia.
+    No vendemos ni cedemos tus datos.</p>
+  <h2>5. Tus derechos</h2>
+  <p>Puedes conocer, actualizar, rectificar y pedir la supresión de tus datos, revocar esta autorización y presentar quejas
+    ante la Superintendencia de Industria y Comercio. Escríbenos a <span class="pendiente">[correo]</span>; respondemos
+    consultas en máximo 10 días hábiles y reclamos en máximo 15.</p>
+  <h2>6. Seguridad y conservación</h2>
+  <p>Conexión cifrada, contraseñas cifradas, bloqueo tras intentos fallidos y separación de los datos de cada anestesiólogo.
+    Conservamos los datos mientras tu cuenta esté activa y durante el tiempo que exijan las normas aplicables.</p>
+  <h2>7. Cambios</h2>
+  <p>Si esta política cambia, te pediremos aceptarla de nuevo al entrar.</p>
+</main>
+</body>
+</html>

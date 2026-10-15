@@ -404,3 +404,7 @@ CREATE TABLE IF NOT EXISTS restablecimiento_clave (
     usado_en           TIMESTAMPTZ
 );
 CREATE INDEX IF NOT EXISTS idx_restablecimiento_anest ON restablecimiento_clave (anestesiologo_id, creado_en);
+
+-- 27. Aceptación de los términos de uso y de la política de datos: versión y fecha
+ALTER TABLE anestesiologo ADD COLUMN IF NOT EXISTS terminos_version VARCHAR(20);
+ALTER TABLE anestesiologo ADD COLUMN IF NOT EXISTS terminos_aceptados_en TIMESTAMPTZ;

@@ -93,7 +93,8 @@ def test_las_migraciones_solo_corren_cuando_cambian(db_url, monkeypatch):
 
 # ------------------------------------------------ registro propio con aprobación del administrador
 NUEVO = {"nombre": "Dr. Nuevo Ficticio", "email": "Nuevo@Ejemplo.com", "registro_medico": "RM-12345",
-         "telefono": "3000000000", "password": "clave-nueva-123", "autoriza_datos": True}
+         "telefono": "3000000000", "password": "clave-nueva-123", "autoriza_datos": True,
+         "acepta_terminos": True}
 
 
 def admin_cliente():
@@ -108,7 +109,7 @@ def admin_cliente():
 
 def test_registro_pendiente_y_aprobacion(anonimo, monkeypatch):
     main._registros_por_ip.clear()
-    assert anonimo.get("/api/registro").json() == {"abierto": True}
+    assert anonimo.get("/api/registro").json()["abierto"] is True
     assert anonimo.post("/api/registro", json={**NUEVO, "autoriza_datos": False}).status_code == 422
     assert anonimo.post("/api/registro", json={**NUEVO, "password": "corta"}).status_code == 422
     assert anonimo.post("/api/registro", json=NUEVO).status_code == 201
@@ -253,3 +254,22 @@ def test_proveedores_de_correo(monkeypatch):
     error = httpx.Client(transport=httpx.MockTransport(lambda req: httpx.Response(401, text="no")))
     with pytest.raises(correo.CorreoError):
         correo.enviar("dr@ejemplo.co", "A", "t", "h", cliente=error)
+
+
+def test_terminos_con_version_y_fecha(anonimo):
+    assert anonimo.post("/api/registro", json={**NUEVO, "acepta_terminos": False}).status_code == 422
+    assert anonimo.post("/api/registro", json=NUEVO).status_code == 201
+    from app.repositorio import conectar
+    with conectar() as c:
+        fila = c.execute("""SELECT terminos_version, terminos_aceptados_en, autoriza_datos_en FROM anestesiologo
+                             WHERE email = 'nuevo@ejemplo.com'""").fetchone()
+    assert fila["terminos_version"] == config.TERMINOS_VERSION and fila["terminos_aceptados_en"] and fila["autoriza_datos_en"]
+    # páginas públicas con la versión vigente
+    for ruta in ("/terminos", "/privacidad"):
+        r = anonimo.get(ruta)
+        assert r.status_code == 200 and f"Versión {config.TERMINOS_VERSION}" in r.text
+    # una cuenta sin la versión vigente (creada por el administrador) debe aceptarlos al entrar
+    anonimo.post("/api/login", json={"email": EMAIL, "password": PASSWORD})
+    assert anonimo.get("/api/yo").json()["debe_aceptar_terminos"] is True
+    assert anonimo.post("/api/aceptar-terminos").json()["version"] == config.TERMINOS_VERSION
+    assert anonimo.get("/api/yo").json()["debe_aceptar_terminos"] is False
