@@ -148,3 +148,35 @@ def test_rechazo_robots_y_limites(anonimo, monkeypatch):
     main._registros_por_ip.clear()
     monkeypatch.setattr(config, "REGISTRO_ABIERTO", False)
     assert anonimo.post("/api/registro", json={**NUEVO, "email": "z@y.co", "registro_medico": "RM-3"}).status_code == 403
+
+
+def test_bloqueo_tras_intentos_fallidos(anonimo, monkeypatch):
+    main._fallos_por_ip.clear()
+    for _ in range(4):
+        assert anonimo.post("/api/login", json={"email": EMAIL, "password": "mala-clave"}).status_code == 401
+    r = anonimo.post("/api/login", json={"email": EMAIL, "password": "mala-clave"})       # el 5.º bloquea
+    assert r.status_code == 429 and "15 minutos" in r.json()["detail"]
+    # bloqueada: ni con la clave correcta entra
+    r = anonimo.post("/api/login", json={"email": EMAIL, "password": PASSWORD})
+    assert r.status_code == 429 and "Olvidé mi contraseña" in r.json()["detail"]
+    # al vencer el bloqueo entra y el contador vuelve a cero
+    from app.repositorio import conectar
+    with conectar() as c:
+        c.execute("UPDATE anestesiologo SET bloqueado_hasta = now() - interval '1 minute' WHERE email = %s", (EMAIL,))
+        c.commit()
+    assert anonimo.post("/api/login", json={"email": EMAIL, "password": PASSWORD}).status_code == 200
+    with conectar() as c:
+        assert c.execute("SELECT intentos_fallidos FROM anestesiologo WHERE email = %s", (EMAIL,)).fetchone()["intentos_fallidos"] == 0
+        # la segunda tanda de 5 fallos bloquea el doble
+        c.execute("UPDATE anestesiologo SET intentos_fallidos = 9 WHERE email = %s", (EMAIL,))
+        c.commit()
+    r = anonimo.post("/api/login", json={"email": EMAIL, "password": "mala-clave"})
+    assert r.status_code == 429 and "30 minutos" in r.json()["detail"]
+
+
+def test_limite_de_fallos_por_conexion(anonimo):
+    main._fallos_por_ip.clear()
+    for i in range(main.MAX_FALLOS_IP):
+        assert anonimo.post("/api/login", json={"email": f"nadie{i}@x.co", "password": "x"}).status_code == 401
+    assert anonimo.post("/api/login", json={"email": EMAIL, "password": PASSWORD}).status_code == 429
+    main._fallos_por_ip.clear()

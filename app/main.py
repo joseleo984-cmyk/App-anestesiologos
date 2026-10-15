@@ -12,7 +12,7 @@ import logging
 import time
 import uuid
 from contextlib import asynccontextmanager
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Literal, Optional
 
@@ -142,12 +142,39 @@ class Credenciales(BaseModel):
     password: str
 
 
+# Intentos fallidos por conexión (correos que no existen o muchas cuentas a la vez)
+MAX_FALLOS_IP, VENTANA_FALLOS_IP = 20, 900
+_fallos_por_ip: dict[str, list[float]] = {}
+
+
+def _mensaje_bloqueo(hasta) -> str:
+    minutos = max(1, int((hasta - datetime.now(timezone.utc)).total_seconds() // 60) + 1)
+    return (f"Demasiados intentos fallidos: la cuenta queda bloqueada por {minutos} minuto{'s' if minutos != 1 else ''}. "
+            "Si no recuerdas la contraseña, usa «Olvidé mi contraseña».")
+
+
 @app.post("/api/login")
-def iniciar_sesion(datos: Credenciales, response: Response, conn=Depends(get_conn, scope="function")):
+def iniciar_sesion(datos: Credenciales, request: Request, response: Response, conn=Depends(get_conn, scope="function")):
+    ip, ahora = (request.client.host if request.client else "?"), time.time()
+    fallos = [t for t in _fallos_por_ip.get(ip, []) if ahora - t < VENTANA_FALLOS_IP]
+    _fallos_por_ip[ip] = fallos
+    if len(fallos) >= MAX_FALLOS_IP:
+        raise HTTPException(429, "Demasiados intentos fallidos desde esta conexión. Espera 15 minutos.")
     usuario = repositorio.buscar_anestesiologo_por_email(conn, datos.email)
+    if usuario and usuario["bloqueado_hasta"] and usuario["bloqueado_hasta"] > datetime.now(timezone.utc):
+        raise HTTPException(429, _mensaje_bloqueo(usuario["bloqueado_hasta"]))  # ni siquiera se prueba la clave
     if not usuario or not auth.verificar_password(datos.password, usuario["password_hash"]):
+        fallos.append(ahora)
+        if usuario:
+            hasta = repositorio.registrar_intento_fallido(conn, usuario["anestesiologo_id"])
+            conn.commit()
+            if hasta and hasta > datetime.now(timezone.utc):
+                raise HTTPException(429, _mensaje_bloqueo(hasta))
         time.sleep(1)  # frena los intentos de adivinar contraseñas
         raise HTTPException(401, "Correo o contraseña incorrectos.")
+    if usuario["intentos_fallidos"]:
+        repositorio.limpiar_intentos(conn, usuario["anestesiologo_id"])
+        conn.commit()
     if usuario["estado_registro"] == "PENDIENTE":
         raise HTTPException(403, "Tu solicitud de registro está pendiente: el administrador de AP debe aprobarla.")
     if not usuario["activo"]:

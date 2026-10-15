@@ -33,3 +33,12 @@ def conn(db_url):
     from app.repositorio import conectar
     with conectar() as c:
         yield c
+
+
+@pytest.fixture(autouse=True)
+def limites_limpios():
+    """Los límites por conexión (intentos fallidos, registros) viven en memoria: cada prueba empieza de cero."""
+    from app import main
+    main._fallos_por_ip.clear()
+    main._registros_por_ip.clear()
+    yield

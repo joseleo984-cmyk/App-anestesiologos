@@ -334,3 +334,7 @@ END $$;
 DELETE FROM paciente WHERE anestesiologo_id IS NULL AND NOT EXISTS (SELECT 1 FROM cirugia c WHERE c.paciente_id = paciente.paciente_id);
 ALTER TABLE paciente ALTER COLUMN anestesiologo_id SET NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS paciente_anestesiologo_documento ON paciente (anestesiologo_id, tipo_documento, numero_documento);
+
+-- 25. Bloqueo temporal de la cuenta tras varios intentos fallidos de contraseña
+ALTER TABLE anestesiologo ADD COLUMN IF NOT EXISTS intentos_fallidos INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE anestesiologo ADD COLUMN IF NOT EXISTS bloqueado_hasta TIMESTAMPTZ;

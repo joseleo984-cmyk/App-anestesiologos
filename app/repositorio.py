@@ -545,7 +545,7 @@ def ciudad_conocida(conn, anestesiologo_id: int, clinica: str) -> Optional[str]:
 
 
 _CUENTA = """anestesiologo_id, nombre, email, password_hash, es_admin, activo, debe_cambiar_clave,
-             version_sesion, estado_registro"""
+             version_sesion, estado_registro, intentos_fallidos, bloqueado_hasta"""
 
 
 def obtener_cuenta(conn, anestesiologo_id: int) -> Optional[dict]:
@@ -592,6 +592,28 @@ def crear_usuario(conn, nombre: str, email: str, registro_medico: Optional[str],
             ).fetchone()["anestesiologo_id"]
     except psycopg.errors.UniqueViolation as e:
         raise EmailYaRegistrado() from e
+
+
+INTENTOS_ANTES_DE_BLOQUEAR = 5
+MINUTOS_BLOQUEO = 15        # se duplica con cada nueva tanda de intentos fallidos, hasta 24 horas
+
+
+def registrar_intento_fallido(conn, anestesiologo_id: int):
+    """Suma un intento fallido; cada 5 seguidos bloquea la cuenta (15 min, luego 30, 60… hasta 24 h).
+    Devuelve hasta cuándo queda bloqueada (o None)."""
+    return conn.execute(
+        """UPDATE anestesiologo
+              SET intentos_fallidos = intentos_fallidos + 1,
+                  bloqueado_hasta = CASE WHEN (intentos_fallidos + 1) %% %(n)s = 0
+                      THEN now() + make_interval(mins => LEAST(%(min)s * power(2, (intentos_fallidos + 1) / %(n)s - 1)::int, 1440))
+                      ELSE bloqueado_hasta END
+            WHERE anestesiologo_id = %(id)s RETURNING bloqueado_hasta""",
+        {"n": INTENTOS_ANTES_DE_BLOQUEAR, "min": MINUTOS_BLOQUEO, "id": anestesiologo_id}).fetchone()["bloqueado_hasta"]
+
+
+def limpiar_intentos(conn, anestesiologo_id: int) -> None:
+    conn.execute("UPDATE anestesiologo SET intentos_fallidos = 0, bloqueado_hasta = NULL WHERE anestesiologo_id = %s",
+                 (anestesiologo_id,))
 
 
 MAX_PENDIENTES = 30  # tope de solicitudes sin revisar (frena el registro masivo de cuentas falsas)

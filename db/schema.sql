@@ -390,3 +390,7 @@ ALTER TABLE anestesiologo ADD COLUMN IF NOT EXISTS estado_registro VARCHAR(10) N
     CHECK (estado_registro IN ('PENDIENTE', 'APROBADA'));
 ALTER TABLE anestesiologo ADD COLUMN IF NOT EXISTS telefono VARCHAR(30);
 ALTER TABLE anestesiologo ADD COLUMN IF NOT EXISTS autoriza_datos_en TIMESTAMPTZ;  -- autorización de tratamiento de datos (Ley 1581)
+
+-- 25. Bloqueo temporal de la cuenta tras varios intentos fallidos de contraseña
+ALTER TABLE anestesiologo ADD COLUMN IF NOT EXISTS intentos_fallidos INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE anestesiologo ADD COLUMN IF NOT EXISTS bloqueado_hasta TIMESTAMPTZ;
