@@ -434,3 +434,34 @@ class Favorita(_Base):
 
 class ClaveCopia(_Base):
     clave: str = Field(min_length=10, max_length=200)
+
+
+class PuntoComparacion(_Base):
+    """Una cifra de la simulación frente a la misma cifra en la otra fuente."""
+    clave: str = Field(pattern=r"^[a-z0-9_]{1,30}$")
+    etiqueta: str = Field(min_length=1, max_length=80)
+    unidad: str = Field(min_length=1, max_length=20)
+    app: Optional[float] = Field(default=None, allow_inf_nan=False)
+    referencia: Optional[float] = Field(default=None, allow_inf_nan=False)
+
+
+class PruebaValidacion(_Base):
+    """Prueba de la bitácora de validación (caso simulado, sin datos de pacientes)."""
+    modulo: Literal["tiva"]
+    elemento: str = Field(pattern=r"^[a-z0-9_]{1,40}$")
+    caso: str = Field(min_length=3, max_length=300)
+    referencia: Literal["simtiva", "bomba", "otra_app", "publicacion", "otro"]
+    referencia_detalle: Optional[str] = Field(default=None, max_length=150)
+    parametros: dict
+    comparacion: list[PuntoComparacion] = Field(min_length=1, max_length=20)
+    veredicto: Literal["coincide", "aceptable", "no_coincide"]
+    comentario: Optional[str] = Field(default=None, max_length=2000)
+
+    @model_validator(mode="after")
+    def _con_referencia(self):
+        import json
+        if len(json.dumps(self.parametros)) > 4000:
+            raise ValueError("los parámetros del caso son demasiado largos")
+        if not any(p.referencia is not None for p in self.comparacion):
+            raise ValueError("escribe al menos una cifra de la referencia para comparar")
+        return self

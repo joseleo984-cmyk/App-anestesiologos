@@ -308,8 +308,41 @@
     return null;
   }
 
+  /**
+   * Cifras de la simulación que un anestesiólogo compara con otra fuente (SimTIVA, una bomba TCI…)
+   * para la bitácora de validación. o = { modo, sitio, objetivo, duracion, umbral, cantidad, conc, soloPlasma }.
+   * Devuelve [{ clave, etiqueta, unidad, app }]; app es null si la simulación no llega a ese punto.
+   */
+  function puntosComparacion(serie, o) {
+    const en = (min) => serie.find((s) => s.t >= min - 1e-9);
+    const puntos = [];
+    const agregar = (clave, etiqueta, unidad, app) => puntos.push({ clave, etiqueta, unidad, app: app == null || !isFinite(app) ? null : app });
+    const minutos = [5, 15, 60].filter((m) => m < o.duracion);
+    if (o.modo === "tci") {
+      const campo = o.sitio === "efecto" ? "ce" : "cp";
+      const llega = serie.find((s) => s[campo] >= o.objetivo * 0.97);
+      agregar("bolo", "Bolo de inducción (1.er minuto)", o.cantidad, tramos(serie, o.duracion)[0].cantidad);
+      agregar("t_objetivo", `Llega al objetivo (${campo === "ce" ? "Ce" : "Cp"})`, "min", llega ? llega.t : null);
+      for (const m of minutos) agregar(`mlh_${m}`, `Velocidad a los ${m} min`, "mL/h", (en(m) || {}).mlh);
+    } else {
+      const campo = o.soloPlasma ? "cp" : "ce";
+      for (const m of minutos) agregar(`${campo}_${m}`, `${campo === "ce" ? "Ce" : "Cp"} a los ${m} min`, o.conc, (en(m) || {})[campo]);
+    }
+    agregar("total", `Total en ${o.duracion} min`, o.cantidad, (en(o.duracion) || serie[serie.length - 1]).acumulado);
+    agregar("despertar", `Despertar (${o.soloPlasma ? "Cp" : "Ce"} < ${String(o.umbral).replace(".", ",")})`, "min",
+      tiempoHasta(serie, o.duracion, o.umbral, o.soloPlasma ? "cp" : "ce"));
+    return puntos;
+  }
+
+  /** Diferencia de la app frente a la referencia, en % de la referencia (null si no se puede calcular). */
+  function diferenciaPct(app, referencia) {
+    if (app == null || referencia == null || !isFinite(app) || !isFinite(referencia)) return null;
+    if (referencia === 0) return app === 0 ? 0 : null;
+    return (app - referencia) / Math.abs(referencia) * 100;
+  }
+
   const api = { MODELOS, FARMACOS, validar, masaMagraJames, pesoMaximoJames, masaLibreGrasaAlSallami, imc,
-    paso, avanzar, planTCI, simularManual, tramos, tiempoHasta, bisPredicho };
+    paso, avanzar, planTCI, simularManual, tramos, tiempoHasta, bisPredicho, puntosComparacion, diferenciaPct };
   raiz.Tiva = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis);

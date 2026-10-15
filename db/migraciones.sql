@@ -399,3 +399,21 @@ ALTER TABLE reporte_pago ADD COLUMN IF NOT EXISTS valor_pagado NUMERIC(14,2);
 -- 31. Pagos globales en el reporte de AP: la línea trae al anestesiólogo en vez del paciente (ej. Santa Ana)
 ALTER TABLE pago_detalle ADD COLUMN IF NOT EXISTS pago_global BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE pago_detalle ADD COLUMN IF NOT EXISTS radicado_id BIGINT REFERENCES reporte_pago(reporte_id) ON DELETE SET NULL;
+-- 32. Bitácora de validación: pruebas de los anestesiólogos que comparan la app con otra fuente
+--     (SimTIVA, una bomba TCI…). No guarda datos de pacientes: solo casos simulados.
+CREATE TABLE IF NOT EXISTS validacion_prueba (
+    prueba_id          BIGSERIAL PRIMARY KEY,
+    anestesiologo_id   BIGINT NOT NULL REFERENCES anestesiologo(anestesiologo_id) ON DELETE CASCADE,
+    modulo             VARCHAR(20) NOT NULL CHECK (modulo IN ('tiva')),
+    elemento           VARCHAR(40) NOT NULL,   -- en TIVA, el modelo (eleveld_propofol, minto…)
+    caso               VARCHAR(300) NOT NULL,  -- resumen legible del caso simulado
+    referencia         VARCHAR(20) NOT NULL CHECK (referencia IN ('simtiva','bomba','otra_app','publicacion','otro')),
+    referencia_detalle VARCHAR(150),           -- marca y versión, por ejemplo
+    parametros         JSONB NOT NULL,         -- lo que se simuló, para repetir la prueba
+    comparacion        JSONB NOT NULL,         -- [{clave, etiqueta, unidad, app, referencia}]
+    veredicto          VARCHAR(20) NOT NULL CHECK (veredicto IN ('coincide','aceptable','no_coincide')),
+    comentario         TEXT,
+    version_app        VARCHAR(20),            -- versión publicada que dio las cifras de la app
+    creado_en          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_validacion_modulo ON validacion_prueba (modulo, creado_en DESC);

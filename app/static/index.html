@@ -282,6 +282,23 @@
   table.inf-tabla th:first-child, table.inf-tabla td:first-child { text-align: left; }
   table.inf-tabla td { text-align: right; padding: 9px 6px; border-top: 1px solid var(--line); }
   table.inf-tabla tr.actual td { background: var(--accent-bg); font-weight: 700; }
+  /* Bitácora de validación */
+  .dif { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .dif.ok { color: var(--ok-text); } .dif.rev { color: var(--warn-text); } .dif.mal { color: var(--err-text); }
+  .chip.coincide { background: var(--ok-bg); color: var(--ok-text); border-color: transparent; }
+  .chip.aceptable { background: var(--warn-bg); color: var(--warn-text); border-color: transparent; }
+  .chip.no_coincide { background: var(--err-bg); color: var(--err-text); border-color: transparent; }
+  .val-tabla td, .val-tabla th { vertical-align: middle; }
+  .val-tabla input { min-height: 38px; padding: 4px 8px; text-align: right; width: 100%; min-width: 72px; }
+  .val-prueba { border-top: 1px solid var(--line); padding: 12px 0; display: grid; gap: 4px; }
+  .val-prueba:first-child { border-top: 0; padding-top: 0; }
+  .val-prueba .linea { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+  .val-prueba .botones { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+  .val-caso { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); }
+  .val-caso:first-child { border-top: 0; padding-top: 0; }
+  .val-caso button { white-space: nowrap; min-height: 36px; padding: 4px 12px; }
+  .ficha .seg-veredicto { display: flex; width: 100%; }
+  .ficha .seg-veredicto button { flex: 1; }
   /* TIVA */
   .tv-modelos { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-top: 8px; }
   .tv-modelos button { text-align: left; display: grid; gap: 2px; padding: 10px 12px; border-radius: 14px; }
@@ -842,6 +859,26 @@
       Pendiente de validación por AP.</p>
   </div>
 
+  <div id="pestana-validacion" class="pestana oculto">
+    <div class="saludo"><span class="sub">Bitácora de validación</span><h1>Pruebas de TIVA</h1></div>
+    <section class="card">
+      <h2>Cómo probar</h2>
+      <ol style="margin:4px 0 8px;padding-left:20px;line-height:1.5">
+        <li>Abre en TIVA uno de los casos sugeridos (o uno propio).</li>
+        <li>Simula el mismo caso en SimTIVA o en una bomba TCI: mismo modelo, objetivo, jeringa y duración.</li>
+        <li>En TIVA toca «Registrar prueba» y escribe las cifras de la otra fuente. La app calcula la diferencia.</li>
+      </ol>
+      <p class="sub" style="margin:0">Solo casos simulados: no escribas nombres ni datos de pacientes. Todos los anestesiólogos ven la bitácora.</p>
+    </section>
+    <section class="card"><h2>Resumen por modelo</h2><div id="val-resumen"><p class="sub">Cargando…</p></div></section>
+    <section class="card"><h2>Casos sugeridos</h2><div id="val-casos"></div></section>
+    <section class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">
+        <h2 style="margin:0">Pruebas registradas</h2><a class="boton" href="/api/validacion.xlsx" style="min-height:36px;padding:6px 12px">Descargar Excel</a></div>
+      <div id="val-lista"></div>
+    </section>
+  </div>
+
   <div id="pestana-regional" class="pestana oculto">
     <div class="saludo"><span class="sub">Guía rápida</span><h1>Anestesia regional</h1></div>
     <section class="card" id="rg-calculadora">
@@ -1253,6 +1290,7 @@
     <button type="button" data-pestana="infusiones"><strong>Infusiones</strong><span class="sub">Vasopresores e inotrópicos</span></button>
     <button type="button" data-pestana="tiva"><strong>TIVA</strong><span class="sub">Propofol y remifentanilo (TCI)</span></button>
     <button type="button" data-pestana="regional"><strong>Regional</strong><span class="sub">Bloqueos, volúmenes y dosis</span></button>
+    <button type="button" data-pestana="validacion"><strong>Validación</strong><span class="sub">Bitácora de pruebas de TIVA</span></button>
     <button type="button" data-pestana="noticias"><strong>Noticias</strong><span class="sub">Novedades en anestesia</span><span class="globo oculto" id="not-globo" style="right:10px;top:10px"></span></button>
   </div>
 </div>
@@ -1269,6 +1307,7 @@
   <div class="botones"><button type="button" id="terminos-salir">Salir</button>
     <button type="button" class="primario" id="terminos-aceptar" disabled>Aceptar y continuar</button></div>
 </div></div>
+<div id="capa-validacion" class="capa oculto"><div class="ficha" id="ficha-validacion" role="dialog" aria-modal="true" aria-label="Registrar prueba de validación"></div></div>
 <div id="capa-bloque" class="capa oculto"><div class="ficha" id="ficha-bloque" role="dialog" aria-modal="true" aria-label="Bloqueo"></div></div>
 <div id="mazo" class="oculto" role="dialog" aria-modal="true" aria-label="Revisar noticias nuevas"></div>
 <div id="visor" class="oculto" role="dialog" aria-modal="true" aria-labelledby="visor-titulo">
@@ -1705,7 +1744,7 @@ window.addEventListener("drop", (e) => e.preventDefault());
 
 // ---------------------------------------------------------------- pestañas
 let pestanaActual = "inicio";
-const EN_MAS = ["reportes", "relacion", "finanzas", "infusiones", "tiva", "regional", "noticias", "usuarios", "clave"];
+const EN_MAS = ["reportes", "relacion", "finanzas", "infusiones", "tiva", "regional", "validacion", "noticias", "usuarios", "clave"];
 function hojaMas(abrir) {
   $("#hoja-mas").classList.toggle("oculto", !abrir);
   $("#fondo-mas").classList.toggle("oculto", !abrir);
@@ -1725,6 +1764,7 @@ function mostrarPestana(nombre) {
   if (nombre === "infusiones") abrirInfusiones();
   if (nombre === "tiva") abrirTiva();
   if (nombre === "regional") abrirRegional();
+  if (nombre === "validacion") cargarValidacion();
   if (nombre === "cirugias") { cargarCirugias(); if (!inicioDatos) cargarResumen(); }
   if (nombre === "pagos") cargarAntiguedadPagos();
   if (nombre === "reportes") cargarReporte();
@@ -2670,6 +2710,7 @@ function calcularTiva() {
   const v = Tiva.validar(tiva.modelo, p);
   $("#tv-avisos").innerHTML = [...v.errores.map((t) => `<div class="aviso err">${escapar(t)}</div>`),
     ...v.avisos.map((t) => `<div class="aviso warn">⚠ ${escapar(t)}</div>`)].join("");
+  tivaUltima = null;
   if (v.errores.length) { res.innerHTML = `<p class="sub" style="margin:0">Completa los datos del paciente para ver la simulación.</p>`; $("#tv-parametros").innerHTML = ""; return; }
   const k = mod.calcular(p);
   if (!(tiva.jeringa > 0)) { res.innerHTML = `<div class="aviso err">Escribe la concentración de la jeringa.</div>`; return; }
@@ -2714,6 +2755,17 @@ function calcularTiva() {
       ${tr.map((t) => `<tr><td>${fmtInf(t.desde)}–${fmtInf(t.hasta)}</td><td>${fmtInf(t.velocidadMedia / tiva.jeringa * 60, 3)}</td>
         <td>${p.peso > 0 ? (tiva.farmaco === "propofol" ? fmtInf(t.velocidadMedia * 60 / p.peso, 3) : fmtInf(t.velocidadMedia / p.peso, 3)) : "—"}</td><td>${fmtInf(t.cantidad, 3)}</td></tr>`).join("")}
       </tbody></table></div>` : ""}`;
+  tivaUltima = {
+    elemento: tiva.modelo, caso: casoTiva(f, mod, p, dur, objetivos),
+    parametros: { farmaco: tiva.farmaco, modelo: tiva.modelo, modelo_nombre: mod.nombre, paciente: { ...tiva.paciente },
+      modo: tiva.modo, sitio: tiva.sitio, objetivo: tiva.objetivo, cambios: tiva.cambios, manual: tiva.manual,
+      duracion: dur, jeringa: tiva.jeringa, velMax: tiva.velMax, despertar: umbral },
+    puntos: Tiva.puntosComparacion(serie, { modo: tiva.modo, sitio: tiva.sitio, objetivo: tiva.objetivo, duracion: dur, umbral,
+      cantidad: f.cantidad, conc: f.conc, soloPlasma: !!mod.soloPlasma }),
+  };
+  res.insertAdjacentHTML("beforeend", `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px">
+    <button type="button" class="primario" data-tv="registrar">📝 Registrar prueba de validación</button>
+    <button type="button" data-tv="bitacora">Ver bitácora</button></div>`);
   graficaTiva($("#tv-grafica"), serie, { conc: f.conc, objetivo: tiva.modo === "tci", soloPlasma: !!mod.soloPlasma, fin: dur });
   graficaVelocidad($("#tv-grafica-vel"), serie, dur);
   $("#tv-parametros").innerHTML = `<summary>Parámetros del modelo ${escapar(mod.nombre)}</summary>
@@ -2723,6 +2775,200 @@ function calcularTiva() {
       .map(([n, val, u]) => `<tr><td>${n}</td><td>${mod.soloPlasma && n === "ke0" ? "no publicado" : `${fmtInf(val, 4)} ${u}`}</td></tr>`).join("")}
     </tbody></table>`;
 }
+
+// ---------------------------------------------------------------- Bitácora de validación (TIVA)
+let tivaUltima = null, valForm = null, valDatos = null;
+const VAL_REFERENCIAS = { simtiva: "SimTIVA", bomba: "Bomba TCI", otra_app: "Otra app", publicacion: "Publicación", otro: "Otro" };
+const VAL_VEREDICTOS = { coincide: "Coincide", aceptable: "Diferencia aceptable", no_coincide: "No coincide" };
+// Casos de prueba ficticios que cubren cada modelo y los extremos (adulto mayor, obeso, niño)
+const VAL_CASOS = [
+  { titulo: "Adulto, Eleveld", farmaco: "propofol", modelo: "eleveld_propofol", paciente: { edad: 40, sexo: "M", peso: 70, talla: 170, opioide: true }, sitio: "efecto", objetivo: 3 },
+  { titulo: "Adulto mayor, Eleveld", farmaco: "propofol", modelo: "eleveld_propofol", paciente: { edad: 80, sexo: "F", peso: 60, talla: 158, opioide: true }, sitio: "efecto", objetivo: 2 },
+  { titulo: "Obesidad, Eleveld", farmaco: "propofol", modelo: "eleveld_propofol", paciente: { edad: 45, sexo: "M", peso: 130, talla: 175, opioide: true }, sitio: "efecto", objetivo: 3 },
+  { titulo: "Niño, Eleveld", farmaco: "propofol", modelo: "eleveld_propofol", paciente: { edad: 6, sexo: "F", peso: 20, talla: 115, opioide: true }, sitio: "efecto", objetivo: 3 },
+  { titulo: "Adulto, Schnider", farmaco: "propofol", modelo: "schnider", paciente: { edad: 50, sexo: "F", peso: 65, talla: 165 }, sitio: "efecto", objetivo: 4 },
+  { titulo: "Adulto, Marsh", farmaco: "propofol", modelo: "marsh", paciente: { edad: 40, sexo: "M", peso: 80, talla: 180 }, sitio: "plasma", objetivo: 4 },
+  { titulo: "Niño, Paedfusor", farmaco: "propofol", modelo: "paedfusor", paciente: { edad: 8, sexo: "M", peso: 25, talla: 128 }, sitio: "plasma", objetivo: 4 },
+  { titulo: "Adulto, Minto", farmaco: "remifentanilo", modelo: "minto", paciente: { edad: 50, sexo: "M", peso: 75, talla: 175 }, sitio: "efecto", objetivo: 4 },
+  { titulo: "Adulto mayor, Eleveld remifentanilo", farmaco: "remifentanilo", modelo: "eleveld_remi", paciente: { edad: 70, sexo: "F", peso: 60, talla: 160 }, sitio: "efecto", objetivo: 3 },
+];
+const fmtDif = (d) => d == null ? "—" : `${d > 0 ? "+" : ""}${d.toFixed(1).replace(".", ",")} %`;
+const claseDif = (d) => d == null ? "" : Math.abs(d) <= 10 ? "ok" : Math.abs(d) <= 20 ? "rev" : "mal";
+
+function casoTiva(f, mod, p, dur, objetivos) {
+  const pac = [p.edad != null ? `${fmtInf(tiva.paciente.edad)} ${tiva.paciente.unidadEdad}` : null, p.sexo === "F" ? "mujer" : "hombre",
+    p.peso ? `${fmtInf(p.peso)} kg` : null, p.talla ? `${fmtInf(p.talla)} cm` : null].filter(Boolean).join(", ");
+  const meta = tiva.modo === "tci"
+    ? `${tiva.sitio === "efecto" && !mod.soloPlasma ? "Ce" : "Cp"} ${fmtInf(tiva.objetivo)} ${f.conc}${objetivos.length > 1 ? " con cambios" : ""}`
+    : "pauta manual";
+  const extra = tiva.modelo === "eleveld_propofol" ? (p.opioide ? " · con opioide" : " · sin opioide") : "";
+  return `${f.nombre} · ${mod.nombre} · ${pac} · ${meta} · jeringa ${fmtInf(tiva.jeringa)} ${f.cantidad}/mL · ${fmtInf(dur)} min${extra}`;
+}
+
+// Abre un caso (sugerido o de la bitácora) en el simulador de TIVA
+function cargarCasoTiva(c) {
+  const f = Tiva.FARMACOS[c.farmaco];
+  Object.assign(tiva, {
+    farmaco: c.farmaco, modelo: c.modelo, modo: c.modo || "tci", sitio: c.sitio || "efecto", objetivo: c.objetivo ?? f.objetivo,
+    cambios: c.cambios || [], manual: c.manual || [{ min: 0, bolo: null, mlh: null }], duracion: c.duracion || 60,
+    jeringa: c.jeringa || f.jeringa[0], velMax: c.velMax || 1200, despertar: c.despertar ?? null,
+    paciente: { unidadEdad: "años", opioide: true, talla: null, ...c.paciente },
+  });
+  guardarTiva();
+  mostrarPestana("tiva");
+}
+
+$("#tv-resultado").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-tv]");
+  if (!b) return;
+  if (b.dataset.tv === "registrar") abrirRegistroPrueba();
+  if (b.dataset.tv === "bitacora") mostrarPestana("validacion");
+});
+
+function abrirRegistroPrueba() {
+  if (!tivaUltima) return;
+  const u = tivaUltima;
+  valForm = { referencia: "simtiva", veredicto: null, valores: u.puntos.map(() => null) };
+  $("#ficha-validacion").innerHTML = `<div class="agarre"></div>
+    <div class="arriba"><span class="etiq" style="--c1:var(--accent)">Bitácora de validación</span><span style="flex:1"></span>
+      <button type="button" data-vf="cerrar" aria-label="Cerrar" style="min-height:36px;padding:4px 12px">✕</button></div>
+    <h3 style="margin:0">Registrar prueba</h3>
+    <p class="sub" style="margin:0">${escapar(u.caso)}</p>
+    <div><label>Comparado con</label><div class="inf-preps" id="vf-referencia">
+      ${Object.entries(VAL_REFERENCIAS).map(([k, t]) => `<button type="button" data-vref="${k}" aria-pressed="${k === "simtiva"}">${t}</button>`).join("")}</div>
+      <label for="vf-detalle">Detalle (opcional)</label>
+      <input id="vf-detalle" maxlength="150" placeholder="Ej: SimTIVA web, o marca y modelo de la bomba"></div>
+    <div><label>Cifras</label>
+      <p class="sub" style="margin:0 0 6px">Escribe lo que muestra la otra fuente. Deja en blanco lo que no muestre.</p>
+      <div class="tabla-scroll"><table class="inf-tabla val-tabla"><thead><tr><th>Cifra</th><th>App</th><th>Referencia</th><th>Dif.</th></tr></thead><tbody>
+      ${u.puntos.map((pt, i) => `<tr><td>${escapar(pt.etiqueta)}<div class="sub" style="font-size:.75rem">${escapar(pt.unidad)}</div></td>
+        <td>${fmtInf(pt.app, 4)}</td>
+        <td><input data-vi="${i}" type="text" inputmode="decimal" autocomplete="off" aria-label="${escapar(pt.etiqueta)} en la referencia"></td>
+        <td class="dif" id="vf-dif-${i}">—</td></tr>`).join("")}
+      </tbody></table></div>
+      <p class="sub" style="margin:6px 0 0">Diferencia frente a la referencia: verde hasta 10 %, amarilla hasta 20 %, roja más de 20 %
+        (umbral orientativo, pendiente de definir por AP).</p></div>
+    <div><label>Veredicto</label><div class="segmentado seg-veredicto" id="vf-veredicto">
+      ${Object.entries(VAL_VEREDICTOS).map(([k, t]) => `<button type="button" data-vver="${k}" aria-pressed="false">${t}</button>`).join("")}</div></div>
+    <div><label for="vf-comentario">Comentario (opcional)</label>
+      <textarea id="vf-comentario" maxlength="2000" rows="3" placeholder="Qué diferencias viste y por qué crees que ocurren"></textarea></div>
+    <div id="vf-error"></div>
+    <div class="botones"><button type="button" class="primario" data-vf="guardar">Guardar prueba</button></div>
+    <p class="sub" style="margin:0">No escribas nombres ni datos de pacientes: la bitácora la ven todos los anestesiólogos.</p>`;
+  $("#capa-validacion").classList.remove("oculto");
+  $("#ficha-validacion").scrollTop = 0;
+  document.body.style.overflow = "hidden";
+}
+function cerrarRegistroPrueba() { $("#capa-validacion").classList.add("oculto"); document.body.style.overflow = ""; valForm = null; }
+
+$("#capa-validacion").addEventListener("input", (e) => {
+  const i = e.target.dataset.vi;
+  if (i == null || !valForm) return;
+  const v = numInf(e.target.value), d = Tiva.diferenciaPct(tivaUltima.puntos[i].app, v);
+  valForm.valores[i] = v;
+  const celda = $(`#vf-dif-${i}`);
+  celda.textContent = fmtDif(d);
+  celda.className = `dif ${claseDif(d)}`;
+});
+$("#capa-validacion").addEventListener("click", async (e) => {
+  if (e.target.id === "capa-validacion") return cerrarRegistroPrueba();
+  const b = e.target.closest("[data-vf],[data-vref],[data-vver]");
+  if (!b || !valForm) return;
+  if (b.dataset.vref) {
+    valForm.referencia = b.dataset.vref;
+    document.querySelectorAll("#vf-referencia [data-vref]").forEach((x) => x.setAttribute("aria-pressed", x === b));
+  }
+  if (b.dataset.vver) {
+    valForm.veredicto = b.dataset.vver;
+    document.querySelectorAll("#vf-veredicto [data-vver]").forEach((x) => x.setAttribute("aria-pressed", x === b));
+  }
+  if (b.dataset.vf === "cerrar") cerrarRegistroPrueba();
+  if (b.dataset.vf === "guardar") {
+    const error = $("#vf-error");
+    if (!valForm.valores.some((v) => v != null)) return aviso(error, "err", "Escribe al menos una cifra de la referencia.");
+    if (!valForm.veredicto) return aviso(error, "err", "Elige el veredicto.");
+    const u = tivaUltima;
+    const datos = {
+      modulo: "tiva", elemento: u.elemento, caso: u.caso, referencia: valForm.referencia,
+      referencia_detalle: $("#vf-detalle").value.trim() || null, parametros: u.parametros,
+      comparacion: u.puntos.map((pt, i) => ({ ...pt, referencia: valForm.valores[i] })),
+      veredicto: valForm.veredicto, comentario: $("#vf-comentario").value.trim() || null,
+    };
+    b.disabled = true;
+    const r = await fetch("/api/validacion", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(datos) });
+    b.disabled = false;
+    if (!r.ok) return aviso(error, "err", mensajeError(await r.json().catch(() => null), "No se pudo guardar la prueba."));
+    cerrarRegistroPrueba();
+    valDatos = null;
+    toast("Prueba registrada en la bitácora");
+  }
+});
+
+async function cargarValidacion() {
+  pintarCasosValidacion();
+  const r = await fetch("/api/validacion?modulo=tiva");
+  if (!r.ok) { $("#val-resumen").innerHTML = `<div class="aviso err">No se pudo cargar la bitácora.</div>`; return; }
+  valDatos = await r.json();
+  pintarValidacion();
+}
+function nombreModelo(id) { return Tiva.MODELOS[id]?.nombre || id; }
+function pintarCasosValidacion() {
+  $("#val-casos").innerHTML = VAL_CASOS.map((c, i) => {
+    const f = Tiva.FARMACOS[c.farmaco], p = c.paciente;
+    return `<div class="val-caso"><div><strong>${escapar(c.titulo)}</strong>
+      <div class="sub">${f.nombre} · ${fmtInf(p.edad)} años, ${p.sexo === "F" ? "mujer" : "hombre"}, ${fmtInf(p.peso)} kg, ${fmtInf(p.talla)} cm ·
+        ${c.sitio === "efecto" ? "Ce" : "Cp"} ${fmtInf(c.objetivo)} ${f.conc} · 60 min</div></div>
+      <button type="button" data-caso="${i}">Abrir en TIVA</button></div>`;
+  }).join("") + `<p class="sub" style="margin:10px 0 0">Casos ficticios. Usa jeringa de ${Tiva.FARMACOS.propofol.jeringa[0]} mg/mL de propofol
+    y ${Tiva.FARMACOS.remifentanilo.jeringa[0]} µg/mL de remifentanilo, o cámbiala igual en las dos fuentes.</p>`;
+}
+function pintarValidacion() {
+  const d = valDatos, porModelo = Object.fromEntries(d.resumen.map((g) => [g.elemento, g]));
+  const fila = (id) => { const g = porModelo[id];
+    return `<tr><td>${escapar(nombreModelo(id))}</td>
+      <td>${g ? `${g.pruebas}<div class="sub" style="font-size:.75rem">${g.autores} ${g.autores === 1 ? "persona" : "personas"}</div>` : `<span class="sub">0</span>`}</td>
+      <td>${g ? `${g.coincide ? `<span class="chip coincide">${g.coincide} ✓</span> ` : ""}${g.aceptable ? `<span class="chip aceptable">${g.aceptable} ≈</span> ` : ""}${g.no_coincide ? `<span class="chip no_coincide">${g.no_coincide} ✗</span>` : ""}
+        <div class="sub" style="font-size:.75rem">mayor dif. <span class="dif ${claseDif(g.mayor_diferencia)}">${fmtDif(g.mayor_diferencia)}</span></div>`
+        : `<span class="sub">Sin pruebas</span>`}</td></tr>`; };
+  $("#val-resumen").innerHTML = Object.values(Tiva.FARMACOS).map((F) => `<h3 style="margin:10px 0 2px;font-size:.95rem">${F.nombre}</h3>
+    <table class="inf-tabla"><thead><tr><th>Modelo</th><th>Pruebas</th><th>Resultado</th></tr></thead>
+    <tbody>${F.modelos.map(fila).join("")}</tbody></table>`).join("") +
+    `<p class="sub" style="margin:10px 0 0">✓ coincide · ≈ diferencia aceptable · ✗ no coincide</p>`;
+  const fecha = (iso) => new Date(iso).toLocaleString("es-CO", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
+  $("#val-lista").innerHTML = d.pruebas.length ? d.pruebas.map((p) => `<div class="val-prueba">
+      <div class="linea"><strong>${escapar(p.parametros.modelo_nombre || nombreModelo(p.elemento))}</strong>
+        <span class="chip ${p.veredicto}">${VAL_VEREDICTOS[p.veredicto]}</span></div>
+      <div>${escapar(p.caso)}</div>
+      <div class="sub">${fecha(p.creado_en)} · ${escapar(p.autor)} · frente a ${VAL_REFERENCIAS[p.referencia]}${p.referencia_detalle ? ` (${escapar(p.referencia_detalle)})` : ""}
+        · mayor dif. <span class="dif ${claseDif(p.mayor_diferencia)}">${fmtDif(p.mayor_diferencia)}</span></div>
+      <details><summary class="sub">Ver cifras${p.comentario ? " y comentario" : ""}</summary>
+        <div class="tabla-scroll"><table class="inf-tabla" style="margin-top:6px"><thead><tr><th>Cifra</th><th>App</th><th>Referencia</th><th>Dif.</th></tr></thead><tbody>
+        ${p.comparacion.map((c) => { const dif = Tiva.diferenciaPct(c.app, c.referencia);
+          return `<tr><td>${escapar(c.etiqueta)} <span class="sub">(${escapar(c.unidad)})</span></td><td>${fmtInf(c.app, 4)}</td>
+            <td>${c.referencia == null ? "—" : fmtInf(c.referencia, 4)}</td><td class="dif ${claseDif(dif)}">${fmtDif(dif)}</td></tr>`; }).join("")}
+        </tbody></table></div>
+        ${p.comentario ? `<p style="margin:8px 0 0;white-space:pre-wrap">${escapar(p.comentario)}</p>` : ""}
+        <p class="sub" style="margin:6px 0 0">Versión de la app: ${escapar(p.version_app || "—")}</p></details>
+      <div class="botones"><button type="button" data-val="repetir" data-id="${p.prueba_id}" style="min-height:36px;padding:4px 12px">Repetir en TIVA</button>
+        ${p.mia || esAdmin ? `<button type="button" data-val="borrar" data-id="${p.prueba_id}" class="enlace" style="border:0;background:none;min-height:0">Borrar</button>` : ""}</div>
+    </div>`).join("") : `<p class="sub" style="margin:0">Aún no hay pruebas. Abre un caso sugerido y registra la primera.</p>`;
+}
+$("#pestana-validacion").addEventListener("click", async (e) => {
+  const caso = e.target.closest("[data-caso]");
+  if (caso) return cargarCasoTiva({ ...VAL_CASOS[Number(caso.dataset.caso)], duracion: 60 });
+  const b = e.target.closest("[data-val]");
+  if (!b || !valDatos) return;
+  const p = valDatos.pruebas.find((x) => String(x.prueba_id) === b.dataset.id);
+  if (!p) return;
+  if (b.dataset.val === "repetir") return cargarCasoTiva(p.parametros);
+  if (b.dataset.val === "borrar") {
+    if (!confirm("¿Borrar esta prueba de la bitácora?")) return;
+    const r = await fetch(`/api/validacion/${p.prueba_id}`, { method: "DELETE" });
+    if (!r.ok) return toast(mensajeError(await r.json().catch(() => null), "No se pudo borrar."));
+    toast("Prueba borrada");
+    cargarValidacion();
+  }
+});
 
 // Gráfica de concentraciones (Ce y Cp sobre un solo eje, con el objetivo punteado) y tooltip al tocar
 function graficaTiva(cont, serie, o) {

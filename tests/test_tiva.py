@@ -85,3 +85,22 @@ def test_validaciones():
     assert "masa magra" in r["obesa"]["errores"][0]
     assert r["falta"]["errores"] == ["Falta la talla.", "Falta el sexo."]
     assert r["nino"]["avisos"] and r["ok"] == {"errores": [], "avisos": []}
+
+
+def test_puntos_para_la_bitacora_de_validacion():
+    r = js("""const k = T.MODELOS.schnider.calcular({ edad: 40, peso: 70, talla: 170, sexo: "M" });
+      const s = T.planTCI(k, { objetivos: [{ min: 0, valor: 3 }], modo: "efecto", duracion: 30, concJeringa: 10, despues: 60 });
+      const tci = T.puntosComparacion(s, { modo: "tci", sitio: "efecto", objetivo: 3, duracion: 30, umbral: 1.2, cantidad: "mg", conc: "µg/mL" });
+      const m = T.simularManual(k, [{ min: 0, bolo: 140, mlh: 60 }, { min: 30, mlh: 0 }], 10, 90);
+      const man = T.puntosComparacion(m, { modo: "manual", duracion: 30, umbral: 1.2, cantidad: "mg", conc: "µg/mL" });
+      return { tci, man, bolo: T.tramos(s, 30)[0].cantidad, d: [T.diferenciaPct(110, 100), T.diferenciaPct(90, 100),
+               T.diferenciaPct(null, 1), T.diferenciaPct(1, 0), T.diferenciaPct(0, 0)] };""")
+    assert [p["clave"] for p in r["tci"]] == ["bolo", "t_objetivo", "mlh_5", "mlh_15", "total", "despertar"]
+    assert r["tci"][0]["app"] == pytest.approx(r["bolo"]) and r["tci"][0]["unidad"] == "mg"
+    assert 0 < r["tci"][1]["app"] < 5 and all(p["app"] > 0 for p in r["tci"])
+    assert r["tci"][4]["etiqueta"] == "Total en 30 min" and r["tci"][5]["unidad"] == "min"
+    # pauta manual: concentraciones en sitio efecto; 60 min queda fuera de una pauta de 30
+    assert [p["clave"] for p in r["man"]] == ["ce_5", "ce_15", "total", "despertar"]
+    assert r["man"][2]["app"] == pytest.approx(140 + 300, rel=1e-3)   # bolo + 60 mL/h × 10 mg/mL × 0,5 h
+    assert r["d"][0] == pytest.approx(10) and r["d"][1] == pytest.approx(-10) and r["d"][2:] == [None, None, 0]
+    assert r["tci"][5]["etiqueta"] == "Despertar (Ce < 1,2)"

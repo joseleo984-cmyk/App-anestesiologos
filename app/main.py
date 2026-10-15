@@ -26,9 +26,9 @@ from pydantic import BaseModel, Field
 from rapidfuzz import fuzz
 
 from app import (almacenamiento, auth, calidad, cartera, catalogo, config, copia, correo, exportar, extraccion, extractos,
-                 finanzas, inicio, liquidacion, noticias, radicado, repositorio, uso_ia)
+                 finanzas, inicio, liquidacion, noticias, radicado, repositorio, uso_ia, validacion)
 from app.modelos import (ClaveCopia, CompromisoEntrada, CuentaEntrada, Favorita, FuenteNoticias, ImportacionConfirmada, MetaEntrada,
-                         MovimientoEntrada, OrdenConfirmada, PartidaEntrada, Sugerencia, TemasNoticias)
+                         MovimientoEntrada, OrdenConfirmada, PartidaEntrada, PruebaValidacion, Sugerencia, TemasNoticias)
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 log = logging.getLogger(__name__)
@@ -1205,6 +1205,39 @@ def _a_jpeg(datos: bytes) -> bytes:
     salida = io.BytesIO()
     img.save(salida, "JPEG", quality=85)
     return salida.getvalue()
+
+
+@app.get("/api/validacion")
+def bitacora_validacion(modulo: Literal["tiva"] = "tiva", conn=Depends(get_conn, scope="function"),
+                        anestesiologo_id=Depends(anestesiologo_actual)):
+    """Bitácora de pruebas de todos los anestesiólogos, con el resumen por modelo."""
+    pruebas = validacion.listar(conn, modulo, anestesiologo_id)
+    return {"pruebas": pruebas, "resumen": validacion.resumen(pruebas)}
+
+
+@app.post("/api/validacion", status_code=201)
+def registrar_prueba(prueba: PruebaValidacion, conn=Depends(get_conn, scope="function"),
+                     anestesiologo_id=Depends(anestesiologo_actual)):
+    return validacion.crear(conn, anestesiologo_id, prueba)
+
+
+@app.delete("/api/validacion/{prueba_id}", status_code=204)
+def borrar_prueba(prueba_id: int, conn=Depends(get_conn, scope="function"), cuenta: dict = Depends(cuenta_sesion),
+                  anestesiologo_id=Depends(anestesiologo_actual)):
+    borrada = validacion.borrar(conn, prueba_id, anestesiologo_id, cuenta["es_admin"])
+    if borrada is None:
+        raise HTTPException(404, "Prueba no encontrada.")
+    if not borrada:
+        raise HTTPException(403, "Solo quien registró la prueba (o el administrador) puede borrarla.")
+    return Response(status_code=204)
+
+
+@app.get("/api/validacion.xlsx")
+def bitacora_excel(modulo: Literal["tiva"] = "tiva", conn=Depends(get_conn, scope="function"),
+                   anestesiologo_id=Depends(anestesiologo_actual)):
+    libro = validacion.libro(validacion.listar(conn, modulo, anestesiologo_id))
+    return Response(libro, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f'attachment; filename="bitacora-{modulo}-{date.today()}.xlsx"'})
 
 
 @app.get("/api/regional/imagenes")
