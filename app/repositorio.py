@@ -544,7 +544,7 @@ def ciudad_conocida(conn, anestesiologo_id: int, clinica: str) -> Optional[str]:
 
 
 _CUENTA = """anestesiologo_id, nombre, email, password_hash, es_admin, activo, debe_cambiar_clave,
-             version_sesion"""
+             version_sesion, estado_registro"""
 
 
 def obtener_cuenta(conn, anestesiologo_id: int) -> Optional[dict]:
@@ -571,9 +571,9 @@ def cambiar_clave(conn, anestesiologo_id: int, password_hash: str, temporal: boo
 def listar_usuarios(conn) -> list[dict]:
     return conn.execute(
         """SELECT a.anestesiologo_id, a.nombre, a.email, a.registro_medico, a.es_admin, a.activo,
-                  a.debe_cambiar_clave, a.creado_en,
+                  a.debe_cambiar_clave, a.creado_en, a.estado_registro, a.telefono,
                   (SELECT COUNT(*) FROM cirugia c WHERE c.anestesiologo_id = a.anestesiologo_id) AS cirugias
-             FROM anestesiologo a ORDER BY a.activo DESC, a.nombre"""
+             FROM anestesiologo a ORDER BY a.estado_registro = 'PENDIENTE' DESC, a.activo DESC, a.nombre"""
     ).fetchall()
 
 
@@ -593,10 +593,50 @@ def crear_usuario(conn, nombre: str, email: str, registro_medico: Optional[str],
         raise EmailYaRegistrado() from e
 
 
+MAX_PENDIENTES = 30  # tope de solicitudes sin revisar (frena el registro masivo de cuentas falsas)
+
+
+class DemasiadasSolicitudes(Exception):
+    pass
+
+
+def registrar_solicitud(conn, nombre: str, email: str, registro_medico: str, telefono: Optional[str],
+                        password_hash: str) -> int:
+    """Cuenta nueva pendiente de aprobación: no puede entrar hasta que el administrador la apruebe."""
+    if conn.execute("SELECT count(*) AS n FROM anestesiologo WHERE estado_registro = 'PENDIENTE'").fetchone()["n"] >= MAX_PENDIENTES:
+        raise DemasiadasSolicitudes()
+    try:
+        with conn.transaction():
+            return conn.execute(
+                """INSERT INTO anestesiologo (nombre, email, registro_medico, telefono, password_hash, activo,
+                                             estado_registro, autoriza_datos_en)
+                   VALUES (%s, %s, %s, %s, %s, FALSE, 'PENDIENTE', now()) RETURNING anestesiologo_id""",
+                (nombre, email.strip().lower(), registro_medico, telefono, password_hash),
+            ).fetchone()["anestesiologo_id"]
+    except psycopg.errors.UniqueViolation as e:
+        raise EmailYaRegistrado() from e
+
+
+def aprobar_solicitud(conn, anestesiologo_id: int) -> bool:
+    return conn.execute(
+        """UPDATE anestesiologo SET activo = TRUE, estado_registro = 'APROBADA'
+            WHERE anestesiologo_id = %s AND estado_registro = 'PENDIENTE'""", (anestesiologo_id,)).rowcount == 1
+
+
+def rechazar_solicitud(conn, anestesiologo_id: int) -> bool:
+    """Borra la solicitud (no tiene datos): la persona puede volver a registrarse si fue un error."""
+    return conn.execute("DELETE FROM anestesiologo WHERE anestesiologo_id = %s AND estado_registro = 'PENDIENTE'",
+                        (anestesiologo_id,)).rowcount == 1
+
+
+def solicitudes_pendientes(conn) -> int:
+    return conn.execute("SELECT count(*) AS n FROM anestesiologo WHERE estado_registro = 'PENDIENTE'").fetchone()["n"]
+
+
 def cambiar_activo(conn, anestesiologo_id: int, activo: bool) -> bool:
     return conn.execute(
         """UPDATE anestesiologo SET activo = %s, version_sesion = version_sesion + 1
-            WHERE anestesiologo_id = %s""",
+            WHERE anestesiologo_id = %s AND estado_registro = 'APROBADA'""",
         (activo, anestesiologo_id),
     ).rowcount == 1
 

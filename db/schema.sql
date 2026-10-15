@@ -382,3 +382,9 @@ CREATE TABLE IF NOT EXISTS regional_imagen (
     subida_en          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_regional_imagen_bloque ON regional_imagen (bloque);
+
+-- 23. Registro propio: el anestesiólogo se registra y el administrador aprueba la cuenta
+ALTER TABLE anestesiologo ADD COLUMN IF NOT EXISTS estado_registro VARCHAR(10) NOT NULL DEFAULT 'APROBADA'
+    CHECK (estado_registro IN ('PENDIENTE', 'APROBADA'));
+ALTER TABLE anestesiologo ADD COLUMN IF NOT EXISTS telefono VARCHAR(30);
+ALTER TABLE anestesiologo ADD COLUMN IF NOT EXISTS autoriza_datos_en TIMESTAMPTZ;  -- autorización de tratamiento de datos (Ley 1581)

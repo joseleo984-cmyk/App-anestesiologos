@@ -16,7 +16,7 @@ from datetime import date
 from pathlib import Path
 from typing import Literal, Optional
 
-from fastapi import BackgroundTasks, Cookie, Depends, FastAPI, File, Form, HTTPException, Query, Response, UploadFile
+from fastapi import BackgroundTasks, Cookie, Depends, FastAPI, File, Form, HTTPException, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -145,9 +145,13 @@ class Credenciales(BaseModel):
 @app.post("/api/login")
 def iniciar_sesion(datos: Credenciales, response: Response, conn=Depends(get_conn, scope="function")):
     usuario = repositorio.buscar_anestesiologo_por_email(conn, datos.email)
-    if (not usuario or not usuario["activo"]
-            or not auth.verificar_password(datos.password, usuario["password_hash"])):
+    if not usuario or not auth.verificar_password(datos.password, usuario["password_hash"]):
         time.sleep(1)  # frena los intentos de adivinar contraseñas
+        raise HTTPException(401, "Correo o contraseña incorrectos.")
+    if usuario["estado_registro"] == "PENDIENTE":
+        raise HTTPException(403, "Tu solicitud de registro está pendiente: el administrador de AP debe aprobarla.")
+    if not usuario["activo"]:
+        time.sleep(1)
         raise HTTPException(401, "Correo o contraseña incorrectos.")
     poner_cookie(response, usuario["anestesiologo_id"], usuario["version_sesion"])
     return {"nombre": usuario["nombre"], "debe_cambiar_clave": usuario["debe_cambiar_clave"]}
@@ -182,6 +186,69 @@ def cambiar_mi_clave(datos: CambioClave, response: Response, conn=Depends(get_co
     version = repositorio.cambiar_clave(conn, cuenta["anestesiologo_id"], auth.hash_password(datos.nueva), False)
     conn.commit()
     poner_cookie(response, cuenta["anestesiologo_id"], version)  # esta sesión sigue; las demás se cierran
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------- registro propio (pendiente de aprobación)
+class Registro(BaseModel):
+    nombre: str = Field(min_length=5, max_length=150)
+    email: str = Field(min_length=5, max_length=150, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+    registro_medico: str = Field(min_length=3, max_length=30)
+    telefono: Optional[str] = Field(default=None, max_length=30)
+    password: str = Field(min_length=10, max_length=200)
+    autoriza_datos: bool
+    sitio_web: Optional[str] = None  # campo trampa: invisible para las personas, los robots lo llenan
+
+
+MAX_REGISTROS_HORA = 3
+_registros_por_ip: dict[str, list[float]] = {}
+
+
+@app.get("/api/registro")
+def registro_disponible():
+    return {"abierto": config.REGISTRO_ABIERTO}
+
+
+@app.post("/api/registro", status_code=201)
+def registrarse(datos: Registro, request: Request, conn=Depends(get_conn, scope="function")):
+    """Un anestesiólogo crea su cuenta; queda pendiente hasta que el administrador la apruebe."""
+    if not config.REGISTRO_ABIERTO:
+        raise HTTPException(403, "El registro está cerrado. Pide la cuenta al administrador de AP.")
+    if not datos.autoriza_datos:
+        raise HTTPException(422, "Debes autorizar el tratamiento de tus datos para registrarte.")
+    ahora, ip = time.time(), (request.client.host if request.client else "?")
+    recientes = [t for t in _registros_por_ip.get(ip, []) if ahora - t < 3600]
+    if len(recientes) >= MAX_REGISTROS_HORA:
+        raise HTTPException(429, "Demasiados registros desde esta conexión. Intenta más tarde.")
+    _registros_por_ip[ip] = recientes + [ahora]
+    if datos.sitio_web:  # robot: se responde igual que a una persona, sin crear nada
+        return {"ok": True}
+    try:
+        repositorio.registrar_solicitud(conn, " ".join(datos.nombre.split()), datos.email,
+                                        " ".join(datos.registro_medico.split()), (datos.telefono or "").strip() or None,
+                                        auth.hash_password(datos.password))
+    except repositorio.EmailYaRegistrado:
+        conn.rollback()
+        raise HTTPException(409, "Ya existe una cuenta con ese correo o registro médico. Si es tuya, inicia sesión.")
+    except repositorio.DemasiadasSolicitudes:
+        raise HTTPException(429, "Hay muchas solicitudes sin revisar. Avísale al administrador de AP.")
+    conn.commit()
+    return {"ok": True}
+
+
+@app.post("/api/usuarios/{usuario_id}/aprobar")
+def aprobar_registro(usuario_id: int, conn=Depends(get_conn, scope="function"), _=Depends(admin_actual)):
+    if not repositorio.aprobar_solicitud(conn, usuario_id):
+        raise HTTPException(404, "Solicitud no encontrada.")
+    conn.commit()
+    return {"ok": True}
+
+
+@app.post("/api/usuarios/{usuario_id}/rechazar")
+def rechazar_registro(usuario_id: int, conn=Depends(get_conn, scope="function"), _=Depends(admin_actual)):
+    if not repositorio.rechazar_solicitud(conn, usuario_id):
+        raise HTTPException(404, "Solicitud no encontrada.")
+    conn.commit()
     return {"ok": True}
 
 
@@ -524,9 +591,12 @@ def cobro_de_cirugia(cirugia_id: int, conn=Depends(get_conn, scope="function"), 
 
 
 @app.get("/api/inicio")
-def pantalla_de_inicio(conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
+def pantalla_de_inicio(conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual),
+                       cuenta: dict = Depends(cuenta_sesion)):
     """Resumen de la cartera para la pantalla de Inicio: cobrado, por cobrar, antigüedad y tareas pendientes."""
-    return cartera.resumen(conn, anestesiologo_id)
+    datos = cartera.resumen(conn, anestesiologo_id)
+    datos["solicitudes"] = repositorio.solicitudes_pendientes(conn) if cuenta["es_admin"] else 0
+    return datos
 
 
 @app.put("/api/cirugias/{cirugia_id}")

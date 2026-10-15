@@ -43,6 +43,14 @@
            border: 0; background: var(--accent); color: var(--accent-text); cursor: pointer; }
   button:disabled { opacity: .6; }
   .error { background: var(--err-bg); color: var(--err-text); padding: 10px 12px; border-radius: 8px; margin-top: 12px; }
+  .ok { background: color-mix(in srgb, var(--accent) 14%, transparent); padding: 12px; border-radius: 10px; color: var(--text); }
+  .cambiar { text-align: center; margin: 16px 0 0; }
+  .cambiar a { color: var(--accent); font-weight: 600; }
+  .oculto { display: none !important; }
+  .trampa { position: absolute; left: -5000px; width: 1px; height: 1px; overflow: hidden; }
+  .autoriza { display: flex; gap: 8px; align-items: flex-start; font-size: .82rem; color: var(--muted); margin-top: 14px; }
+  .autoriza input { width: auto; margin-top: 3px; }
+  .nota { font-size: .8rem; margin: 6px 0 0; }
 </style>
 </head>
 <body>
@@ -50,7 +58,7 @@
   <img src="/static/icono-192.png" alt="" width="72" height="72" style="border-radius:16px;display:block;margin:0 auto 12px">
   <h1 style="text-align:center">Auditorías AP</h1>
   <p style="text-align:center">Anestesiólogos Permanentes</p>
-  <p>Inicia sesión para continuar.</p>
+  <p id="texto-login">Inicia sesión para continuar.</p>
   <form id="login">
     <label for="email">Correo</label>
     <input id="email" type="email" autocomplete="username" required>
@@ -59,8 +67,70 @@
     <div id="error"></div>
     <button type="submit">Entrar</button>
   </form>
+  <p class="cambiar oculto" id="ir-registro">¿Eres anestesiólogo de AP y no tienes cuenta? <a href="#registro">Regístrate</a></p>
+
+  <form id="registro" class="oculto" novalidate>
+    <h1 style="font-size:1.15rem;margin:0 0 4px">Crear mi cuenta</h1>
+    <p class="nota" style="margin:0 0 6px">Tu cuenta queda pendiente hasta que el administrador de AP la apruebe.</p>
+    <label for="r-nombre">Nombre completo</label><input id="r-nombre" autocomplete="name" required>
+    <label for="r-registro">Registro médico (RETHUS)</label><input id="r-registro" autocomplete="off" required>
+    <label for="r-email">Correo</label><input id="r-email" type="email" autocomplete="email" required>
+    <label for="r-telefono">Celular (opcional, para contactarte)</label><input id="r-telefono" type="tel" autocomplete="tel">
+    <label for="r-clave">Contraseña (mínimo 10 caracteres)</label><input id="r-clave" type="password" autocomplete="new-password" required>
+    <label for="r-clave2">Repite la contraseña</label><input id="r-clave2" type="password" autocomplete="new-password" required>
+    <div class="trampa" aria-hidden="true"><label for="r-sitio">No llenar</label><input id="r-sitio" tabindex="-1" autocomplete="off"></div>
+    <label class="autoriza"><input type="checkbox" id="r-autoriza">
+      <span>Autorizo el tratamiento de mis datos personales para crear y administrar mi cuenta en Auditorías AP (Ley 1581 de 2012).</span></label>
+    <div id="error-registro"></div>
+    <button type="submit">Enviar solicitud</button>
+  </form>
+  <div id="registro-listo" class="oculto ok">
+    <strong>✓ Solicitud enviada.</strong> El administrador de AP revisará tus datos. Cuando la apruebe podrás entrar con tu
+    correo y la contraseña que escogiste.
+  </div>
+  <p class="cambiar oculto" id="ir-login"><a href="#">Ya tengo cuenta: iniciar sesión</a></p>
 </main>
 <script>
+const $ = (s) => document.querySelector(s);
+function vista() {
+  const registro = location.hash === "#registro";
+  $("#login").classList.toggle("oculto", registro);
+  $("#texto-login").classList.toggle("oculto", registro);
+  $("#ir-registro").classList.toggle("oculto", registro || !registroAbierto);
+  $("#registro").classList.toggle("oculto", !registro || $("#registro-listo").classList.contains("visto"));
+  $("#ir-login").classList.toggle("oculto", !registro);
+}
+let registroAbierto = false;
+fetch("/api/registro").then((r) => r.ok ? r.json() : null).then((d) => { registroAbierto = !!(d && d.abierto); vista(); });
+window.addEventListener("hashchange", vista);
+$("#ir-login a").onclick = (e) => { e.preventDefault(); history.pushState("", "", location.pathname); vista(); };
+function error(caja, texto) { caja.innerHTML = `<div class="error"></div>`; caja.firstChild.textContent = texto; }
+$("#registro").onsubmit = async (ev) => {
+  ev.preventDefault();
+  const caja = $("#error-registro"), boton = ev.submitter;
+  caja.innerHTML = "";
+  const datos = { nombre: $("#r-nombre").value.trim(), registro_medico: $("#r-registro").value.trim(),
+    email: $("#r-email").value.trim(), telefono: $("#r-telefono").value.trim() || null, password: $("#r-clave").value,
+    autoriza_datos: $("#r-autoriza").checked, sitio_web: $("#r-sitio").value || null };
+  if (datos.nombre.length < 5) return error(caja, "Escribe tu nombre completo.");
+  if (datos.registro_medico.length < 3) return error(caja, "Escribe tu registro médico.");
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(datos.email)) return error(caja, "Revisa el correo.");
+  if (datos.password.length < 10) return error(caja, "La contraseña debe tener al menos 10 caracteres.");
+  if (datos.password !== $("#r-clave2").value) return error(caja, "Las contraseñas no coinciden.");
+  if (!datos.autoriza_datos) return error(caja, "Debes autorizar el tratamiento de tus datos.");
+  boton.disabled = true;
+  try {
+    const r = await fetch("/api/registro", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(datos) });
+    const cuerpo = await r.json().catch(() => null);
+    if (!r.ok) return error(caja, cuerpo && typeof cuerpo.detail === "string" ? cuerpo.detail : "No se pudo enviar la solicitud.");
+    $("#registro").classList.add("oculto");
+    $("#registro-listo").classList.remove("oculto"); $("#registro-listo").classList.add("visto");
+  } catch {
+    error(caja, "Sin conexión. Intenta de nuevo.");
+  } finally {
+    boton.disabled = false;
+  }
+};
 document.getElementById("login").onsubmit = async (ev) => {
   ev.preventDefault();
   const boton = ev.submitter, error = document.getElementById("error");

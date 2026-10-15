@@ -89,3 +89,62 @@ def test_las_migraciones_solo_corren_cuando_cambian(db_url, monkeypatch):
         finally:
             otra.close()
         assert c.execute("SELECT count(*) AS n FROM migracion_aplicada").fetchone()["n"] == 1
+
+
+# ------------------------------------------------ registro propio con aprobación del administrador
+NUEVO = {"nombre": "Dr. Nuevo Ficticio", "email": "Nuevo@Ejemplo.com", "registro_medico": "RM-12345",
+         "telefono": "3000000000", "password": "clave-nueva-123", "autoriza_datos": True}
+
+
+def admin_cliente():
+    from app.repositorio import conectar
+    with conectar() as c:
+        c.execute("UPDATE anestesiologo SET es_admin = TRUE WHERE email = %s", (EMAIL,))
+        c.commit()
+    adm = TestClient(main.app)
+    assert adm.post("/api/login", json={"email": EMAIL, "password": PASSWORD}).status_code == 200
+    return adm
+
+
+def test_registro_pendiente_y_aprobacion(anonimo, monkeypatch):
+    main._registros_por_ip.clear()
+    assert anonimo.get("/api/registro").json() == {"abierto": True}
+    assert anonimo.post("/api/registro", json={**NUEVO, "autoriza_datos": False}).status_code == 422
+    assert anonimo.post("/api/registro", json={**NUEVO, "password": "corta"}).status_code == 422
+    assert anonimo.post("/api/registro", json=NUEVO).status_code == 201
+    assert anonimo.post("/api/registro", json={**NUEVO, "registro_medico": "otro"}).status_code == 409  # correo repetido
+    # pendiente: no entra, con un mensaje claro (solo si la clave es correcta)
+    r = anonimo.post("/api/login", json={"email": "nuevo@ejemplo.com", "password": NUEVO["password"]})
+    assert r.status_code == 403 and "pendiente" in r.json()["detail"]
+    assert anonimo.post("/api/login", json={"email": "nuevo@ejemplo.com", "password": "mala-clave-1"}).status_code == 401
+
+    adm = admin_cliente()
+    assert adm.get("/api/inicio").json()["solicitudes"] == 1
+    pendiente = next(u for u in adm.get("/api/usuarios").json() if u["estado_registro"] == "PENDIENTE")
+    assert pendiente["telefono"] == "3000000000" and pendiente["registro_medico"] == "RM-12345"
+    # activar no sirve para una solicitud: hay que aprobarla
+    assert adm.put(f"/api/usuarios/{pendiente['anestesiologo_id']}", json={"activo": True}).status_code == 404
+    assert adm.post(f"/api/usuarios/{pendiente['anestesiologo_id']}/aprobar").status_code == 200
+    assert adm.get("/api/inicio").json()["solicitudes"] == 0
+    nuevo = TestClient(main.app)
+    r = nuevo.post("/api/login", json={"email": "nuevo@ejemplo.com", "password": NUEVO["password"]})
+    assert r.status_code == 200 and r.json()["debe_cambiar_clave"] is False
+    assert nuevo.get("/api/cirugias").json() == []      # empieza sin datos: no ve los de otros
+
+
+def test_rechazo_robots_y_limites(anonimo, monkeypatch):
+    main._registros_por_ip.clear()
+    assert anonimo.post("/api/registro", json={**NUEVO, "sitio_web": "http://spam"}).status_code == 201
+    adm = admin_cliente()
+    assert all(u["estado_registro"] != "PENDIENTE" for u in adm.get("/api/usuarios").json())  # el robot no creó nada
+    assert anonimo.post("/api/registro", json=NUEVO).status_code == 201
+    pid = next(u["anestesiologo_id"] for u in adm.get("/api/usuarios").json() if u["estado_registro"] == "PENDIENTE")
+    assert adm.post(f"/api/usuarios/{pid}/rechazar").status_code == 200
+    assert anonimo.post("/api/login", json={"email": NUEVO["email"], "password": NUEVO["password"]}).status_code == 401
+    # límite por conexión (3 por hora): el robot, la rechazada y esta ya suman 3
+    assert anonimo.post("/api/registro", json={**NUEVO, "email": "w@y.co", "registro_medico": "RM-1"}).status_code == 201
+    assert anonimo.post("/api/registro", json={**NUEVO, "email": "x@y.co", "registro_medico": "RM-2"}).status_code == 429
+    # registro cerrado
+    main._registros_por_ip.clear()
+    monkeypatch.setattr(config, "REGISTRO_ABIERTO", False)
+    assert anonimo.post("/api/registro", json={**NUEVO, "email": "z@y.co", "registro_medico": "RM-3"}).status_code == 403
