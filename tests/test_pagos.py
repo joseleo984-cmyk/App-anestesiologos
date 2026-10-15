@@ -198,7 +198,7 @@ def test_volver_a_cruzar_todos(con_reporte):
         conn.execute("UPDATE pago_detalle SET cirugia_id = NULL")
         conn.commit()
     r = c.post("/api/pagos/cruzar-todos").json()
-    assert r == {"reportes": 1, "lineas": 3, "encontradas": 1, "nuevas": 1, "marcadas_pagadas": 0}
+    assert r == {"reportes": 1, "lineas": 3, "encontradas": 1, "nuevas": 1, "marcadas_pagadas": 0, "por_aplicar": 1}
     assert c.get(f"/api/pagos/{rep['reporte_id']}").json()["filas"][0]["cirugia_id"] == uno
     assert c.get(f"/api/cirugias/{uno}").json()["estado"] == "PROGRAMADA"  # leído, no aplicado: no se marca pagada
 
@@ -235,3 +235,15 @@ def test_varias_lineas_del_mismo_paciente_van_a_la_misma_cirugia(con_reporte):
     assert [f["cirugia_id"] for f in rep["filas"]] == [uno, uno]
     assert c.post(f"/api/pagos/{rep['reporte_id']}/aplicar").json() == {"marcadas": 1}
     assert c.get(f"/api/cirugias/{uno}").json()["valor_honorarios"] == 700405  # la suma de las dos líneas
+
+
+def test_marcar_todas_las_encontradas(con_reporte):
+    c = con_reporte
+    rep = subir(c).json()                                   # leído, sin aplicar
+    uno = crear(c, "72000730", "2026-04-01")                # se cruzan al registrarlas
+    dos = crear(c, "32622878", "2026-03-01")
+    assert c.post("/api/pagos/cruzar-todos").json()["por_aplicar"] == 2
+    assert c.post("/api/pagos/aplicar-todos").json() == {"marcadas": 2}
+    assert {c.get(f"/api/cirugias/{i}").json()["estado"] for i in (uno, dos)} == {"PAGADA"}
+    assert c.get(f"/api/pagos/{rep['reporte_id']}").json()["estado"] == "APLICADO"
+    assert c.post("/api/pagos/cruzar-todos").json()["por_aplicar"] == 0

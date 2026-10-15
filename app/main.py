@@ -934,6 +934,14 @@ def cruzar_todos(conn=Depends(get_conn, scope="function"), anestesiologo_id=Depe
     return resultado
 
 
+@app.post("/api/pagos/aplicar-todos")
+def aplicar_todos(conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
+    """Marca como pagadas todas las cirugías encontradas en los reportes (en vez de ir reporte por reporte)."""
+    marcadas = repositorio.aplicar_todos(conn, anestesiologo_id)
+    conn.commit()
+    return {"marcadas": marcadas}
+
+
 @app.post("/api/pagos/{reporte_id}/cruzar")
 def volver_a_cruzar(reporte_id: int, conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
     """Repite el cruce (por ejemplo, después de registrar las cirugías que faltaban)."""

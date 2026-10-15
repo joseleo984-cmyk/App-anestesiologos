@@ -2287,6 +2287,20 @@ $("#cruzar-todos").onclick = async () => {
   aviso(estado, c.nuevas ? "ok" : "warn", `${c.encontradas} de ${c.lineas} pagos de pacientes encontrados en tus cirugías` +
     (c.nuevas ? ` (${c.nuevas} nuevo${c.nuevas === 1 ? "" : "s"} ahora)` : " (ninguno nuevo)") +
     (c.marcadas_pagadas ? `; ${c.marcadas_pagadas} cirugía${c.marcadas_pagadas === 1 ? "" : "s"} marcada${c.marcadas_pagadas === 1 ? "" : "s"} como pagada${c.marcadas_pagadas === 1 ? "" : "s"}.` : "."));
+  if (c.por_aplicar) {
+    estado.insertAdjacentHTML("beforeend", `<p class="sub">${c.por_aplicar} cirugía${c.por_aplicar === 1 ? "" : "s"} encontrada${c.por_aplicar === 1 ? "" : "s"} aún sin marcar como pagada${c.por_aplicar === 1 ? "" : "s"}.
+      Revísalas abriendo cada reporte, o márcalas todas de una vez:</p>
+      <button type="button" class="primario" id="aplicar-todos">✓ Marcar las ${c.por_aplicar} como pagadas</button>`);
+    $("#aplicar-todos").onclick = async () => {
+      if (!confirm(`¿Marcar como pagadas las ${c.por_aplicar} cirugías encontradas en los reportes, con el valor y la fecha de cada reporte?`)) return;
+      $("#aplicar-todos").disabled = true;
+      const ra = await fetch("/api/pagos/aplicar-todos", { method: "POST" });
+      const ca = await ra.json().catch(() => null);
+      if (!ra.ok) { $("#aplicar-todos").disabled = false; return aviso(estado, "err", mensajeError(ca, "No se pudo aplicar.")); }
+      aviso(estado, "ok", `Listo: ${ca.marcadas} cirugía${ca.marcadas === 1 ? "" : "s"} quedaron como pagadas, con el valor y la fecha de su reporte.`);
+      cargarReportesPago();
+    };
+  }
   cargarReportesPago();
 };
 

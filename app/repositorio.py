@@ -715,7 +715,26 @@ def recruzar_todos(conn, anestesiologo_id: int) -> dict:
     lineas = conn.execute("""SELECT count(*) AS n FROM pago_detalle d JOIN reporte_pago r USING (reporte_id)
                               WHERE r.anestesiologo_id = %s AND d.es_paciente""", (anestesiologo_id,)).fetchone()["n"]
     return {"reportes": len(reportes), "lineas": lineas, "encontradas": despues,
-            "nuevas": despues - antes, "marcadas_pagadas": marcadas}
+            "nuevas": despues - antes, "marcadas_pagadas": marcadas, "por_aplicar": por_aplicar(conn, anestesiologo_id)}
+
+
+def por_aplicar(conn, anestesiologo_id: int) -> int:
+    """Cirugías encontradas en los reportes que aún no están marcadas como pagadas."""
+    return conn.execute(
+        """SELECT count(DISTINCT c.cirugia_id) AS n FROM pago_detalle d
+             JOIN reporte_pago r USING (reporte_id) JOIN cirugia c ON c.cirugia_id = d.cirugia_id
+            WHERE r.anestesiologo_id = %s AND c.estado NOT IN ('PAGADA', 'CANCELADA')""",
+        (anestesiologo_id,)).fetchone()["n"]
+
+
+def aplicar_todos(conn, anestesiologo_id: int) -> int:
+    """Aplica todos los reportes que tienen cirugías encontradas sin pagar. Devuelve cuántas se marcaron."""
+    reportes = conn.execute(
+        """SELECT DISTINCT r.reporte_id FROM reporte_pago r JOIN pago_detalle d USING (reporte_id)
+             JOIN cirugia c ON c.cirugia_id = d.cirugia_id
+            WHERE r.anestesiologo_id = %s AND c.estado NOT IN ('PAGADA', 'CANCELADA')
+            ORDER BY r.reporte_id""", (anestesiologo_id,)).fetchall()
+    return sum(aplicar_reporte(conn, anestesiologo_id, r["reporte_id"]) for r in reportes)
 
 
 def obtener_reporte(conn, anestesiologo_id: int, reporte_id: int) -> Optional[dict]:
