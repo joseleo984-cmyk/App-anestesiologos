@@ -745,7 +745,7 @@ def conciliar(conn, anestesiologo_id: int, reporte_id: int) -> None:
     En las relaciones de AP las líneas no suelen traer fecha: se busca hasta DIAS_ANTES antes de la fecha de
     la relación, prefiriendo la cirugía con el mismo nº de orden y si no la más reciente."""
     pago = conn.execute("SELECT fecha_proceso, tipo FROM reporte_pago WHERE reporte_id = %s", (reporte_id,)).fetchone()
-    relacion = bool(pago) and pago["tipo"] == "RELACION"
+    relacion = bool(pago) and pago["tipo"] in ("RELACION", "RADICADO")
     filas = conn.execute(
         """SELECT d.detalle_id, d.documento_paciente, doc_norm(d.documento_paciente) AS doc, d.fecha_servicio,
                   doc_norm(d.numero_orden) AS orden, d.cirugia_id, c.estado
@@ -812,7 +812,7 @@ def cruzar_paciente(conn, anestesiologo_id: int, paciente_id: int) -> int:
     marcadas = 0
     for r in reportes:
         conciliar(conn, anestesiologo_id, r["reporte_id"])
-        if r["estado"] == "APLICADO":
+        if r["estado"] in ("APLICADO", "PAGADO"):
             marcadas += aplicar_reporte(conn, anestesiologo_id, r["reporte_id"])
     return marcadas
 
@@ -827,7 +827,7 @@ def recruzar_todos(conn, anestesiologo_id: int) -> dict:
     marcadas = 0
     for r in reportes:
         conciliar(conn, anestesiologo_id, r["reporte_id"])
-        if r["estado"] == "APLICADO":
+        if r["estado"] in ("APLICADO", "PAGADO"):
             marcadas += aplicar_reporte(conn, anestesiologo_id, r["reporte_id"])
     despues = conn.execute(contar, (anestesiologo_id,)).fetchone()["n"]
     lineas = conn.execute("""SELECT count(*) AS n FROM pago_detalle d JOIN reporte_pago r USING (reporte_id)
@@ -837,11 +837,12 @@ def recruzar_todos(conn, anestesiologo_id: int) -> dict:
 
 
 def por_aplicar(conn, anestesiologo_id: int) -> int:
-    """Cirugías encontradas en los reportes que aún no están marcadas como pagadas."""
+    """Cirugías encontradas en los reportes que aún no están marcadas como pagadas (un radicado no es un pago:
+    sus cirugías se pagan al registrar el pago de la clínica)."""
     return conn.execute(
         """SELECT count(DISTINCT c.cirugia_id) AS n FROM pago_detalle d
              JOIN reporte_pago r USING (reporte_id) JOIN cirugia c ON c.cirugia_id = d.cirugia_id
-            WHERE r.anestesiologo_id = %s AND c.estado NOT IN ('PAGADA', 'CANCELADA')""",
+            WHERE r.anestesiologo_id = %s AND c.estado NOT IN ('PAGADA', 'CANCELADA') AND r.tipo <> 'RADICADO'""",
         (anestesiologo_id,)).fetchone()["n"]
 
 
@@ -850,7 +851,7 @@ def aplicar_todos(conn, anestesiologo_id: int) -> int:
     reportes = conn.execute(
         """SELECT DISTINCT r.reporte_id FROM reporte_pago r JOIN pago_detalle d USING (reporte_id)
              JOIN cirugia c ON c.cirugia_id = d.cirugia_id
-            WHERE r.anestesiologo_id = %s AND c.estado NOT IN ('PAGADA', 'CANCELADA')
+            WHERE r.anestesiologo_id = %s AND c.estado NOT IN ('PAGADA', 'CANCELADA') AND r.tipo <> 'RADICADO'
             ORDER BY r.reporte_id""", (anestesiologo_id,)).fetchall()
     return sum(aplicar_reporte(conn, anestesiologo_id, r["reporte_id"]) for r in reportes)
 
@@ -858,7 +859,7 @@ def aplicar_todos(conn, anestesiologo_id: int) -> int:
 def obtener_reporte(conn, anestesiologo_id: int, reporte_id: int) -> Optional[dict]:
     cab = conn.execute(
         """SELECT reporte_id, pagador, fecha_proceso, periodo_desde, periodo_hasta, total_neto, estado,
-                  subido_en, datos_extraidos->>'prestador' AS prestador, tipo, numero,
+                  subido_en, datos_extraidos->>'prestador' AS prestador, tipo, numero, pagado_en, valor_pagado,
                   COALESCE(jsonb_array_length(datos_extraidos->'paginas'), 1) AS paginas
              FROM reporte_pago WHERE reporte_id = %s AND anestesiologo_id = %s""",
         (reporte_id, anestesiologo_id),
@@ -873,7 +874,7 @@ def obtener_reporte(conn, anestesiologo_id: int, reporte_id: int) -> Optional[di
                   p.nombres || ' ' || p.apellidos AS paciente_app,
                   CASE WHEN NOT d.es_paciente THEN 'OTRO_CONCEPTO'
                        WHEN d.cirugia_id IS NULL THEN 'SIN_CIRUGIA'
-                       WHEN c.estado = 'PAGADA' AND %s <> 'APLICADO' THEN 'YA_PAGADA'
+                       WHEN c.estado = 'PAGADA' AND %s NOT IN ('APLICADO', 'PAGADO') THEN 'YA_PAGADA'
                        ELSE 'COINCIDE' END AS resultado
              FROM pago_detalle d
              LEFT JOIN cirugia c  ON c.cirugia_id = d.cirugia_id
@@ -882,39 +883,82 @@ def obtener_reporte(conn, anestesiologo_id: int, reporte_id: int) -> Optional[di
         (cab["estado"], reporte_id),
     ).fetchall()
     suma = sum((f["neto"] or 0) for f in filas)
+    sin_valores = all(f["neto"] is None for f in filas)  # radicado: las líneas no traen valor, solo el total
     return {**cab, "suma_neto": suma,
-            "cuadra": None if cab["total_neto"] is None else abs(suma - cab["total_neto"]) <= 1,
+            "cuadra": None if cab["total_neto"] is None or sin_valores else abs(suma - cab["total_neto"]) <= 1,
             "filas": filas}
 
 
 def aplicar_reporte(conn, anestesiologo_id: int, reporte_id: int) -> int:
     """Marca como PAGADAS las cirugías encontradas, con el neto y la fecha del reporte.
     Las que ya estaban pagadas no se tocan, así que se puede repetir tras volver a cruzar
-    (por ejemplo, después de registrar un paciente que faltaba). Devuelve cuántas se marcaron."""
+    (por ejemplo, después de registrar un paciente que faltaba). Devuelve cuántas se marcaron.
+    Un radicado no es un pago: marca las cirugías FACTURADAS (y, si ya se registró su pago, PAGADAS)."""
     rep = conn.execute(
-        "SELECT estado, fecha_proceso FROM reporte_pago WHERE reporte_id = %s AND anestesiologo_id = %s FOR UPDATE",
+        """SELECT estado, fecha_proceso, tipo, pagado_en FROM reporte_pago
+            WHERE reporte_id = %s AND anestesiologo_id = %s FOR UPDATE""",
         (reporte_id, anestesiologo_id),
     ).fetchone()
     if rep is None:
         raise DocumentoNoEncontrado()
-    marcadas = conn.execute(
+    if rep["tipo"] == "RADICADO" and rep["estado"] == "PAGADO":
+        return _marcar_pagadas(conn, anestesiologo_id, reporte_id, rep["pagado_en"])
+    if rep["tipo"] == "RADICADO":
+        marcadas = conn.execute(
+            """UPDATE cirugia c SET estado = 'FACTURADA', valor_honorarios = COALESCE(c.valor_honorarios, d.neto)
+                 FROM (SELECT cirugia_id, sum(neto) AS neto FROM pago_detalle
+                        WHERE reporte_id = %s AND cirugia_id IS NOT NULL GROUP BY cirugia_id) d
+                WHERE d.cirugia_id = c.cirugia_id
+                  AND c.anestesiologo_id = %s AND c.estado IN ('PROGRAMADA', 'REALIZADA')""",
+            (reporte_id, anestesiologo_id),
+        ).rowcount
+    else:
+        marcadas = _marcar_pagadas(conn, anestesiologo_id, reporte_id, rep["fecha_proceso"])
+    conn.execute("UPDATE reporte_pago SET estado = 'APLICADO' WHERE reporte_id = %s", (reporte_id,))
+    return marcadas
+
+
+def _marcar_pagadas(conn, anestesiologo_id: int, reporte_id: int, fecha) -> int:
+    """Las cirugías del reporte quedan PAGADAS. El valor de la línea reemplaza el de la cirugía solo si la
+    línea trae valor (un radicado escrito a mano no lo trae: se conserva el que ya tenía la cirugía)."""
+    return conn.execute(
         """UPDATE cirugia c
-              SET estado = 'PAGADA', valor_honorarios = d.neto,
+              SET estado = 'PAGADA', valor_honorarios = COALESCE(d.neto, c.valor_honorarios),
                   fecha_pago = COALESCE(%s, CURRENT_DATE)
              FROM (SELECT cirugia_id, sum(neto) AS neto FROM pago_detalle
                     WHERE reporte_id = %s AND cirugia_id IS NOT NULL GROUP BY cirugia_id) d
             WHERE d.cirugia_id = c.cirugia_id
               AND c.anestesiologo_id = %s AND c.estado NOT IN ('PAGADA', 'CANCELADA')""",
-        (rep["fecha_proceso"], reporte_id, anestesiologo_id),
+        (fecha, reporte_id, anestesiologo_id),
     ).rowcount
-    conn.execute("UPDATE reporte_pago SET estado = 'APLICADO' WHERE reporte_id = %s", (reporte_id,))
-    return marcadas
+
+
+def pagar_radicado(conn, anestesiologo_id: int, reporte_id: int, fecha_pago, valor=None) -> int:
+    """La clínica pagó el radicado: sus cirugías quedan pagadas con esa fecha. Devuelve cuántas se marcaron."""
+    if not conn.execute(
+            """UPDATE reporte_pago SET estado = 'PAGADO', pagado_en = %s, valor_pagado = COALESCE(%s, total_neto)
+                WHERE reporte_id = %s AND anestesiologo_id = %s AND tipo = 'RADICADO'""",
+            (fecha_pago, valor, reporte_id, anestesiologo_id)).rowcount:
+        raise DocumentoNoEncontrado()
+    return _marcar_pagadas(conn, anestesiologo_id, reporte_id, fecha_pago)
+
+
+def radicados_por_cobrar(conn, anestesiologo_id: int) -> list[dict]:
+    """Radicados que la clínica aún no ha pagado, con cuántas cirugías llevan y los días desde la radicación."""
+    return conn.execute(
+        """SELECT r.reporte_id, r.pagador, r.fecha_proceso, r.total_neto, r.estado,
+                  count(DISTINCT d.cirugia_id) AS cirugias, count(d.*) FILTER (WHERE d.es_paciente) AS lineas,
+                  CURRENT_DATE - r.fecha_proceso AS dias
+             FROM reporte_pago r LEFT JOIN pago_detalle d USING (reporte_id)
+            WHERE r.anestesiologo_id = %s AND r.tipo = 'RADICADO' AND r.estado <> 'PAGADO'
+            GROUP BY r.reporte_id ORDER BY r.fecha_proceso NULLS LAST, r.reporte_id""",
+        (anestesiologo_id,)).fetchall()
 
 
 def listar_reportes(conn, anestesiologo_id: int) -> list[dict]:
     return conn.execute(
         """SELECT r.reporte_id, r.pagador, r.fecha_proceso, r.periodo_desde, r.periodo_hasta, r.total_neto,
-                  r.estado, r.subido_en, r.tipo, r.numero,
+                  r.estado, r.subido_en, r.tipo, r.numero, r.pagado_en,
                   COUNT(d.*) FILTER (WHERE d.es_paciente) AS lineas,
                   COUNT(d.*) FILTER (WHERE d.cirugia_id IS NOT NULL) AS encontradas
              FROM reporte_pago r LEFT JOIN pago_detalle d USING (reporte_id)

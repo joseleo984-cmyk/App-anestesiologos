@@ -6,7 +6,7 @@ import pytest
 from app import extraccion
 from app.modelos import ReportePagoExtraido
 from tests.test_api import CONFIRMAR, cliente  # noqa: F401  (fixture)
-from tests.test_extraccion import ClienteFalso
+from tests.test_extraccion import ClienteFalso, foto
 
 REPORTE = {
     "pagador": "ASOCIACION DE ANESTESIOLOGOS (FICTICIA)", "prestador": "DRA. PRUEBA",
@@ -334,3 +334,99 @@ def test_lectura_de_la_relacion_con_claude():
     assert r.numero == "0061527" and r.fecha_proceso.isoformat() == "2026-09-01" and r.cuadra is True
     assert [f.documento_paciente for f in r.filas] == ["72000730", "32622878"]
     assert r.filas[0].neto == 300000 and r.filas[0].numero_orden == "OR-77"
+
+
+# Radicado escrito a mano: sin valor por línea, solo el total al pie (datos ficticios)
+RADICADO = {
+    "numero": None, "fecha": "2026-01-15", "mes_facturar": None, "clinica": "Santa Ana",
+    "anestesiologo": "DRA. PRUEBA", "total": 8957666,
+    "filas": [
+        {"entidad": "EPS FICTICIA", "paciente": "PACIENTE UNO", "documento_paciente": "72000730",
+         "procedimiento": "CESAREA", "numero_orden": None, "fecha_servicio": None, "valor": None},
+        {"entidad": None, "paciente": "PACIENTE DOS", "documento_paciente": "32622878",
+         "procedimiento": "SEDACION PARA TAC", "numero_orden": None, "fecha_servicio": None, "valor": None},
+        {"entidad": None, "paciente": "PACIENTE TRES", "documento_paciente": "55555555",
+         "procedimiento": "COLGAJO", "numero_orden": None, "fecha_servicio": None, "valor": None},
+    ],
+}
+
+
+@pytest.fixture
+def con_radicado(cliente, monkeypatch):
+    llamadas = []
+
+    def leer(archivos, tipo="relacion"):
+        llamadas.append(tipo)
+        return extraccion.relacion_a_reporte(RADICADO)
+    monkeypatch.setattr(extraccion, "extraer_relacion", leer)
+    cliente.llamadas_radicado = llamadas
+    return cliente
+
+
+def subir_radicado(cliente, **campos):
+    return cliente.post("/api/pagos/radicado", data=campos,
+                        files=[("archivos", ("radicado.jpg", foto(), "image/jpeg"))])
+
+
+def test_radicado_marca_facturadas_y_luego_pagadas_sin_borrar_el_valor(con_radicado):
+    c = con_radicado
+    datos = {**CONFIRMAR, "fecha_procedimiento": "2026-01-05", "valor_honorarios": 850000,
+             "paciente": {**CONFIRMAR["paciente"], "numero_documento": "72000730"}}
+    uno = c.post("/api/cirugias", json=datos).json()["cirugia_id"]
+    dos = crear(c, "32622878", "2026-01-10")
+
+    r = subir_radicado(c, pagador="Clínica Santa Ana (ficticia)")
+    assert r.status_code == 201, r.text
+    rep = r.json()
+    assert c.llamadas_radicado == ["radicado"]
+    assert rep["tipo"] == "RADICADO" and rep["total_neto"] == 8957666 and rep["fecha_proceso"] == "2026-01-15"
+    assert rep["cuadra"] is None                       # las líneas no traen valor: no se compara con el total
+    assert [f["resultado"] for f in rep["filas"]] == ["COINCIDE", "COINCIDE", "SIN_CIRUGIA"]
+
+    # Un radicado no es un pago: no aparece como «pago encontrado» ni lo aplica «aplicar todos»
+    inicio = c.get("/api/inicio").json()
+    assert inicio["por_aplicar"] == 0
+    assert inicio["radicados"][0]["total_neto"] == 8957666 and inicio["radicados"][0]["estado"] == "LEIDO"
+    assert c.post("/api/pagos/aplicar-todos").json() == {"marcadas": 0}
+
+    assert c.post(f"/api/pagos/{rep['reporte_id']}/aplicar").json() == {"marcadas": 2}
+    d = c.get(f"/api/cirugias/{uno}").json()
+    assert d["estado"] == "FACTURADA" and d["valor_honorarios"] == 850000 and d["fecha_pago"] is None
+    pasos = c.get(f"/api/cirugias/{uno}/cobro").json()["pasos"]
+    assert pasos[1]["hecho"] and pasos[1]["detalle"] == "Radicada en Clínica Santa Ana (ficticia)"
+    assert c.get("/api/inicio").json()["radicados"][0]["cirugias"] == 2
+
+    # Santa Ana paga el total: todas quedan pagadas con esa fecha, y el valor de cada cirugía se conserva
+    r = c.post(f"/api/pagos/{rep['reporte_id']}/pagar", json={"fecha_pago": "2026-03-20"})
+    assert r.json() == {"marcadas": 2}
+    d = c.get(f"/api/cirugias/{uno}").json()
+    assert d["estado"] == "PAGADA" and d["valor_honorarios"] == 850000 and d["fecha_pago"] == "2026-03-20"
+    assert c.get(f"/api/cirugias/{dos}").json()["estado"] == "PAGADA"
+    rep = c.get(f"/api/pagos/{rep['reporte_id']}").json()
+    assert rep["estado"] == "PAGADO" and rep["pagado_en"] == "2026-03-20" and rep["valor_pagado"] == 8957666
+    assert {f["resultado"] for f in rep["filas"]} == {"COINCIDE", "SIN_CIRUGIA"}
+    assert c.get("/api/inicio").json()["radicados"] == []
+
+    # La cirugía que faltaba se registra después: queda pagada de una vez con la fecha del pago
+    tres = crear(c, "55555555", "2026-01-12")
+    d = c.get(f"/api/cirugias/{tres}").json()
+    assert d["estado"] == "PAGADA" and d["fecha_pago"] == "2026-03-20"
+
+
+def test_solo_se_paga_un_radicado(con_relacion):
+    rep = subir_relacion(con_relacion).json()
+    r = con_relacion.post(f"/api/pagos/{rep['reporte_id']}/pagar", json={"fecha_pago": "2026-03-20"})
+    assert r.status_code == 404
+
+
+def test_aplicar_una_linea_sin_valor_no_borra_el_valor_de_la_cirugia(con_relacion, monkeypatch):
+    c = con_relacion
+    datos = {**CONFIRMAR, "fecha_procedimiento": "2026-08-20", "valor_honorarios": 400000,
+             "paciente": {**CONFIRMAR["paciente"], "numero_documento": "32622878"}}
+    cid = c.post("/api/cirugias", json=datos).json()["cirugia_id"]
+    sin_valor = {**RELACION, "filas": [{**RELACION["filas"][1], "valor": None}]}
+    monkeypatch.setattr(extraccion, "extraer_relacion", lambda archivos: extraccion.relacion_a_reporte(sin_valor))
+    rep = subir_relacion(c, fecha_pago="2026-09-30").json()
+    assert c.post(f"/api/pagos/{rep['reporte_id']}/aplicar").json() == {"marcadas": 1}
+    d = c.get(f"/api/cirugias/{cid}").json()
+    assert d["estado"] == "PAGADA" and d["valor_honorarios"] == 400000

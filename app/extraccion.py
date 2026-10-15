@@ -310,20 +310,27 @@ ESQUEMA_RELACION = {
 INSTRUCCIONES_RELACION = """Lees la "RELACION DE ORDENES" (o liquidación) que la asociación de anestesiólogos \
 (AP) hace de las órdenes que entrega un anestesiólogo en Colombia; algunas clínicas pagan el total de esa \
 relación y no paciente por paciente. Puede venir en varias páginas o fotos: combínalas en una sola relación. \
-Extrae:
+Muchas veces está llenada a mano: lee con cuidado cada dígito de las cédulas. Extrae:
 
 - numero: el número de la relación o de radicado (a veces sellado o escrito a mano, ej. en rojo), sin espacios.
-- fecha: la FECHA del documento, en AAAA-MM-DD (el documento usa día/mes/año).
+- fecha: la FECHA del documento, en AAAA-MM-DD (el documento usa día/mes/año). Si tiene un sello de \
+recibido o radicado con fecha (ej. "2026 ENE. 15"), usa la fecha del sello.
 - mes_facturar: MES A FACTURAR en formato AAAA-MM.
-- clinica: la clínica o pagador al que corresponde la relación si aparece en el encabezado; si no, null.
+- clinica: la clínica o pagador al que corresponde la relación si aparece en el encabezado (a veces escrita \
+a mano junto al título, ej. "Santa Ana"); si no, null.
 - anestesiologo: el nombre del ANESTESIÓLOGO.
-- total: el TOTAL de la relación en pesos como número entero (508.360 -> 508360).
-- filas: UNA por cada línea con datos, en el orden del documento (no incluyas las líneas vacías ni el total):
-  - entidad: la ENTIDAD (aseguradora, EPS o IPS); paciente: tal como aparece.
+- total: el TOTAL de la relación en pesos como número entero (508.360 -> 508360; 8'957.666 -> 8957666). Si \
+el TOTAL de la tabla está vacío o en 0 y hay un valor total escrito a mano fuera de la tabla (al pie, junto a \
+la firma o al sello), usa ese.
+- filas: UNA por cada paciente, en el orden del documento (no incluyas las líneas vacías ni el total). Si una \
+línea no tiene paciente ni cédula y solo continúa el procedimiento de la línea anterior, es parte de ese \
+procedimiento: únelo a la fila anterior, no es una fila nueva.
+  - entidad: la ENTIDAD (aseguradora, EPS o IPS); si la casilla está vacía, null (no la copies de otra \
+fila). paciente: tal como aparece.
   - documento_paciente: la CEDULA o documento, sin puntos ni espacios.
   - procedimiento; numero_orden: el No. ORDEN tal como aparece; fecha_servicio: si la línea tiene fecha \
 (AAAA-MM-DD), si no null.
-  - valor: el VALOR en pesos como número entero.
+  - valor: el VALOR en pesos como número entero; si la casilla está vacía, null.
 
 Copia los datos tal como están; nunca inventes un valor que no se lee: usa null."""
 
@@ -353,11 +360,12 @@ def relacion_a_reporte(datos: dict) -> ReportePagoExtraido:
         "numero": (datos.get("numero") or "").replace(" ", "") or None, "filas": filas})
 
 
-def extraer_relacion(archivos: list[Archivo], client: anthropic.Anthropic | None = None) -> ReportePagoExtraido:
+def extraer_relacion(archivos: list[Archivo], client: anthropic.Anthropic | None = None,
+                     tipo: str = "relacion") -> ReportePagoExtraido:
     pedido = "Extrae los datos de esta relación de órdenes." if len(archivos) == 1 else (
         f"Estos {len(archivos)} archivos son las páginas de la MISMA relación de órdenes. Extrae sus datos.")
     return relacion_a_reporte(_llamar_claude(archivos, INSTRUCCIONES_RELACION, ESQUEMA_RELACION, pedido,
-                                             "medium", client, tipo="relacion"))
+                                             "medium", client, tipo=tipo))
 
 
 _VALORES_VOLANTE = ["probienestar", "compensacion_ordinaria", "compensacion_extraordinaria", "auxilio_sindical",

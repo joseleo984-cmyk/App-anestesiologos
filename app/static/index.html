@@ -512,6 +512,7 @@
   .tono-ok .franja { background: var(--ok-text); } .tono-ok .accion { background: var(--ok-bg); color: var(--ok-text); }
   .tono-err .franja { background: var(--err-text); } .tono-err .accion { background: var(--err-bg); color: var(--err-text); }
   .tono-warn .franja { background: var(--warn-line); } .tono-warn .accion { background: var(--warn-bg); color: var(--warn-text); }
+  .tono-info .franja { background: var(--info-text); } .tono-info .accion { background: var(--info-bg); color: var(--info-text); }
   /* Antigüedad de lo que falta por cobrar */
   .franjas { display: grid; gap: 4px; }
   .franja-fila { display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: 10px; align-items: center; width: 100%;
@@ -576,6 +577,12 @@
 .que-falto textarea { width: 100%; margin-top: 6px; }
 .lista-comentarios { list-style: none; padding: 0; margin: 0; }
 .lista-comentarios li { padding: 8px 0; border-bottom: 1px solid var(--line); white-space: pre-wrap; }
+.segmentos { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 0; }
+.segmentos button { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; padding: 10px 12px; }
+.segmentos button .sub { font-size: .78rem; font-weight: 400; }
+.segmentos button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-bg); color: var(--text); box-shadow: inset 0 0 0 1px var(--accent); }
+.pago-radicado { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
+.pago-radicado h3 { margin: 0 0 4px; }
 </style>
 </head>
 <body>
@@ -670,16 +677,20 @@
       <div id="estado-pago"></div>
     </section>
     <section class="card">
-      <h2>Relación de AP de una clínica que paga el total</h2>
-      <p class="sub">Clínicas como Santa Ana de Dios no pagan paciente por paciente sino el total de la relación
-        entregada a AP. Sube la relación o liquidación de AP (todas sus páginas): la app cruza cada paciente con su
-        cirugía y, al aplicarla, las marca pagadas con el valor de la relación.</p>
-      <div class="fila">
-        <div><label for="relacion-pagador">Clínica que paga</label><input id="relacion-pagador" value="Clínica Santa Ana de Dios" autocomplete="off"></div>
-        <div><label for="relacion-fecha">Fecha del pago</label><input id="relacion-fecha" type="date"></div>
+      <h2>Clínicas que pagan el total (ej. Santa Ana)</h2>
+      <p class="sub">Estas clínicas no pagan paciente por paciente sino el total de la relación de órdenes entregada.
+        Sube la hoja (foto o PDF, todas sus páginas; puede estar escrita a mano): la app cruza cada paciente con su cirugía.</p>
+      <div class="segmentos" id="relacion-tipo" role="radiogroup" aria-label="Qué vas a subir">
+        <button type="button" data-tipo="RADICADO" aria-pressed="true">Radicado<span class="sub">Órdenes entregadas, aún sin pagar</span></button>
+        <button type="button" data-tipo="RELACION" aria-pressed="false">Relación pagada<span class="sub">La clínica ya pagó el total</span></button>
       </div>
-      <p class="sub">Si no pones la fecha del pago se usa la fecha de la relación.</p>
-      <button type="button" class="boton primario" id="elegir-relacion">📄 Elegir relación (PDF o fotos de cada página)</button>
+      <div class="fila">
+        <div><label for="relacion-pagador">Clínica</label><input id="relacion-pagador" value="Clínica Santa Ana de Dios" autocomplete="off"></div>
+        <div><label for="relacion-fecha" id="relacion-fecha-etiqueta">Fecha del radicado</label><input id="relacion-fecha" type="date"></div>
+      </div>
+      <p class="sub" id="relacion-ayuda">Si no pones la fecha se usa la del sello de recibido o la de la hoja. Al aplicarlo, las
+        cirugías quedan facturadas (radicadas); cuando la clínica pague, registras el pago y quedan pagadas.</p>
+      <button type="button" class="boton primario" id="elegir-relacion">📄 Elegir radicado (foto o PDF de cada página)</button>
       <div id="estado-relacion"></div>
     </section>
     <div id="detalle-pago"></div>
@@ -3791,6 +3802,15 @@ async function cargarInicio() {
     sub: `Más de ${d.dias_atraso} días sin pago`, accion: "Ver", ir: () => verLista({ "#f-estado": "ATRASADA" }) });
   if (d.solicitudes) tareas.push({ tono: "warn", titulo: plural(d.solicitudes, "solicitud de registro", "solicitudes de registro"),
     sub: "Anestesiólogos esperando que apruebes su cuenta", accion: "Revisar", ir: () => mostrarPestana("usuarios") });
+  for (const rad of d.radicados || []) {
+    const fecha = rad.fecha_proceso ? aFecha(rad.fecha_proceso) : null;
+    const cuando = fecha ? `${fecha.getDate()} ${MESES_LARGOS[fecha.getMonth()].slice(0, 3)}` : "";
+    const abrir = () => { mostrarPestana("pagos"); mostrarReportePago(rad.reporte_id); };
+    if (rad.estado === "LEIDO") tareas.push({ tono: "warn", titulo: `Radicado ${escapar(rad.pagador || "")} ${cuando} sin aplicar`,
+      sub: `${plural(rad.cirugias, "cirugía encontrada", "cirugías encontradas")} de ${rad.lineas} órdenes: márcalas como radicadas`, accion: "Revisar", ir: abrir });
+    else tareas.push({ tono: rad.dias > d.dias_atraso ? "err" : "info", titulo: `Radicado ${escapar(rad.pagador || "")} ${cuando}: ${rad.total_neto != null ? pesos(rad.total_neto) : "sin total"} por cobrar`,
+      sub: `${plural(rad.cirugias, "cirugía", "cirugías")}${rad.dias != null ? ` · hace ${rad.dias} días` : ""}`, accion: "Ver", ir: abrir });
+  }
   if (d.sin_valor) tareas.push({ tono: "warn", titulo: plural(d.sin_valor, "cirugía sin valor", "cirugías sin valor"),
     sub: "No cuentan en los reportes ni en lo que te deben", accion: "Completar", ir: () => verLista({ "#f-estado": "SIN_VALOR" }) });
   const p = d.proximo_pago;
@@ -3896,16 +3916,17 @@ zonaPago.addEventListener("drop", (e) => subirReportePago(e.dataTransfer.files[0
 async function subirRelacion(archivos) {
   const estado = $("#estado-relacion");
   $("#detalle-pago").innerHTML = $("#liquidacion-pago").innerHTML = "";
-  estado.innerHTML = `<div class="cargando">Leyendo la relación con la IA y cruzándola con tus cirugías… puede tardar hasta un minuto.<br><span class="sub">${archivos.length} archivo${archivos.length === 1 ? "" : "s"}</span></div>`;
+  estado.innerHTML = `<div class="cargando">Leyendo ${tipoRelacion === "RADICADO" ? "el radicado" : "la relación"} con la IA y cruzándolo con tus cirugías… puede tardar hasta un minuto.<br><span class="sub">${archivos.length} archivo${archivos.length === 1 ? "" : "s"}</span></div>`;
   const form = new FormData();
   try {
     for (const a of archivos) form.append("archivos", new Blob([await a.arrayBuffer()], { type: a.type || "application/octet-stream" }), a.name || "relacion");
     if ($("#relacion-pagador").value.trim()) form.append("pagador", $("#relacion-pagador").value.trim());
-    if ($("#relacion-fecha").value) form.append("fecha_pago", $("#relacion-fecha").value);
-    const r = await fetch("/api/pagos/relacion", { method: "POST", body: form });
+    const radicado = tipoRelacion === "RADICADO";
+    if ($("#relacion-fecha").value) form.append(radicado ? "fecha_radicado" : "fecha_pago", $("#relacion-fecha").value);
+    const r = await fetch(radicado ? "/api/pagos/radicado" : "/api/pagos/relacion", { method: "POST", body: form });
     const cuerpo = await r.json().catch(() => null);
     if (r.status === 409 && cuerpo?.detail?.reporte_id) {
-      aviso(estado, "warn", "Esta relación ya se había subido. Te muestro la que ya está guardada.");
+      aviso(estado, "warn", "Este documento ya se había subido. Te muestro el que ya está guardado.");
       return mostrarReportePago(cuerpo.detail.reporte_id);
     }
     if (!r.ok) return aviso(estado, "err", mensajeError(cuerpo, `No se pudo leer la relación (error ${r.status}).`));
@@ -3918,6 +3939,17 @@ async function subirRelacion(archivos) {
   }
 }
 $("#elegir-relacion").addEventListener("click", () => elegirArchivo(subirRelacion, true));
+let tipoRelacion = "RADICADO";
+document.querySelectorAll("#relacion-tipo [data-tipo]").forEach((b) => b.onclick = () => {
+  tipoRelacion = b.dataset.tipo;
+  document.querySelectorAll("#relacion-tipo [data-tipo]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+  const radicado = tipoRelacion === "RADICADO";
+  $("#relacion-fecha-etiqueta").textContent = radicado ? "Fecha del radicado" : "Fecha del pago";
+  $("#relacion-ayuda").textContent = radicado
+    ? "Si no pones la fecha se usa la del sello de recibido o la de la hoja. Al aplicarlo, las cirugías quedan facturadas (radicadas); cuando la clínica pague, registras el pago y quedan pagadas."
+    : "Si no pones la fecha del pago se usa la fecha de la relación. Al aplicarla, las cirugías quedan pagadas con el valor de cada línea.";
+  $("#elegir-relacion").textContent = radicado ? "📄 Elegir radicado (foto o PDF de cada página)" : "📄 Elegir relación (PDF o fotos de cada página)";
+});
 
 async function mostrarReportePago(id) {
   const r = await fetch(`/api/pagos/${id}`);
@@ -3988,6 +4020,7 @@ async function compararVolante(reporteId, archivo) {
 }
 
 function pintarReportePago(rep) {
+  if (rep.tipo === "RADICADO") return pintarRadicado(rep);
   const relacion = rep.tipo === "RELACION";
   // La relación de AP no lleva volante propio: el pago global ya viene en el reporte de pagos
   if (relacion) $("#liquidacion-pago").innerHTML = ""; else mostrarLiquidacion(rep.reporte_id);
@@ -4055,15 +4088,108 @@ function pintarReportePago(rep) {
   };
 }
 
+function pintarRadicado(rep) {
+  $("#liquidacion-pago").innerHTML = "";
+  const paginas = rep.paginas || 1;
+  const cuenta = (res) => rep.filas.filter((f) => f.resultado === res).length;
+  const porRadicar = rep.filas.filter((f) => f.resultado === "COINCIDE" && ["PROGRAMADA", "REALIZADA"].includes(f.estado_cirugia)).length;
+  const encontradas = cuenta("COINCIDE");
+  const pagado = rep.estado === "PAGADO";
+  const plural = (n, uno, varios) => `<strong>${n}</strong> ${n === 1 ? uno : varios}`;
+  const etiqueta = (f) => f.resultado !== "COINCIDE" ? RESULTADO[f.resultado]
+    : f.estado_cirugia === "PAGADA" ? "✓ Pagada" : f.estado_cirugia === "FACTURADA" ? "✓ Radicada" : "✓ Encontrada";
+  const hoyIso = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  $("#detalle-pago").innerHTML = `<section class="card">
+    <h2>Radicado · ${escapar(rep.pagador || "Clínica")}</h2>
+    <p class="sub">Radicado el ${escapar(rep.fecha_proceso || "—")}${rep.numero ? ` · Nº ${escapar(rep.numero)}` : ""}
+      · <a href="/api/pagos/${rep.reporte_id}/archivo" data-visor="Radicado">📄 Ver original</a>${
+      paginas > 1 ? " · " + Array.from({ length: paginas }, (_, i) => `<a href="/api/pagos/${rep.reporte_id}/archivo?pagina=${i + 1}" data-visor="Radicado · página ${i + 1}">página ${i + 1}</a>`).join(" · ") : ""}</p>
+    <div class="cifras" style="margin:8px 0">
+      <div class="card"><span class="sub">Total del radicado</span><span class="grande-cifra">${rep.total_neto != null ? pesosCorto(rep.total_neto) : "—"}</span>
+        <span class="sub">${rep.total_neto != null ? pesos(rep.total_neto) : "No se leyó el total"}</span></div>
+      <div class="card"><span class="sub">${pagado ? "Pagado" : "Estado"}</span><span class="grande-cifra">${pagado ? pesosCorto(rep.valor_pagado) : rep.estado === "APLICADO" ? "Por cobrar" : "Sin aplicar"}</span>
+        <span class="sub">${pagado ? `el ${escapar(rep.pagado_en)}` : `${rep.filas.length} órdenes en la hoja`}</span></div>
+    </div>
+    ${rep.cuadra === false ? `<div class="aviso err">⚠ Las líneas suman ${pesos(rep.suma_neto)} pero el total dice ${pesos(rep.total_neto)}. Revisa el original.</div>` : ""}
+    <p>${plural(encontradas, "orden encontrada en tus cirugías", "órdenes encontradas en tus cirugías")} ·
+       ${plural(cuenta("SIN_CIRUGIA"), "sin cirugía en la app", "sin cirugía en la app")}</p>
+    <div>${rep.filas.map((f) => `<div class="linea-pago">
+      <div class="item-cab"><strong>${escapar(f.paciente || "—")}</strong>${f.neto != null ? `<span class="valor">${pesos(f.neto)}</span>` : ""}</div>
+      <div class="sub">${[f.documento_paciente, f.empresa, f.procedimiento, f.numero_orden && `orden ${f.numero_orden}`].filter(Boolean).map(escapar).join(" · ")}</div>
+      <div style="margin-top:4px"><span class="chip ${f.resultado === "COINCIDE" ? f.estado_cirugia : f.resultado}">${etiqueta(f)}</span>
+        ${f.cirugia_id ? `<span class="sub"> · cirugía del ${escapar(f.fecha_procedimiento)} (${escapar(f.paciente_app)})</span>` : ""}</div>
+    </div>`).join("")}</div>
+    ${cuenta("SIN_CIRUGIA") ? `<p class="sub">Las órdenes «sin cirugía en la app» son pacientes que no registraste, o cuya cédula quedó mal leída (revisa el original). Regístralas en «Nueva» y toca «Volver a cruzar»${pagado ? ": quedarán pagadas con la fecha del pago" : ""}.</p>` : ""}
+    ${pagado ? `<div class="aviso ok">✓ Santa Ana pagó este radicado: ${pesos(rep.valor_pagado)} el ${escapar(rep.pagado_en)}. Sus cirugías quedaron pagadas.</div>` : ""}
+    <div class="acciones-pago">
+      ${porRadicar ? `<button type="button" class="primario" id="aplicar-pago">Marcar ${porRadicar} cirugía${porRadicar === 1 ? "" : "s"} como radicada${porRadicar === 1 ? "" : "s"}</button>` : ""}
+      ${cuenta("SIN_CIRUGIA") ? `<button type="button" id="cruzar-pago">Volver a cruzar</button>` : ""}
+      ${rep.estado === "LEIDO" ? `<button type="button" id="descartar-pago">Descartar radicado</button>` : ""}
+    </div>
+    ${!pagado && encontradas ? `<form class="pago-radicado" id="form-pagar" novalidate>
+      <h3>¿Ya pagó la clínica?</h3>
+      <p class="sub">Registra el pago y las ${encontradas} cirugías encontradas quedan pagadas con esa fecha. El valor de cada cirugía no cambia.</p>
+      <div class="fila">
+        <div><label for="pagar-fecha">Fecha del pago</label><input id="pagar-fecha" type="date" value="${hoyIso}" required></div>
+        <div><label for="pagar-valor">Valor pagado ($)</label><input id="pagar-valor" inputmode="numeric" value="${rep.total_neto != null ? formatoMiles(rep.total_neto) : ""}"></div>
+      </div>
+      <button type="submit" class="primario" style="margin-top:8px">✓ Registrar pago</button>
+    </form>` : ""}
+  </section>`;
+  const aplicar = $("#aplicar-pago");
+  if (aplicar) aplicar.onclick = async () => {
+    aplicar.disabled = true;
+    const r = await fetch(`/api/pagos/${rep.reporte_id}/aplicar`, { method: "POST" });
+    const cuerpo = await r.json().catch(() => null);
+    if (!r.ok) { aplicar.disabled = false; return aviso($("#estado-pago"), "err", mensajeError(cuerpo, "No se pudo aplicar.")); }
+    toast(`${cuerpo.marcadas} cirugía${cuerpo.marcadas === 1 ? "" : "s"} radicada${cuerpo.marcadas === 1 ? "" : "s"}`);
+    inicioDatos = null;
+    mostrarReportePago(rep.reporte_id);
+    cargarReportesPago();
+  };
+  const cruzar = $("#cruzar-pago");
+  if (cruzar) cruzar.onclick = async () => {
+    cruzar.disabled = true;
+    const r = await fetch(`/api/pagos/${rep.reporte_id}/cruzar`, { method: "POST" });
+    if (r.ok) { pintarReportePago(await r.json()); cargarReportesPago(); } else cruzar.disabled = false;
+  };
+  const descartar = $("#descartar-pago");
+  if (descartar) descartar.onclick = async () => {
+    if (!confirm("¿Descartar este radicado? No se marcará ninguna cirugía.")) return;
+    await fetch(`/api/pagos/${rep.reporte_id}`, { method: "DELETE" });
+    $("#detalle-pago").innerHTML = "";
+    inicioDatos = null;
+    cargarReportesPago();
+  };
+  const formPagar = $("#form-pagar");
+  if (formPagar) formPagar.onsubmit = async (ev) => {
+    ev.preventDefault();
+    const fecha = $("#pagar-fecha").value;
+    if (!fecha) return toast("Pon la fecha del pago");
+    const valor = $("#pagar-valor").value.replace(/\D/g, "");
+    if (!confirm(`¿Marcar como pagadas las ${encontradas} cirugías de este radicado, con fecha ${fecha}?`)) return;
+    const boton = ev.submitter; boton.disabled = true;
+    const r = await fetch(`/api/pagos/${rep.reporte_id}/pagar`, { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fecha_pago: fecha, valor: valor ? Number(valor) : null }) });
+    const cuerpo = await r.json().catch(() => null);
+    if (!r.ok) { boton.disabled = false; return toast(mensajeError(cuerpo, "No se pudo registrar el pago.")); }
+    toast(`Pago registrado: ${cuerpo.marcadas} cirugía${cuerpo.marcadas === 1 ? "" : "s"} pagada${cuerpo.marcadas === 1 ? "" : "s"}`);
+    inicioDatos = null;
+    mostrarReportePago(rep.reporte_id);
+    cargarReportesPago();
+  };
+}
+
 async function cargarReportesPago() {
   const cont = $("#lista-pagos");
   const r = await fetch("/api/pagos");
   const filas = await r.json().catch(() => []);
   if (!r.ok || !filas.length) { cont.innerHTML = `<p class="sub">Aún no has subido reportes de pago.</p>`; return; }
   cont.innerHTML = filas.map((p) => `<button type="button" class="item" data-reporte="${p.reporte_id}">
-    <div class="item-cab"><strong>${escapar(p.fecha_proceso || p.subido_en.slice(0, 10))} · ${p.tipo === "RELACION" ? "Relación AP · " : ""}${escapar(p.pagador || "Reporte")}</strong>
+    <div class="item-cab"><strong>${escapar(p.fecha_proceso || p.subido_en.slice(0, 10))} · ${p.tipo === "RELACION" ? "Relación AP · " : p.tipo === "RADICADO" ? "Radicado · " : ""}${escapar(p.pagador || "Reporte")}</strong>
       <span class="valor">${pesos(p.total_neto)}</span></div>
-    <div class="sub">${p.encontradas} de ${p.lineas} pagos encontrados · <span class="chip">${p.estado === "APLICADO" ? "APLICADO" : "SIN APLICAR"}</span></div>
+    <div class="sub">${p.encontradas} de ${p.lineas} ${p.tipo === "RADICADO" ? "órdenes encontradas" : "pagos encontrados"} · <span class="chip ${p.estado === "PAGADO" ? "PAGADA" : p.tipo === "RADICADO" && p.estado === "APLICADO" ? "FACTURADA" : ""}">${
+      p.estado === "PAGADO" ? `PAGADO ${escapar(p.pagado_en || "")}` : p.estado === "APLICADO" ? (p.tipo === "RADICADO" ? "POR COBRAR" : "APLICADO") : "SIN APLICAR"}</span></div>
   </button>`).join("");
   cont.querySelectorAll("[data-reporte]").forEach((b) => b.onclick = () => { mostrarReportePago(b.dataset.reporte); window.scrollTo({ top: 0, behavior: "smooth" }); });
 }

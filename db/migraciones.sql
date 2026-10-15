@@ -387,3 +387,11 @@ CREATE TABLE IF NOT EXISTS comentario_lectura (
     texto              VARCHAR(1000) NOT NULL,
     creado_en          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- 30. Radicados: relación de órdenes entregada en una clínica que paga el total después (ej. Santa Ana)
+ALTER TABLE reporte_pago DROP CONSTRAINT IF EXISTS reporte_pago_tipo_check;
+ALTER TABLE reporte_pago ADD CONSTRAINT reporte_pago_tipo_check CHECK (tipo IN ('PAGOS','RELACION','RADICADO'));
+ALTER TABLE reporte_pago DROP CONSTRAINT IF EXISTS reporte_pago_estado_check;
+ALTER TABLE reporte_pago ADD CONSTRAINT reporte_pago_estado_check CHECK (estado IN ('LEIDO','APLICADO','PAGADO'));
+ALTER TABLE reporte_pago ADD COLUMN IF NOT EXISTS pagado_en DATE;
+ALTER TABLE reporte_pago ADD COLUMN IF NOT EXISTS valor_pagado NUMERIC(14,2);

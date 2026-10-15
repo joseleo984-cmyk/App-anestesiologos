@@ -154,14 +154,18 @@ CREATE TABLE IF NOT EXISTS reporte_pago (
     url_archivo        TEXT NOT NULL,
     hash_sha256        CHAR(64) NOT NULL,
     estado             VARCHAR(10) NOT NULL DEFAULT 'LEIDO'
-                       CHECK (estado IN ('LEIDO','APLICADO')),
+                       CHECK (estado IN ('LEIDO','APLICADO','PAGADO')),  -- PAGADO: radicado ya pagado
     datos_extraidos    JSONB,
     subido_en          TIMESTAMPTZ NOT NULL DEFAULT now(),
     -- PAGOS: reporte de pagos de la asociación. RELACION: relación o liquidación de AP de una clínica que
     -- paga el total de lo entregado (no paciente por paciente); marca las cirugías pagadas pero no es ingreso
-    -- aparte (el pago global ya viene en el reporte de pagos)
-    tipo               VARCHAR(10) NOT NULL DEFAULT 'PAGOS' CHECK (tipo IN ('PAGOS','RELACION')),
+    -- aparte (el pago global ya viene en el reporte de pagos). RADICADO: relación de órdenes entregada
+    -- (radicada) en una clínica que paga el total después: marca las cirugías facturadas y, al registrar el
+    -- pago, pagadas
+    tipo               VARCHAR(10) NOT NULL DEFAULT 'PAGOS' CHECK (tipo IN ('PAGOS','RELACION','RADICADO')),
     numero             VARCHAR(50),                  -- nº de la relación / radicado
+    pagado_en          DATE,                         -- RADICADO: fecha en que la clínica pagó
+    valor_pagado       NUMERIC(14,2),                -- RADICADO: valor que pagó
     UNIQUE (anestesiologo_id, hash_sha256)
 );
 

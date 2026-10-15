@@ -15,6 +15,7 @@ import time
 import uuid
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timezone
+from decimal import Decimal
 from pathlib import Path
 from typing import Literal, Optional
 
@@ -806,36 +807,72 @@ def subir_relacion_ap(archivos: list[UploadFile] = File(...), pagador: Optional[
     """Sube la relación o liquidación de AP de una clínica que paga el total de lo entregado (ej. Santa Ana):
     una o varias páginas. Se lee con la IA y cada paciente se cruza con su cirugía; al aplicarla, las
     cirugías quedan pagadas con el valor de la relación."""
+    return _subir_relacion(conn, anestesiologo_id, archivos, pagador, fecha_pago, "RELACION")
+
+
+@app.post("/api/pagos/radicado", status_code=201)
+def subir_radicado(archivos: list[UploadFile] = File(...), pagador: Optional[str] = Form(default=None),
+                   fecha_radicado: Optional[date] = Form(default=None), conn=Depends(get_conn, scope="function"),
+                   anestesiologo_id=Depends(anestesiologo_actual)):
+    """Sube el radicado: la relación de órdenes entregada en una clínica que paga el total después (ej. Santa
+    Ana). Al aplicarlo, las cirugías quedan facturadas (radicadas); cuando la clínica paga, se registra el pago
+    y quedan pagadas."""
+    return _subir_relacion(conn, anestesiologo_id, archivos, pagador, fecha_radicado, "RADICADO")
+
+
+def _subir_relacion(conn, anestesiologo_id: int, archivos: list[UploadFile], pagador: Optional[str],
+                    fecha: Optional[date], tipo: str):
+    nombre = "relación" if tipo == "RELACION" else "radicado"
     if len(archivos) > MAX_PAGINAS:
-        raise HTTPException(413, f"Máximo {MAX_PAGINAS} fotos o archivos por relación.")
+        raise HTTPException(413, f"Máximo {MAX_PAGINAS} fotos o archivos por {nombre}.")
     paginas = [_leer_subida(a) for a in archivos]
     huellas = [hashlib.sha256(d).hexdigest() for d, _ in paginas]
     hash_sha256 = huellas[0] if len(huellas) == 1 else hashlib.sha256("".join(huellas).encode()).hexdigest()
     existente = repositorio.buscar_reporte_por_hash(conn, anestesiologo_id, hash_sha256)
     if existente:
-        raise HTTPException(409, {"mensaje": "Esta relación ya se había subido.", "reporte_id": existente["reporte_id"]})
+        raise HTTPException(409, {"mensaje": f"Este{'a' if tipo == 'RELACION' else ''} {nombre} ya se había subido.",
+                                  "reporte_id": existente["reporte_id"]})
     uso_ia.en_nombre_de(anestesiologo_id)
     try:
-        relacion = extraccion.extraer_relacion(paginas)
+        relacion = (extraccion.extraer_relacion(paginas) if tipo == "RELACION"
+                    else extraccion.extraer_relacion(paginas, tipo="radicado"))
     except extraccion.ExtraccionError as e:
-        log.warning("No se pudo leer la relación de AP: %s (causa: %r)", e, e.__cause__)
+        log.warning("No se pudo leer la relación de AP (%s): %s (causa: %r)", tipo, e, e.__cause__)
         raise HTTPException(422, {"mensaje": str(e)})
     if not relacion.filas:
         raise HTTPException(422, {"mensaje": "No se encontraron pacientes en el documento. ¿Es una relación de órdenes?"})
     extra = {"fecha_relacion": relacion.fecha_proceso.isoformat() if relacion.fecha_proceso else None}
     if (pagador or "").strip():
         relacion.pagador = pagador.strip()[:200]
-    if fecha_pago:
-        relacion.fecha_proceso = fecha_pago
+    if fecha:
+        relacion.fecha_proceso = fecha
     try:
         ubicaciones = [almacenamiento.guardar(f"relacion-{uuid.uuid4().hex}{EXTENSIONES[t]}", d, t) for d, t in paginas]
     except almacenamiento.AlmacenamientoError as e:
         raise HTTPException(502, str(e))
     extra["paginas"] = ubicaciones
     reporte_id = repositorio.crear_reporte(conn, anestesiologo_id, ubicaciones[0], hash_sha256, relacion,
-                                           tipo="RELACION", extra=extra)
+                                           tipo=tipo, extra=extra)
     conn.commit()
     return repositorio.obtener_reporte(conn, anestesiologo_id, reporte_id)
+
+
+class PagoRadicado(BaseModel):
+    fecha_pago: date
+    valor: Optional[Decimal] = Field(default=None, ge=0, le=Decimal("10000000000"))
+
+
+@app.post("/api/pagos/{reporte_id}/pagar")
+def pagar_radicado(reporte_id: int, pago: PagoRadicado, conn=Depends(get_conn, scope="function"),
+                   anestesiologo_id=Depends(anestesiologo_actual)):
+    """La clínica pagó el radicado: todas sus cirugías quedan pagadas con esa fecha."""
+    try:
+        marcadas = repositorio.pagar_radicado(conn, anestesiologo_id, reporte_id, pago.fecha_pago, pago.valor)
+    except repositorio.DocumentoNoEncontrado:
+        conn.rollback()
+        raise HTTPException(404, "Radicado no encontrado.")
+    conn.commit()
+    return {"marcadas": marcadas}
 
 
 @app.get("/api/pagos")

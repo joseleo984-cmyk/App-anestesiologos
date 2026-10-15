@@ -52,6 +52,7 @@ def resumen(conn, anestesiologo_id: int, hoy: Optional[date] = None) -> dict:
         "atrasadas": franjas[-1]["cirugias"],
         "sin_valor": sin_valor,
         "por_aplicar": repositorio.por_aplicar(conn, anestesiologo_id),
+        "radicados": repositorio.radicados_por_cobrar(conn, anestesiologo_id),
         "proximo_pago": proximo,
         "dias_atraso": finanzas.DIAS_PENDIENTE_MAX,
     }
@@ -92,7 +93,8 @@ def cobro(conn, anestesiologo_id: int, cirugia_id: int, hoy: Optional[date] = No
              FROM pago_detalle d JOIN reporte_pago r USING (reporte_id)
             WHERE d.cirugia_id = %s AND r.anestesiologo_id = %s ORDER BY r.fecha_proceso NULLS LAST, r.reporte_id""",
         (cirugia_id, anestesiologo_id)).fetchall()
-    relacion = next((d for d in docs if d["tipo"] == "RELACION"), None)
+    relacion = next((d for d in docs if d["tipo"] in ("RELACION", "RADICADO")), None)
+    radicado = relacion is not None and relacion["tipo"] == "RADICADO"
     reporte = next((d for d in docs if d["tipo"] == "PAGOS"), None)
     pagada = c["estado"] == "PAGADA"
     cancelada = c["estado"] == "CANCELADA"
@@ -103,7 +105,8 @@ def cobro(conn, anestesiologo_id: int, cirugia_id: int, hoy: Optional[date] = No
          "hecho": realizada, "fecha": c["fecha_procedimiento"], "detalle": c["clinica"]},
         {"clave": "ENTREGADA", "titulo": "Entregada a AP", "hecho": entregada,
          "fecha": relacion["fecha_proceso"] if relacion else None,
-         "detalle": (f"Relación Nº {relacion['numero']}" if relacion and relacion["numero"]
+         "detalle": (f"Radicada en {relacion['pagador'] or 'la clínica'}" if radicado
+                     else f"Relación Nº {relacion['numero']}" if relacion and relacion["numero"]
                      else "En una relación de AP" if relacion else "Facturada" if entregada else None)},
         {"clave": "REPORTE", "titulo": "En un reporte de pagos", "hecho": reporte is not None or pagada,
          "fecha": reporte["fecha_proceso"] if reporte else None,
