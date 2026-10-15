@@ -571,6 +571,11 @@
   .segmentado { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
   .segmentado button { border: 0; border-radius: 0; padding: 6px 10px; font-size: .85rem; }
   .segmentado button[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); }
+.que-falto { margin-top: 14px; border: 1px dashed var(--line); border-radius: 12px; padding: 10px 12px; }
+.que-falto summary { cursor: pointer; font-weight: 600; }
+.que-falto textarea { width: 100%; margin-top: 6px; }
+.lista-comentarios { list-style: none; padding: 0; margin: 0; }
+.lista-comentarios li { padding: 8px 0; border-bottom: 1px solid var(--line); white-space: pre-wrap; }
 </style>
 </head>
 <body>
@@ -1069,6 +1074,12 @@
       <p class="sub">Lecturas con IA de este mes por anestesiólogo, con el costo estimado en dólares según la tarifa de la API.</p>
       <div id="uso-ia"><p class="sub">Cargando…</p></div>
     </section>
+    <section class="card">
+      <h2>Calidad de la lectura</h2>
+      <p class="sub">Campos que los anestesiólogos corrigen después de leer una orden (últimos 90 días) y sus comentarios de
+        «¿Qué te faltó?». Solo se guarda qué campo cambió, nunca el dato.</p>
+      <div id="calidad-lectura"><p class="sub">Cargando…</p></div>
+    </section>
     <form class="card" id="form-copia" novalidate>
       <h2>Copia de seguridad</h2>
       <p class="sub">Descarga toda la base de datos (cirugías, pacientes, pagos, finanzas, noticias…) en un archivo
@@ -1185,6 +1196,14 @@
       <label for="observaciones">Observaciones</label>
       <textarea id="observaciones" maxlength="1000"></textarea>
     </fieldset>
+
+    <details id="que-falto" class="que-falto oculto">
+      <summary>💬 ¿Qué te faltó? Cuéntanos qué leyó mal la IA</summary>
+      <p class="sub">Ej.: «no leyó el segundo procedimiento», «confundió la aseguradora». No escribas nombres ni documentos del paciente.</p>
+      <textarea id="que-falto-texto" maxlength="1000" placeholder="¿Qué no leyó o leyó mal?"></textarea>
+      <div id="que-falto-aviso"></div>
+      <button type="button" id="que-falto-enviar" style="margin-top:8px">Enviar comentario</button>
+    </details>
 
     <div id="error-guardar"></div>
     <div class="fila" style="margin-top:16px">
@@ -1414,6 +1433,11 @@ function llenarFormulario(datos) {
   if (datos.observaciones && modo.tipo === "documento")
     avisos.push(`<div class="aviso warn">${escapar(datos.observaciones)}</div>`);
   $("#avisos").innerHTML = avisos.join("");
+  $("#que-falto").classList.toggle("oculto", !docId);
+  $("#que-falto").open = false;
+  $("#que-falto").dataset.documento = docId || "";
+  $("#que-falto-texto").value = "";
+  $("#que-falto-aviso").innerHTML = "";
   $("#por-revisar").textContent = `${dudosos.length} por revisar`;
   $("#por-revisar").classList.toggle("oculto", !dudosos.length);
   if (modo.tipo !== "editar") $("#cobro-cirugia").innerHTML = "";
@@ -1500,6 +1524,26 @@ function pintarCobro(c) {
       <span class="sub">${p.fecha ? fechaBreve(p.fecha, true) : ""}</span></li>`).join("")}</ol>
   </div>`;
 }
+
+$("#que-falto-enviar").onclick = async () => {
+  const texto = $("#que-falto-texto").value.trim();
+  if (texto.length < 3) return aviso($("#que-falto-aviso"), "err", "Escribe qué te faltó.");
+  const boton = $("#que-falto-enviar"); boton.disabled = true;
+  try {
+    const documento = Number($("#que-falto").dataset.documento) || null;
+    const r = await fetch("/api/comentarios-lectura", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ texto, documento_id: documento }) });
+    const cuerpo = await r.json().catch(() => null);
+    if (!r.ok) return aviso($("#que-falto-aviso"), "err", mensajeError(cuerpo, "No se pudo enviar."));
+    $("#que-falto-texto").value = "";
+    $("#que-falto").open = false;
+    toast("¡Gracias! Lo usaremos para mejorar la lectura");
+  } catch {
+    aviso($("#que-falto-aviso"), "err", "Sin conexión. Intenta de nuevo.");
+  } finally {
+    boton.disabled = false;
+  }
+};
 
 $("#paso-revisar").onsubmit = async (ev) => {
   ev.preventDefault();
@@ -4396,8 +4440,26 @@ async function cargarUsoIA() {
       <td>${formatoMiles(t.tokens_promedio || 0)}</td><td>${usd(t.costo_usd)}</td></tr>`).join("")}
     </tbody></table></div>`;
 }
+async function cargarCalidad() {
+  const cont = $("#calidad-lectura");
+  const r = await fetch("/api/calidad-lectura").catch(() => null);
+  if (!r || !r.ok) { cont.innerHTML = `<p class="sub">No se pudo cargar la calidad de la lectura.</p>`; return; }
+  const d = await r.json();
+  const campos = d.campos.length ? `<div class="tabla-scroll"><table class="inf-tabla"><thead><tr><th>Campo</th><th>Órdenes</th>
+      <th>%</th><th>Faltaba</th><th>Mal leído</th><th>Sobraba</th></tr></thead><tbody>
+    ${d.campos.map((c) => `<tr><td>${escapar(c.nombre)}</td><td>${formatoMiles(c.ordenes)}</td>
+      <td style="white-space:nowrap">${c.porcentaje != null ? c.porcentaje + " %" : "—"}</td><td>${c.agregados}</td><td>${c.corregidos}</td><td>${c.borrados}</td></tr>`).join("")}
+    </tbody></table></div>`
+    : `<p class="sub">Todavía no hay correcciones registradas.</p>`;
+  const comentarios = d.comentarios.length ? `<ul class="lista-comentarios">${d.comentarios.map((k) =>
+      `<li><span class="sub">${escapar(k.nombre)} · ${new Date(k.creado_en).toLocaleDateString("es-CO")}${k.documento_id ? ` · <a href="/api/documentos/${k.documento_id}/archivo" target="_blank" rel="noopener">orden</a>` : ""}</span><br>${escapar(k.texto)}</li>`).join("")}</ul>`
+    : `<p class="sub">Aún no hay comentarios de «¿Qué te faltó?».</p>`;
+  cont.innerHTML = `<p class="sub">Órdenes leídas y guardadas: <strong>${formatoMiles(d.ordenes_leidas)}</strong></p>${campos}
+    <p class="sub" style="margin:12px 0 4px">Comentarios recientes:</p>${comentarios}`;
+}
 async function cargarUsuarios() {
   cargarUsoIA();
+  cargarCalidad();
   const cont = $("#lista-usuarios");
   const r = await fetch("/api/usuarios");
   if (!r.ok) { cont.innerHTML = `<p class="aviso err">No se pudieron cargar las cuentas.</p>`; return; }

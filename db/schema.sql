@@ -425,3 +425,21 @@ CREATE TABLE IF NOT EXISTS uso_ia (
 );
 CREATE INDEX IF NOT EXISTS idx_uso_ia_fecha ON uso_ia (creado_en);
 CREATE INDEX IF NOT EXISTS idx_uso_ia_anest ON uso_ia (anestesiologo_id, creado_en);
+
+-- 29. Calidad de la lectura: campos que el anestesiólogo corrige (solo el nombre, nunca el valor) y comentarios
+CREATE TABLE IF NOT EXISTS correccion_lectura (
+    correccion_id      BIGSERIAL PRIMARY KEY,
+    documento_id       BIGINT REFERENCES documento_fuente(documento_id) ON DELETE CASCADE,
+    anestesiologo_id   BIGINT REFERENCES anestesiologo(anestesiologo_id) ON DELETE CASCADE,
+    campo              VARCHAR(40) NOT NULL,
+    cambio             VARCHAR(10) NOT NULL CHECK (cambio IN ('AGREGADO', 'CORREGIDO', 'BORRADO')),
+    creado_en          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_correccion_campo ON correccion_lectura (creado_en, campo);
+CREATE TABLE IF NOT EXISTS comentario_lectura (
+    comentario_id      BIGSERIAL PRIMARY KEY,
+    documento_id       BIGINT REFERENCES documento_fuente(documento_id) ON DELETE SET NULL,
+    anestesiologo_id   BIGINT NOT NULL REFERENCES anestesiologo(anestesiologo_id) ON DELETE CASCADE,
+    texto              VARCHAR(1000) NOT NULL,
+    creado_en          TIMESTAMPTZ NOT NULL DEFAULT now()
+);

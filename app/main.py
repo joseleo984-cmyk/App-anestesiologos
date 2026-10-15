@@ -24,7 +24,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from rapidfuzz import fuzz
 
-from app import (almacenamiento, auth, cartera, catalogo, config, copia, correo, exportar, extraccion, extractos,
+from app import (almacenamiento, auth, calidad, cartera, catalogo, config, copia, correo, exportar, extraccion, extractos,
                  finanzas, inicio, liquidacion, noticias, repositorio, uso_ia)
 from app.modelos import (ClaveCopia, CompromisoEntrada, CuentaEntrada, Favorita, FuenteNoticias, ImportacionConfirmada, MetaEntrada,
                          MovimientoEntrada, OrdenConfirmada, PartidaEntrada, Sugerencia, TemasNoticias)
@@ -578,8 +578,36 @@ def confirmar_documento(documento_id: int, orden: OrdenConfirmada,
     except repositorio.DocumentoYaValidado as e:
         conn.rollback()
         raise HTTPException(409, {"mensaje": "Esta orden ya fue guardada.", "cirugia_id": e.cirugia_id})
+    calidad.registrar_correcciones(conn, anestesiologo_id, documento_id, orden)  # qué campos corrigió frente a la IA
     conn.commit()
     return {"cirugia_id": cirugia_id}
+
+
+class Comentario(BaseModel):
+    texto: str = Field(min_length=3, max_length=1000)
+    documento_id: Optional[int] = None
+
+
+@app.post("/api/comentarios-lectura", status_code=201)
+def que_te_falto(datos: Comentario, conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
+    """«¿Qué te faltó?»: lo que la lectura no trajo o leyó mal, para mejorarla."""
+    documento = datos.documento_id
+    if documento is not None and not conn.execute(
+            "SELECT 1 FROM documento_fuente WHERE documento_id = %s AND anestesiologo_id = %s",
+            (documento, anestesiologo_id)).fetchone():
+        documento = None  # no es suyo: el comentario se guarda sin el documento
+    if conn.execute("""SELECT count(*) AS n FROM comentario_lectura WHERE anestesiologo_id = %s
+                        AND creado_en > now() - interval '1 day'""", (anestesiologo_id,)).fetchone()["n"] >= 50:
+        raise HTTPException(429, "Ya enviaste muchos comentarios hoy. Gracias, intenta mañana.")
+    cid = calidad.guardar_comentario(conn, anestesiologo_id, documento, datos.texto)
+    conn.commit()
+    return {"comentario_id": cid}
+
+
+@app.get("/api/calidad-lectura")
+def calidad_de_la_lectura(conn=Depends(get_conn, scope="function"), _=Depends(admin_actual)):
+    """Para el administrador: campos más corregidos en los últimos 90 días y comentarios de «¿Qué te faltó?»."""
+    return calidad.resumen(conn)
 
 
 @app.get("/api/documentos/{documento_id}/archivo")
