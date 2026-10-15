@@ -633,7 +633,8 @@ def conciliar(conn, anestesiologo_id: int, reporte_id: int) -> None:
     ventana (DIAS_ANTES / DIAS_DESPUES), sin pasar de la fecha del pago. Una cirugía no se asigna a dos líneas."""
     pago = conn.execute("SELECT fecha_proceso FROM reporte_pago WHERE reporte_id = %s", (reporte_id,)).fetchone()
     filas = conn.execute(
-        """SELECT d.detalle_id, d.documento_paciente, d.fecha_servicio, d.cirugia_id, c.estado
+        """SELECT d.detalle_id, d.documento_paciente, doc_norm(d.documento_paciente) AS doc, d.fecha_servicio,
+                  d.cirugia_id, c.estado
              FROM pago_detalle d LEFT JOIN cirugia c ON c.cirugia_id = d.cirugia_id
             WHERE d.reporte_id = %s AND d.es_paciente AND d.documento_paciente IS NOT NULL
             ORDER BY d.detalle_id""",
@@ -641,8 +642,19 @@ def conciliar(conn, anestesiologo_id: int, reporte_id: int) -> None:
     ).fetchall()
     # Las líneas cuya cirugía ya quedó pagada no se vuelven a cruzar (al repetir el cruce)
     usadas: set[int] = {f["cirugia_id"] for f in filas if f["estado"] == "PAGADA"}
+    # El mismo paciente con la misma fecha en varias líneas del reporte (AP paga por separado cada
+    # procedimiento de una cirugía): todas esas líneas van a la misma cirugía
+    misma_cirugia: dict[tuple, int] = {}
+    clave = lambda f: (f["doc"], f["fecha_servicio"])
     for f in filas:
         if f["estado"] == "PAGADA":
+            misma_cirugia[clave(f)] = f["cirugia_id"]
+    for f in filas:
+        if f["estado"] == "PAGADA":
+            continue
+        if clave(f) in misma_cirugia:
+            conn.execute("UPDATE pago_detalle SET cirugia_id = %s WHERE detalle_id = %s",
+                         (misma_cirugia[clave(f)], f["detalle_id"]))
             continue
         candidatas = conn.execute(
             """SELECT c.cirugia_id,
@@ -666,6 +678,7 @@ def conciliar(conn, anestesiologo_id: int, reporte_id: int) -> None:
         elegida = next((c["cirugia_id"] for c in candidatas if c["cirugia_id"] not in usadas), None)
         if elegida:
             usadas.add(elegida)
+            misma_cirugia[clave(f)] = elegida
         conn.execute("UPDATE pago_detalle SET cirugia_id = %s WHERE detalle_id = %s", (elegida, f["detalle_id"]))
 
 
@@ -749,8 +762,9 @@ def aplicar_reporte(conn, anestesiologo_id: int, reporte_id: int) -> int:
         """UPDATE cirugia c
               SET estado = 'PAGADA', valor_honorarios = d.neto,
                   fecha_pago = COALESCE(%s, CURRENT_DATE)
-             FROM pago_detalle d
-            WHERE d.reporte_id = %s AND d.cirugia_id = c.cirugia_id
+             FROM (SELECT cirugia_id, sum(neto) AS neto FROM pago_detalle
+                    WHERE reporte_id = %s AND cirugia_id IS NOT NULL GROUP BY cirugia_id) d
+            WHERE d.cirugia_id = c.cirugia_id
               AND c.anestesiologo_id = %s AND c.estado NOT IN ('PAGADA', 'CANCELADA')""",
         (rep["fecha_proceso"], reporte_id, anestesiologo_id),
     ).rowcount

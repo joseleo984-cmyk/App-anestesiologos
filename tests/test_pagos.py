@@ -222,3 +222,16 @@ def test_con_varias_cirugias_toma_la_mas_cercana(con_reporte):
     crear(c, "72000730", "2026-02-01")
     cercana = crear(c, "72000730", "2026-07-30")
     assert subir(c).json()["filas"][0]["cirugia_id"] == cercana
+
+
+def test_varias_lineas_del_mismo_paciente_van_a_la_misma_cirugia(con_reporte):
+    c = con_reporte
+    # AP paga en dos líneas los dos procedimientos de la misma cirugía
+    linea = REPORTE["filas"][0]
+    c.poner_reporte({**REPORTE, "total_neto": None, "filas": [
+        {**linea, "neto": 500000, "factura": "1"}, {**linea, "neto": 200405, "factura": "2"}]})
+    uno = crear(c, "72000730", "2026-07-20")
+    rep = subir(c).json()
+    assert [f["cirugia_id"] for f in rep["filas"]] == [uno, uno]
+    assert c.post(f"/api/pagos/{rep['reporte_id']}/aplicar").json() == {"marcadas": 1}
+    assert c.get(f"/api/cirugias/{uno}").json()["valor_honorarios"] == 700405  # la suma de las dos líneas
