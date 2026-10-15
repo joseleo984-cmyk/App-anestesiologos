@@ -324,6 +324,21 @@ CREATE TABLE IF NOT EXISTS noticia (
     temas              TEXT[] NOT NULL DEFAULT '{}',
     titulo_es          TEXT,
     resumen_es         TEXT,
+    -- para la infografía: relevancia (1–5), la cifra principal, cuántos pacientes y la conclusión en una frase
+    relevancia         SMALLINT,
+    cifra              VARCHAR(40),
+    cifra_etiqueta     VARCHAR(160),
+    pacientes          INTEGER,
+    conclusion         TEXT,
+    diseno             VARCHAR(24),                    -- ECA, METAANALISIS, COHORTE…: nivel de evidencia
+    poblacion          TEXT,
+    intervencion       TEXT,
+    comparador         TEXT,
+    grupo_a            VARCHAR(120),                   -- comparación en porcentajes (de cada 100 pacientes)
+    valor_a            NUMERIC(6,2),
+    grupo_b            VARCHAR(120),
+    valor_b            NUMERIC(6,2),
+    evento             VARCHAR(160),
     intentos           INTEGER NOT NULL DEFAULT 0,
     listo_en           TIMESTAMPTZ,
     creado_en          TIMESTAMPTZ NOT NULL DEFAULT now(),

@@ -25,7 +25,7 @@
     --bg: #f3f6f6; --card: #ffffff; --text: #14201f; --muted: #56686a; --line: #d6e0df;
     --accent: #0d7470; --accent-text: #ffffff; --accent-bg: #e0f1ef; --warn-bg: #fff1d1; --warn-line: #d39a00;
     --warn-text: #8a5a00; --ok-bg: #e3f4e8; --ok-text: #1f7a43; --err-bg: #fde6e6; --err-text: #b42323;
-    --info-bg: #e5eefa; --info-text: #2563b0;
+    --info-bg: #e5eefa; --info-text: #2563b0; --morado: #7a4fb0; --morado-bg: #efe8f8;
     --letra: "Figtree", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     --letra-titulo: "Sora", "Figtree", system-ui, -apple-system, sans-serif;
     --serie-1: #2a78d6; --serie-2: #eb6834; --serie-3: #1baf7a; --rejilla: #e8eaee; --eje: #c3c7ce; --libre: #e3e6ea;
@@ -36,7 +36,7 @@
       --bg: #0f1514; --card: #172020; --text: #e3ecea; --muted: #93a6a3; --line: #2a3735;
       --accent: #35b3a9; --accent-text: #06201e; --accent-bg: #163331; --warn-bg: #3a2d10; --warn-line: #c99a1a;
       --warn-text: #e8b34a; --ok-bg: #173322; --ok-text: #6fd294; --err-bg: #3d1c1c; --err-text: #f19a9a;
-      --info-bg: #18263a; --info-text: #7fb0f0;
+      --info-bg: #18263a; --info-text: #7fb0f0; --morado: #c3a3f0; --morado-bg: #2a2140;
       --serie-1: #3987e5; --serie-2: #d95926; --serie-3: #199e70; --rejilla: #262c36; --eje: #3a424f; --libre: #2a313c;
     }
   }
@@ -44,7 +44,7 @@
       --bg: #0f1514; --card: #172020; --text: #e3ecea; --muted: #93a6a3; --line: #2a3735;
       --accent: #35b3a9; --accent-text: #06201e; --accent-bg: #163331; --warn-bg: #3a2d10; --warn-line: #c99a1a;
       --warn-text: #e8b34a; --ok-bg: #173322; --ok-text: #6fd294; --err-bg: #3d1c1c; --err-text: #f19a9a;
-      --info-bg: #18263a; --info-text: #7fb0f0;
+      --info-bg: #18263a; --info-text: #7fb0f0; --morado: #c3a3f0; --morado-bg: #2a2140;
       --serie-1: #3987e5; --serie-2: #d95926; --serie-3: #199e70; --rejilla: #262c36; --eje: #3a424f; --libre: #2a313c;
     }
   * { box-sizing: border-box; }
@@ -145,6 +145,148 @@
   .globo { position: absolute; top: 2px; right: calc(50% - 22px); min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px;
     background: #d03b3b; color: #fff; font-size: .65rem; line-height: 16px; font-weight: 700; text-align: center; }
   .noticia { border-top: 1px solid var(--line); padding: 12px 0; }
+  /* Historias: lo más relevante, como en Instagram */
+  .historias-fila { display: flex; gap: 14px; overflow-x: auto; padding: 4px 2px 10px; margin-bottom: 4px; scrollbar-width: none; }
+  .historias-fila::-webkit-scrollbar { display: none; }
+  .anillo { flex: 0 0 auto; width: 74px; border: 0; background: transparent; padding: 0; display: grid; justify-items: center; gap: 5px;
+    min-height: 0; color: var(--text); }
+  .anillo .aro { width: 68px; height: 68px; border-radius: 50%; padding: 3px; background: conic-gradient(var(--c1), var(--c2), var(--c1)); }
+  .anillo .dentro { width: 100%; height: 100%; border-radius: 50%; background: var(--card); border: 2px solid var(--card); display: grid;
+    place-items: center; text-align: center; font: 700 .95rem/1 var(--letra-titulo); color: var(--c1); overflow: hidden; padding: 4px; letter-spacing: -.02em; }
+  .anillo .nombre { font-size: .7rem; line-height: 1.15; color: var(--muted); max-width: 74px; overflow: hidden; display: -webkit-box;
+    -webkit-line-clamp: 2; -webkit-box-orient: vertical; text-align: center; }
+  .tipo-ALERTA { --c1: var(--err-text); --c2: #ff8a5c; } .tipo-GUIA { --c1: var(--accent); --c2: #6fd2b8; }
+  .tipo-ESTUDIO { --c1: var(--info-text); --c2: #5fc4f0; } .tipo-REVISION { --c1: var(--morado); --c2: #e08ad6; }
+  .tipo-NOTICIA, .tipo-NORMATIVA, .tipo-OTRO { --c1: var(--warn-text); --c2: #f0b54a; }
+  #historia { position: fixed; inset: 0; z-index: 55; color: #fff; display: flex; flex-direction: column; user-select: none; -webkit-user-select: none;
+    background: radial-gradient(120% 80% at 80% 0%, var(--c2), transparent 60%), linear-gradient(170deg, var(--c1), #071312 85%);
+    padding: calc(10px + env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) calc(18px + env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
+    touch-action: none; }
+  #historia .barras { display: grid; grid-auto-flow: column; gap: 4px; }
+  #historia .barras i { height: 3px; border-radius: 2px; background: rgba(255, 255, 255, .3); overflow: hidden; display: block; }
+  #historia .barras i b { display: block; height: 100%; width: 0; background: #fff; }
+  #historia .cab { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 10px; font-size: .85rem; }
+  #historia .cab .quien { display: flex; gap: 8px; align-items: center; min-width: 0; }
+  #historia .etiqueta { font-size: .7rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; padding: 3px 9px; border-radius: 999px; background: rgba(255, 255, 255, .2); }
+  #historia .cerrar { background: rgba(0, 0, 0, .25); color: #fff; border: 0; width: 40px; height: 40px; min-height: 0; border-radius: 50%; font-size: 1.1rem; padding: 0; }
+  #historia .lienzo { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 16px; max-width: 560px; width: 100%; margin: 0 auto; }
+  #historia .titular { font: 700 clamp(1.5rem, 6.5vw, 2.2rem)/1.15 var(--letra-titulo); letter-spacing: -.02em; text-wrap: balance; }
+  #historia .gigante { font: 800 clamp(3.6rem, 21vw, 7rem)/.9 var(--letra-titulo); letter-spacing: -.05em; overflow-wrap: anywhere; }
+  #historia .gigante.media { font-size: clamp(2.4rem, 12vw, 4.2rem); }
+  #historia .medida { font-size: 1.15rem; font-weight: 600; opacity: .95; }
+  #historia .chico { font-size: .9rem; opacity: .8; }
+  #historia .texto { font-size: 1.15rem; line-height: 1.45; font-weight: 500; }
+  #historia .acciones { display: flex; gap: 10px; flex-wrap: wrap; }
+  #historia .acciones a, #historia .acciones button { flex: 1 1 140px; text-align: center; background: rgba(255, 255, 255, .16); color: #fff;
+    border: 1px solid rgba(255, 255, 255, .35); border-radius: 14px; padding: 12px; font-weight: 700; text-decoration: none; }
+  #historia .pista-toque { text-align: center; font-size: .75rem; opacity: .6; }
+  /* Monitor de anestesia: la entrada a Noticias (siempre oscuro, como el equipo) */
+  .monitor { background: #05090a; color: #d8f5e8; border-radius: 20px; padding: 12px 14px 14px; margin-bottom: 14px;
+    box-shadow: inset 0 0 0 1px #142224; display: grid; gap: 8px; }
+  .monitor .mon-cab { display: flex; justify-content: space-between; font-size: .7rem; font-weight: 800; letter-spacing: .12em; color: #7f9a96; }
+  .monitor .mon-cab .vivo { color: #ff4d4d; }
+  .canal { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; border-top: 1px solid #142224; padding: 8px 0 2px;
+    color: var(--onda); text-align: left; background: transparent; border-left: 0; border-right: 0; border-bottom: 0; border-radius: 0; width: 100%; min-height: 0; }
+  .canal .izq { display: grid; gap: 3px; min-width: 0; }
+  .canal .tag { font-size: .68rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+  .canal canvas { width: 100%; height: 34px; display: block; }
+  .canal .txt { font-size: .82rem; color: #c9e2dc; line-height: 1.25; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .canal .num { text-align: right; display: grid; align-content: center; justify-items: end; max-width: 120px; }
+  .canal .num b { font: 700 2rem/1 var(--letra-titulo); letter-spacing: -.03em; overflow-wrap: anywhere; }
+  .canal .num b.largo { font-size: 1.15rem; }
+  .canal .num small { font-size: .66rem; color: #9ab; }
+  .alarma { display: grid; gap: 2px; text-align: left; width: 100%; background: #3a0d0d; color: #ffb0b0; border: 1px solid #ff4d4d;
+    border-radius: 10px; padding: 8px 10px; font-size: .85rem; min-height: 0; }
+  .alarma span { color: #ff4d4d; font-weight: 800; letter-spacing: .1em; font-size: .68rem; }
+  @media (prefers-reduced-motion: no-preference) { .alarma { animation: parpadeo 1.2s steps(2, jump-none) infinite; } .monitor .vivo { animation: parpadeo 1.6s infinite; } }
+  @keyframes parpadeo { 50% { border-color: #3a0d0d; opacity: .75; } }
+  .monitor .mon-botones { display: flex; gap: 8px; margin-top: 4px; }
+  .monitor .mon-botones button { flex: 1; background: #0f1d1c; color: #d8f5e8; border: 1px solid #1f3533; border-radius: 12px; font-weight: 700; font-size: .88rem; }
+  .monitor .mon-botones button.fuerte { background: #19c37d; color: #03140c; border-color: #19c37d; }
+  .monitor .plano { color: #3a5552; font-size: .85rem; text-align: center; padding: 6px 0; }
+  /* Ficha de la noticia (A + B) */
+  .capa { position: fixed; inset: 0; z-index: 52; background: rgba(0, 0, 0, .45); display: flex; align-items: flex-end; justify-content: center; }
+  .ficha { background: var(--card); width: 100%; max-width: 620px; max-height: 92vh; overflow-y: auto; border-radius: 22px 22px 0 0;
+    padding: 10px max(18px, env(safe-area-inset-right)) calc(18px + env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
+    display: grid; gap: 14px; overscroll-behavior: contain; }
+  .ficha .agarre { width: 40px; height: 5px; border-radius: 3px; background: var(--line); margin: 0 auto; }
+  .ficha .arriba { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .ficha .etiq { font-size: .7rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; padding: 3px 10px; border-radius: 999px;
+    background: color-mix(in srgb, var(--c1) 15%, transparent); color: var(--c1); }
+  .ficha h3 { margin: 0; font: 700 1.3rem/1.2 var(--letra-titulo); letter-spacing: -.01em; text-wrap: balance; }
+  .ficha .resultado { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; }
+  .ficha .resultado .grande { font: 800 2.8rem/.95 var(--letra-titulo); letter-spacing: -.04em; color: var(--c1); overflow-wrap: anywhere; }
+  .ficha .resultado .grande.largo { font-size: 1.7rem; }
+  .ficha .pico { display: grid; gap: 8px; }
+  .ficha .pico div { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 10px; align-items: start; font-size: .92rem; }
+  .ficha .pico b { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; font: 700 .8rem var(--letra-titulo);
+    background: color-mix(in srgb, var(--c1) 15%, transparent); color: var(--c1); }
+  .ficha .cien { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .ficha .cien .lado { display: grid; gap: 6px; align-content: start; }
+  .ficha .cien .n { font: 800 1.9rem/1 var(--letra-titulo); }
+  .ficha .puntos { display: grid; grid-template-columns: repeat(10, 1fr); gap: 3px; }
+  .ficha .puntos i { aspect-ratio: 1; border-radius: 50%; background: var(--line); display: block; }
+  .ficha .diferencia { background: color-mix(in srgb, var(--c1) 12%, transparent); color: var(--c1); border-radius: 12px; padding: 9px 12px; font-weight: 700; font-size: .9rem; }
+  .ficha .evidencia { display: grid; gap: 6px; }
+  .ficha .piramide { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; align-items: end; }
+  .ficha .piramide i { display: block; border-radius: 4px; background: var(--line); }
+  .ficha .piramide i.si { background: var(--c1); }
+  .ficha .extremos { display: flex; justify-content: space-between; font-size: .75rem; color: var(--muted); }
+  .ficha .botones { display: flex; gap: 8px; flex-wrap: wrap; }
+  .ficha .botones > * { flex: 1 1 130px; text-align: center; }
+  /* Mazo para deslizar (G) */
+  #mazo { position: fixed; inset: 0; z-index: 51; background: var(--bg); display: flex; flex-direction: column; gap: 14px;
+    padding: calc(12px + env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) calc(18px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+  #mazo .mazo-cab { display: flex; justify-content: space-between; align-items: center; }
+  #mazo .pila { position: relative; flex: 1; max-height: 560px; width: 100%; max-width: 460px; margin: 0 auto; }
+  .carta { position: absolute; inset: 0; border-radius: 26px; color: #fff; padding: 20px; display: flex; flex-direction: column; gap: 8px;
+    background: radial-gradient(110% 70% at 85% 0%, var(--c2), transparent 60%), linear-gradient(165deg, var(--c1), #071312 92%);
+    box-shadow: 0 18px 36px -18px rgba(0, 0, 0, .6); touch-action: none; transition: transform .3s, opacity .3s; will-change: transform; }
+  .carta.arrastre { transition: none; }
+  .carta.atras1 { transform: translateY(12px) scale(.95); } .carta.atras2 { transform: translateY(24px) scale(.9); }
+  .carta .etiq { align-self: flex-start; font-size: .7rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; padding: 3px 10px; border-radius: 999px; background: rgba(255, 255, 255, .2); }
+  .carta .num { margin-top: auto; font: 800 clamp(3.2rem, 18vw, 5.5rem)/.9 var(--letra-titulo); letter-spacing: -.05em; overflow-wrap: anywhere; }
+  .carta .num.largo { font-size: clamp(2rem, 10vw, 3rem); }
+  .carta .medida { font-size: .95rem; opacity: .9; }
+  .carta .tit { font: 700 1.25rem/1.2 var(--letra-titulo); text-wrap: balance; }
+  .carta .fuente { font-size: .8rem; opacity: .75; }
+  .carta .sello { position: absolute; top: 22px; padding: 6px 12px; border: 3px solid #fff; border-radius: 10px; font: 800 1rem var(--letra-titulo);
+    letter-spacing: .08em; opacity: 0; transform: rotate(-12deg); }
+  .carta .sello.der { right: 20px; transform: rotate(12deg); } .carta .sello.izq { left: 20px; }
+  #mazo .mazo-botones { display: flex; justify-content: center; gap: 18px; align-items: center; }
+  #mazo .mazo-botones button { width: 62px; height: 62px; border-radius: 50%; font-size: 1.4rem; padding: 0; }
+  #mazo .mazo-botones .ver { width: auto; height: 44px; border-radius: 999px; font-size: .95rem; padding: 0 18px; }
+  #mazo .mazo-botones .si { color: #c98a00; }
+  #mazo .vacio { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; gap: 8px; }
+  #mazo .vacio b { font: 700 1.5rem var(--letra-titulo); color: var(--accent); }
+  /* Boletín semanal */
+  .boletin { background: var(--card); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; margin-bottom: 14px; }
+  .boletin .portada { background: linear-gradient(140deg, var(--accent), #0a4f4c); color: #fff; padding: 16px; display: grid; gap: 4px; }
+  .boletin .portada .sem { font-size: .72rem; letter-spacing: .1em; text-transform: uppercase; opacity: .85; font-weight: 700; }
+  .boletin .portada h2 { margin: 0; font-size: 1.35rem; color: #fff; }
+  .boletin .portada .nav { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .boletin .portada .nav button { background: rgba(255, 255, 255, .18); color: #fff; border: 0; min-height: 36px; padding: 4px 12px; border-radius: 999px; font-weight: 700; }
+  .boletin .portada .nav button:disabled { opacity: .35; }
+  .boletin .cuenta { display: flex; gap: 18px; margin-top: 8px; }
+  .boletin .cuenta b { display: block; font: 800 1.7rem/1 var(--letra-titulo); }
+  .boletin .cuenta span { font-size: .78rem; opacity: .85; }
+  .boletin .bloque { padding: 14px 16px; border-top: 1px solid var(--line); display: grid; gap: 10px; }
+  .boletin .bloque:first-of-type { border-top: 0; }
+  .boletin .rotulo { font-size: .72rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .boletin .alerta { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: center; text-align: left; width: 100%; background: var(--err-bg);
+    color: var(--err-text); border: 1px solid transparent; border-radius: 14px; padding: 10px 12px; font-weight: 700; }
+  .boletin .cifra-sem { display: grid; grid-template-columns: minmax(92px, auto) minmax(0, 1fr); gap: 12px; align-items: center; text-align: left;
+    width: 100%; background: transparent; border: 0; border-radius: 12px; padding: 6px 4px; }
+  .boletin .cifra-sem:hover { background: var(--bg); }
+  .boletin .cifra-sem .num { font: 800 1.45rem/1 var(--letra-titulo); letter-spacing: -.03em; color: var(--c1); text-align: right; overflow-wrap: anywhere; }
+  .boletin .cifra-sem .que { font-size: .9rem; line-height: 1.3; }
+  .boletin .cifra-sem .que small { display: block; color: var(--muted); font-size: .78rem; }
+  .boletin .tema-barra { display: grid; grid-template-columns: 112px minmax(0, 1fr) 24px; gap: 10px; align-items: center; font-size: .86rem; }
+  .boletin .tema-barra .pista { height: 10px; border-radius: 5px; background: var(--line); overflow: hidden; }
+  .boletin .tema-barra .pista i { display: block; height: 100%; border-radius: 5px; background: var(--accent); }
+  .boletin .tema-barra b { text-align: right; font-variant-numeric: tabular-nums; }
+  .boletin .tipos { display: flex; flex-wrap: wrap; gap: 6px; }
+  .boletin .tipos span { font-size: .78rem; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: color-mix(in srgb, var(--c1) 14%, transparent); color: var(--c1); }
   .noticia:first-child { border-top: 0; }
   .noticia h3 { margin: 4px 0; font-size: 1rem; line-height: 1.35; }
   .noticia .original { font-size: .78rem; color: var(--muted); font-style: italic; margin: 0 0 6px; }
@@ -535,8 +677,12 @@
   </div>
 
   <div id="pestana-noticias" class="pestana oculto">
+    <div class="titulo-seccion" id="not-historias-titulo" style="margin-top:4px">Lo más relevante</div>
+    <div class="historias-fila" id="not-historias"></div>
+    <div class="monitor" id="not-monitor"><div class="mon-cab"><span>NOTICIAS · AP</span><span>Cargando…</span></div></div>
+    <div class="boletin" id="not-boletin"><div class="bloque"><p class="sub">Cargando el boletín…</p></div></div>
     <section class="card">
-      <div class="item-cab"><h2>Noticias de anestesia</h2>
+      <div class="item-cab"><h2>Todas las noticias</h2>
         <button type="button" id="not-btn-temas" style="flex:0 0 auto">⚙ Mis temas</button></div>
       <p class="sub">Lo nuevo de fuentes científicas y gremiales seleccionadas, resumido en español.</p>
       <div id="not-temas" class="oculto">
@@ -881,6 +1027,9 @@
   </div>
 </div>
 <div id="toast" role="status" aria-live="polite"></div>
+<div id="historia" class="oculto" role="dialog" aria-modal="true" aria-label="Historias de noticias"></div>
+<div id="capa-ficha" class="capa oculto"><div class="ficha" id="ficha" role="dialog" aria-modal="true" aria-label="Ficha de la noticia"></div></div>
+<div id="mazo" class="oculto" role="dialog" aria-modal="true" aria-label="Revisar noticias nuevas"></div>
 <div id="visor" class="oculto" role="dialog" aria-modal="true" aria-labelledby="visor-titulo">
   <div class="visor-barra">
     <button type="button" id="visor-cerrar" aria-label="Cerrar">✕ Cerrar</button>
@@ -1311,7 +1460,7 @@ function mostrarPestana(nombre) {
   if (nombre === "usuarios") cargarUsuarios();
   if (nombre === "relacion") abrirRelacion();
   if (nombre === "finanzas") cargarFinanzas();
-  if (nombre === "noticias") cargarNoticias();
+  if (nombre === "noticias") { cargarNoticias(); cargarHistorias(); cargarBoletin(); cargarMonitor(); }
 }
 document.querySelectorAll("[data-pestana]").forEach((b) => b.onclick = () => {
   if (modo.tipo === "editar") modo = { tipo: "manual" };
@@ -1928,8 +2077,10 @@ async function cargarNoticias() {
     : notVer === "favoritas" ? "No has guardado noticias. Toca ☆ Guardar en una noticia para tenerla aquí." : "Aún no has leído noticias.";
   $("#not-lista").innerHTML = d.noticias.length ? d.noticias.map((n) => `<article class="noticia" data-noticia="${n.noticia_id}">
       <div class="sub">${escapar(n.fuente)} · ${fechaCorta(n.publicado_en || n.listo_en)}${TIPO_NOTICIA[n.tipo] ? ` · <span class="chip">${TIPO_NOTICIA[n.tipo]}</span>` : ""}</div>
-      <h3>${escapar(n.titulo_es || n.titulo)}</h3>
+      <h3><button type="button" class="enlace" data-accion="ficha" style="text-align:left;color:inherit;text-decoration:none;font:inherit;min-height:0;padding:0;border:0;background:none">${escapar(n.titulo_es || n.titulo)}</button></h3>
       ${n.titulo_es && n.titulo_es !== n.titulo ? `<p class="original">${escapar(n.titulo)}</p>` : ""}
+      ${n.cifra ? `<p style="margin:2px 0 6px"><span class="valor tipo-${tipoDe(n)}" style="font:800 1.3rem var(--letra-titulo);color:var(--c1)">${escapar(n.cifra)}</span>
+        <span class="sub"> ${escapar(n.cifra_etiqueta || "")}</span></p>` : ""}
       <p class="resumen">${escapar(n.resumen_es || "")}</p>
       <div>${n.temas.map((t) => `<span class="tema-chip">${escapar(nombres[t] || t)}</span>`).join("")}</div>
       <div class="acciones">
@@ -1941,8 +2092,456 @@ async function cargarNoticias() {
   if (d.revisando && notReintentos < 4) { notReintentos++; setTimeout(cargarNoticias, 8000); } else if (!d.revisando) notReintentos = 0;
   if (esAdmin) cargarFuentes();
 }
+// ---------------------------------------------------------------- historias y boletín semanal
+const NOMBRE_TIPO = { GUIA: "Guía", ESTUDIO: "Estudio", REVISION: "Revisión", ALERTA: "Alerta", NOTICIA: "Noticia",
+  NORMATIVA: "Normativa", OTRO: "Novedad" };
+const NOMBRE_TEMA = { SEGURIDAD: "Seguridad", GUIAS: "Guías", FARMACOLOGIA: "Farmacología", VIA_AEREA: "Vía aérea",
+  REGIONAL: "Regional", OBSTETRICIA: "Obstetricia", PEDIATRIA: "Pediatría", CARDIOVASCULAR: "Cardiovascular",
+  NEURO: "Neuro", DOLOR: "Dolor", CRITICO: "Crítico", NORMATIVA: "Normativa", GENERAL: "General" };
+const tipoDe = (n) => NOMBRE_TIPO[n.tipo] ? n.tipo : "OTRO";
+let historiasDatos = [];
+
+function anillo(n, i) {
+  const centro = n.cifra && n.cifra.length <= 7 ? escapar(n.cifra) : n.tipo === "ALERTA" ? "⚠" : escapar(NOMBRE_TIPO[tipoDe(n)]);
+  return `<button type="button" class="anillo tipo-${tipoDe(n)}" data-h="${i}" aria-label="${escapar(n.titulo_es || n.titulo)}">
+    <span class="aro"><span class="dentro" style="${centro.length > 5 ? "font-size:.72rem" : ""}">${centro}</span></span>
+    <span class="nombre">${escapar(n.tipo === "ALERTA" ? "Alerta" : NOMBRE_TEMA[n.temas[0]] || NOMBRE_TIPO[tipoDe(n)])}</span></button>`;
+}
+async function cargarHistorias() {
+  const r = await fetch("/api/noticias/historias").catch(() => null);
+  historiasDatos = r && r.ok ? (await r.json()).historias : [];
+  for (const [fila, caja] of [["#not-historias", "#not-historias"], ["#inicio-historias-fila", "#inicio-historias"]]) {
+    const el = $(fila);
+    if (!el) continue;
+    el.innerHTML = historiasDatos.map(anillo).join("");
+    el.querySelectorAll("[data-h]").forEach((b) => b.onclick = () => abrirHistorias(historiasDatos, Number(b.dataset.h)));
+    if (caja === "#inicio-historias") $(caja).classList.toggle("oculto", !historiasDatos.length);
+  }
+  $("#not-historias-titulo").textContent = historiasDatos.length ? "Lo más relevante" : "";
+  $("#not-historias-titulo").classList.toggle("oculto", !historiasDatos.length);
+}
+
+// Visor de historias: cada noticia en 2 o 3 partes (titular, cifra, conclusión); avanza solo
+const SEG_HISTORIA = 6500;
+let hist = null;
+function partesDe(n) {
+  const fecha = fechaBreve(n.publicado_en || n.listo_en);
+  const partes = [`<span class="chico">${escapar(n.fuente)} · ${fecha}</span>
+    <div class="titular">${escapar(n.titulo_es || n.titulo)}</div>
+    <div class="chico">${n.temas.map((t) => escapar(NOMBRE_TEMA[t] || t)).join(" · ")}</div>`];
+  if (n.cifra) partes.push(`<span class="chico">${escapar(n.tipo === "ALERTA" ? "Alerta" : "El resultado")}</span>
+    <div class="gigante ${n.cifra.length > 7 ? "media" : ""}">${escapar(n.cifra)}</div>
+    ${n.cifra_etiqueta ? `<div class="medida">${escapar(n.cifra_etiqueta)}</div>` : ""}
+    ${n.pacientes ? `<div class="chico">${formatoMiles(n.pacientes)} pacientes</div>` : ""}`);
+  partes.push(`<span class="chico">Qué dice</span>
+    <div class="texto">${escapar(n.conclusion || n.resumen_es || "")}</div>
+    ${n.conclusion && n.resumen_es ? `<div class="chico" style="font-size:.85rem">${escapar(n.resumen_es)}</div>` : ""}
+    <div class="acciones">
+      <button type="button" data-hacer="favorita">${n.favorita ? "★ Guardada" : "☆ Guardar"}</button>
+      ${n.enlace ? `<a href="${escapar(n.enlace)}" target="_blank" rel="noopener" data-hacer="abrir">Leer original ↗</a>` : ""}
+    </div>`);
+  return partes;
+}
+function abrirHistorias(lista, desde = 0) {
+  if (!lista.length) return;
+  hist = { lista, i: desde, parte: 0, inicio: 0, pausa: 0, pausado: false, leidas: new Set(), cuadro: 0 };
+  $("#historia").classList.remove("oculto");
+  document.body.style.overflow = "hidden";
+  pintarHistoria();
+  hist.cuadro = requestAnimationFrame(avanceHistoria);
+}
+function cerrarHistorias() {
+  if (!hist) return;
+  cancelAnimationFrame(hist.cuadro);
+  const habia = hist.leidas.size;
+  hist = null;
+  $("#historia").classList.add("oculto");
+  $("#historia").innerHTML = "";
+  document.body.style.overflow = "";
+  if (habia) { cargarHistorias(); actualizarGlobo(); if (pestanaActual === "noticias") { cargarNoticias(); cargarBoletin(boletinSemana); } }
+}
+function pintarHistoria() {
+  const n = hist.lista[hist.i], partes = partesDe(n), cont = $("#historia");
+  hist.partes = partes.length;
+  cont.className = `tipo-${tipoDe(n)}`;
+  cont.innerHTML = `<div class="barras">${partes.map((_, k) => `<i><b style="width:${k < hist.parte ? 100 : 0}%"></b></i>`).join("")}</div>
+    <div class="cab"><div class="quien"><span class="etiqueta">${escapar(NOMBRE_TIPO[tipoDe(n)])}</span>
+      <span class="chico">${hist.i + 1} de ${hist.lista.length}</span></div>
+      <button type="button" class="cerrar" data-hacer="cerrar" aria-label="Cerrar">✕</button></div>
+    <div class="lienzo">${partes[hist.parte]}</div>
+    <div class="pista-toque">Toca a la derecha para seguir · a la izquierda para volver · desliza hacia abajo para cerrar</div>`;
+  hist.inicio = performance.now();
+  hist.pausa = 0;
+}
+function marcarHistoriaLeida(n) {
+  if (hist.leidas.has(n.noticia_id)) return;
+  hist.leidas.add(n.noticia_id);
+  fetch(`/api/noticias/${n.noticia_id}/leida`, { method: "POST", keepalive: true });
+}
+function moverHistoria(paso) {
+  if (!hist) return;
+  if (paso > 0 && hist.parte < hist.partes - 1) hist.parte++;
+  else if (paso > 0) {
+    marcarHistoriaLeida(hist.lista[hist.i]);
+    if (hist.i >= hist.lista.length - 1) return cerrarHistorias();
+    hist.i++; hist.parte = 0;
+  } else if (hist.parte > 0) hist.parte--;
+  else if (hist.i > 0) { hist.i--; hist.parte = 0; }
+  pintarHistoria();
+}
+function avanceHistoria(ahora) {
+  if (!hist) return;
+  const barra = $("#historia .barras i:nth-child(" + (hist.parte + 1) + ") b");
+  const t = hist.pausado ? hist.pausa : ahora - hist.inicio;
+  if (barra) barra.style.width = `${Math.min(100, t / SEG_HISTORIA * 100)}%`;
+  if (!hist.pausado && t >= SEG_HISTORIA) moverHistoria(1);
+  if (hist) hist.cuadro = requestAnimationFrame(avanceHistoria);
+}
+(function () {
+  const el = $("#historia");
+  let x0 = 0, y0 = 0, t0 = 0;
+  el.addEventListener("pointerdown", (e) => {
+    if (!hist || e.target.closest("[data-hacer]")) return;
+    x0 = e.clientX; y0 = e.clientY; t0 = performance.now();
+    hist.pausado = true; hist.pausa = performance.now() - hist.inicio;
+  });
+  el.addEventListener("pointerup", async (e) => {
+    if (!hist) return;
+    const accion = e.target.closest("[data-hacer]");
+    if (accion) {
+      const n = hist.lista[hist.i];
+      if (accion.dataset.hacer === "cerrar") return cerrarHistorias();
+      if (accion.dataset.hacer === "abrir") { marcarHistoriaLeida(n); return; }
+      if (accion.dataset.hacer === "favorita") {
+        const fav = !n.favorita;
+        const r = await fetch(`/api/noticias/${n.noticia_id}/favorita`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ favorita: fav }) });
+        if (r.ok) { n.favorita = fav; accion.textContent = fav ? "★ Guardada" : "☆ Guardar"; toast(fav ? "Guardada en favoritas" : "Quitada de favoritas"); }
+      }
+      return;
+    }
+    const dy = e.clientY - y0, dx = e.clientX - x0, largo = performance.now() - t0;
+    hist.pausado = false; hist.inicio = performance.now() - hist.pausa;
+    if (dy > 80 && Math.abs(dy) > Math.abs(dx)) return cerrarHistorias();
+    if (Math.abs(dx) > 60) return moverHistoria(dx < 0 ? 1 : -1);
+    if (largo > 450) return;  // mantener presionado: solo pausa
+    moverHistoria(e.clientX < window.innerWidth * .3 ? -1 : 1);
+  });
+  document.addEventListener("keydown", (e) => {
+    if (!hist) return;
+    if (e.key === "Escape") cerrarHistorias();
+    if (e.key === "ArrowRight") moverHistoria(1);
+    if (e.key === "ArrowLeft") moverHistoria(-1);
+  });
+})();
+
+// ---------------------------------------------------------------- monitor de anestesia (entrada a Noticias)
+const ONDAS = {
+  ecg: (p) => p < .08 ? Math.sin(p / .08 * Math.PI) * .12 : p < .14 ? 0 : p < .16 ? -.15 : p < .19 ? .95 : p < .22 ? -.35 : p < .4 ? 0 : p < .55 ? Math.sin((p - .4) / .15 * Math.PI) * .22 : 0,
+  pleth: (p) => p < .3 ? Math.sin(p / .3 * Math.PI / 2) * .8 : .8 * Math.exp(-(p - .3) * 4) + (p > .45 && p < .55 ? .12 * Math.sin((p - .45) / .1 * Math.PI) : 0),
+  co2: (p) => p < .08 ? p / .08 * .75 : p < .55 ? .75 + (p - .08) * .25 : p < .62 ? .87 * (1 - (p - .55) / .07) : 0,
+  art: (p) => p < .12 ? Math.sin(p / .12 * Math.PI / 2) * .9 : p < .3 ? .9 - (p - .12) * 2.2 + (p > .2 && p < .26 ? .12 : 0) : Math.max(0, .5 - (p - .3) * .7),
+};
+const CANALES = [["#19c37d", "ecg"], ["#3fd0ff", "pleth"], ["#ffd23f", "co2"], ["#ff6b6b", "art"]];
+let monitorNuevas = [], monitorCuadro = 0, monitorT = 0;
+async function cargarMonitor() {
+  const r = await fetch("/api/noticias?ver=nuevas").catch(() => null);
+  if (!r || !r.ok) return;
+  monitorNuevas = (await r.json()).noticias;
+  pintarMonitor();
+}
+function pintarMonitor() {
+  const cont = $("#not-monitor"), nuevas = monitorNuevas;
+  const grupos = {};
+  for (const n of nuevas) if (n.tipo !== "ALERTA") (grupos[n.temas[0] || "GENERAL"] = grupos[n.temas[0] || "GENERAL"] || []).push(n);
+  const canales = Object.entries(grupos).map(([tema, l]) => ({ tema, l, top: [...l].sort((a, b) => (b.relevancia || 0) - (a.relevancia || 0))[0] }))
+    .sort((a, b) => (b.top.relevancia || 0) - (a.top.relevancia || 0) || b.l.length - a.l.length).slice(0, 4);
+  const alerta = nuevas.find((n) => n.tipo === "ALERTA");
+  cont.innerHTML = `<div class="mon-cab"><span>NOTICIAS · AP</span><span class="${nuevas.length ? "vivo" : ""}">${nuevas.length ? `● ${nuevas.length} NUEVA${nuevas.length === 1 ? "" : "S"}` : "SIN NOVEDADES"}</span></div>
+    ${alerta ? `<button type="button" class="alarma" data-mon="alerta"><span>⚠ ALARMA</span>${escapar(alerta.titulo_es || alerta.titulo)}</button>` : ""}
+    ${canales.length ? canales.map((c, i) => {
+      const [color, onda] = CANALES[i], n = c.top, cifra = n.cifra || String(c.l.length);
+      return `<button type="button" class="canal" style="--onda:${color}" data-mon="${i}">
+        <span class="izq"><span class="tag">${escapar(NOMBRE_TEMA[c.tema] || c.tema)}${c.l.length > 1 ? ` · ${c.l.length}` : ""}</span>
+          <canvas data-onda="${onda}"></canvas><span class="txt">${escapar(n.titulo_es || n.titulo)}</span></span>
+        <span class="num"><b class="${cifra.length > 6 ? "largo" : ""}">${escapar(cifra)}</b><small>${escapar(n.cifra ? (n.cifra_etiqueta || "").slice(0, 28) : c.l.length === 1 ? "nueva" : "nuevas")}</small></span></button>`;
+    }).join("")
+      : `<div style="--onda:#2f4a47"><canvas data-onda="plano" style="width:100%;height:30px;display:block"></canvas></div><div class="plano">✓ Estás al día: sin noticias nuevas en tus temas</div>`}
+    ${nuevas.length ? `<div class="mon-botones"><button type="button" class="fuerte" id="mon-revisar">▶ Revisar ${nuevas.length}</button>
+      <button type="button" id="mon-silenciar">🔕 Silenciar</button></div>` : ""}`;
+  cont.querySelectorAll("[data-mon]").forEach((b) => b.onclick = () =>
+    abrirFicha(b.dataset.mon === "alerta" ? alerta : canales[Number(b.dataset.mon)].top));
+  if ($("#mon-revisar")) $("#mon-revisar").onclick = () => abrirMazo(nuevas);
+  if ($("#mon-silenciar")) $("#mon-silenciar").onclick = async () => {
+    if (!confirm("¿Marcar todas las noticias nuevas como leídas?")) return;
+    await fetch("/api/noticias/leer-todo", { method: "POST" });
+    toast("Alarmas silenciadas: todo leído");
+    refrescarNoticias();
+  };
+  cancelAnimationFrame(monitorCuadro);
+  dibujarOndas();
+}
+function dibujarOndas() {
+  const lienzos = [...document.querySelectorAll("#not-monitor canvas")];
+  const quieto = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  for (const c of lienzos) {
+    const r = c.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+    if (!r.width) continue;
+    if (c.width !== Math.round(r.width * dpr)) { c.width = Math.round(r.width * dpr); c.height = Math.round(r.height * dpr); }
+    const g = c.getContext("2d"), w = c.width, h = c.height, forma = ONDAS[c.dataset.onda] || (() => 0);
+    g.clearRect(0, 0, w, h);
+    g.strokeStyle = getComputedStyle(c).getPropertyValue("--onda").trim() || "#19c37d";
+    g.lineWidth = 1.8 * dpr; g.lineJoin = "round"; g.beginPath();
+    for (let x = 0; x <= w; x += 2) {
+      const v = x / w * 2.4 + monitorT, y = h * .88 - forma(v - Math.floor(v)) * h * .78;
+      if (x === 0) g.moveTo(x, y); else g.lineTo(x, y);
+    }
+    g.stroke();
+  }
+  if (!quieto && pestanaActual === "noticias" && document.visibilityState === "visible" && lienzos.length) {
+    monitorT += .012;
+    monitorCuadro = requestAnimationFrame(dibujarOndas);
+  }
+}
+document.addEventListener("visibilitychange", () => {
+  if (pestanaActual === "noticias" && document.visibilityState === "visible") { cancelAnimationFrame(monitorCuadro); dibujarOndas(); }
+});
+function refrescarNoticias() {
+  cargarHistorias(); cargarMonitor(); actualizarGlobo();
+  if (pestanaActual === "noticias") { cargarNoticias(); cargarBoletin(boletinSemana); }
+}
+
+// ---------------------------------------------------------------- ficha de la noticia (evidencia + de cada 100)
+const NIVEL = { OPINION: 1, SERIE_CASOS: 1, TRANSVERSAL: 2, CASOS_CONTROLES: 2, COHORTE: 3, ECA: 4, METAANALISIS: 5 };
+const NOMBRE_DISENO = { OPINION: "Opinión o revisión narrativa", SERIE_CASOS: "Serie de casos", TRANSVERSAL: "Estudio transversal",
+  CASOS_CONTROLES: "Casos y controles", COHORTE: "Estudio de cohorte", ECA: "Ensayo clínico aleatorizado",
+  METAANALISIS: "Metaanálisis o revisión sistemática", GUIA: "Guía o consenso" };
+let fichaActual = null;
+function puntos(n, color) {
+  return `<div class="puntos">${Array.from({ length: 100 }, (_, i) => `<i${i < Math.round(n) ? ` style="background:${color}"` : ""}></i>`).join("")}</div>`;
+}
+const numero = (v) => String(Math.round(Number(v) * 10) / 10).replace(".", ",");
+function abrirFicha(n) {
+  fichaActual = { n, cambio: false };
+  const nivel = NIVEL[n.diseno], a = n.valor_a != null ? Number(n.valor_a) : null, b = n.valor_b != null ? Number(n.valor_b) : null;
+  const dif = a != null && b != null ? Math.abs(a - b) : 0;
+  const ficha = $("#ficha");
+  ficha.className = `ficha tipo-${tipoDe(n)}`;
+  ficha.innerHTML = `<div class="agarre"></div>
+    <div class="arriba"><span class="etiq">${escapar(NOMBRE_TIPO[tipoDe(n)])}</span>
+      <span class="sub" style="flex:1">${n.temas.map((t) => escapar(NOMBRE_TEMA[t] || t)).join(" · ")} · ${fechaBreve(n.publicado_en || n.listo_en)}</span>
+      <button type="button" data-f="cerrar" aria-label="Cerrar" style="min-height:36px;padding:4px 12px">✕</button></div>
+    <div><h3>${escapar(n.titulo_es || n.titulo)}</h3><p class="sub" style="margin:4px 0 0">${escapar(n.fuente)}</p></div>
+    ${n.cifra || n.pacientes ? `<div class="resultado">
+      <div>${n.cifra ? `<div class="grande ${n.cifra.length > 8 ? "largo" : ""}">${escapar(n.cifra)}</div><div class="sub">${escapar(n.cifra_etiqueta || "")}</div>` : ""}</div>
+      ${n.pacientes ? `<div style="text-align:right"><div style="font:700 1.3rem var(--letra-titulo)">${formatoMiles(n.pacientes)}</div><div class="sub">pacientes</div></div>` : ""}</div>` : ""}
+    ${a != null && b != null ? `<div style="display:grid;gap:10px">
+      <strong>De cada 100 pacientes${n.evento ? `, tuvieron ${escapar(n.evento)}` : ""}:</strong>
+      <div class="cien">
+        <div class="lado"><span class="n" style="color:var(--c1)">${numero(a)}</span><span class="sub">${escapar(n.grupo_a)}</span>${puntos(a, "var(--c1)")}</div>
+        <div class="lado"><span class="n" style="color:var(--warn-text)">${numero(b)}</span><span class="sub">${escapar(n.grupo_b)}</span>${puntos(b, "var(--warn-line)")}</div>
+      </div>
+      ${dif ? `<div class="diferencia">Diferencia: ${numero(dif)} de cada 100 pacientes${dif >= 1 ? ` · NNT ≈ ${Math.ceil(100 / dif)}` : ""}</div>
+        <p class="sub" style="margin:-4px 0 0">Calculado con los porcentajes del resumen.</p>` : ""}</div>` : ""}
+    ${n.poblacion || n.intervencion || n.comparador || n.conclusion ? `<div class="pico">
+      ${n.poblacion ? `<div><b>P</b><span><strong>Pacientes:</strong> ${escapar(n.poblacion)}</span></div>` : ""}
+      ${n.intervencion ? `<div><b>I</b><span><strong>Se probó:</strong> ${escapar(n.intervencion)}</span></div>` : ""}
+      ${n.comparador ? `<div><b>C</b><span><strong>Contra:</strong> ${escapar(n.comparador)}</span></div>` : ""}
+      ${n.conclusion ? `<div><b>R</b><span><strong>Resultado:</strong> ${escapar(n.conclusion)}</span></div>` : ""}</div>` : ""}
+    ${nivel ? `<div class="evidencia"><span class="sub"><strong style="color:var(--text)">Nivel de evidencia:</strong> ${escapar(NOMBRE_DISENO[n.diseno])}</span>
+      <div class="piramide">${[1, 2, 3, 4, 5].map((k) => `<i class="${k <= nivel ? "si" : ""}" style="height:${6 + k * 5}px"></i>`).join("")}</div>
+      <div class="extremos"><span>Opinión</span><span>Metaanálisis</span></div></div>`
+      : n.diseno === "GUIA" ? `<div class="sub"><strong style="color:var(--text)">Tipo:</strong> guía o consenso</div>` : ""}
+    <p style="margin:0">${escapar(n.resumen_es || "")}</p>
+    ${n.titulo_es && n.titulo_es !== n.titulo ? `<p class="original" style="margin:0">${escapar(n.titulo)}</p>` : ""}
+    <div class="botones">
+      <button type="button" data-f="favorita">${n.favorita ? "★ Guardada" : "☆ Guardar"}</button>
+      ${n.enlace ? `<a class="boton" href="${escapar(n.enlace)}" target="_blank" rel="noopener" data-f="abrir">Leer original ↗</a>` : ""}
+      ${n.leida ? "" : `<button type="button" class="primario" data-f="leida">✓ Leída</button>`}
+    </div>
+    <p class="sub" style="margin:0">Resumen hecho por IA a partir del resumen público. Antes de cambiar una conducta clínica, lee el artículo original.</p>`;
+  $("#capa-ficha").classList.remove("oculto");
+  ficha.scrollTop = 0;
+  document.body.style.overflow = "hidden";
+}
+function cerrarFicha() {
+  if (!fichaActual) return;
+  const cambio = fichaActual.cambio;
+  fichaActual = null;
+  $("#capa-ficha").classList.add("oculto");
+  if (mazo) { if (cambio) mazo.cambio = true; return; }  // el mazo sigue abierto debajo
+  document.body.style.overflow = "";
+  if (cambio) refrescarNoticias();
+}
+$("#capa-ficha").addEventListener("click", async (e) => {
+  if (e.target.id === "capa-ficha") return cerrarFicha();
+  const b = e.target.closest("[data-f]");
+  if (!b || !fichaActual) return;
+  const n = fichaActual.n;
+  if (b.dataset.f === "cerrar") return cerrarFicha();
+  if (b.dataset.f === "abrir") { fetch(`/api/noticias/${n.noticia_id}/leida`, { method: "POST", keepalive: true }); fichaActual.cambio = true; return; }
+  if (b.dataset.f === "favorita") {
+    const fav = !n.favorita;
+    const r = await fetch(`/api/noticias/${n.noticia_id}/favorita`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ favorita: fav }) });
+    if (r.ok) { n.favorita = fav; b.textContent = fav ? "★ Guardada" : "☆ Guardar"; fichaActual.cambio = true; toast(fav ? "Guardada en favoritas" : "Quitada de favoritas"); }
+  }
+  if (b.dataset.f === "leida") {
+    const r = await fetch(`/api/noticias/${n.noticia_id}/leida`, { method: "POST" });
+    if (r.ok) { n.leida = true; fichaActual.cambio = true; toast("Marcada como leída"); cerrarFicha(); }
+  }
+});
+(function () {  // deslizar hacia abajo para cerrar la ficha
+  let y0 = null;
+  const f = $("#ficha");
+  f.addEventListener("touchstart", (e) => { y0 = f.scrollTop <= 0 ? e.touches[0].clientY : null; }, { passive: true });
+  f.addEventListener("touchend", (e) => { if (y0 != null && e.changedTouches[0].clientY - y0 > 90) cerrarFicha(); y0 = null; });
+})();
+
+// ---------------------------------------------------------------- mazo: desliza para clasificar lo nuevo
+let mazo = null;
+function abrirMazo(lista) {
+  const orden = [...lista].sort((a, b) => (b.tipo === "ALERTA") - (a.tipo === "ALERTA") || (b.relevancia || 0) - (a.relevancia || 0));
+  mazo = { cartas: orden, hechas: 0, cambio: false };
+  $("#mazo").classList.remove("oculto");
+  document.body.style.overflow = "hidden";
+  pintarMazo();
+}
+function cerrarMazo() {
+  $("#mazo").classList.add("oculto");
+  $("#mazo").innerHTML = "";
+  document.body.style.overflow = "";
+  const cambio = mazo && mazo.cambio;
+  mazo = null;
+  if (cambio) refrescarNoticias();
+}
+function cartaHtml(n, pos) {
+  const cifra = n.cifra || "";
+  return `<div class="carta tipo-${tipoDe(n)} ${pos === 1 ? "atras1" : pos === 2 ? "atras2" : ""}" style="z-index:${10 - pos}" ${pos === 0 ? 'id="carta-arriba"' : ""}>
+    <span class="sello izq">LEÍDA</span><span class="sello der">★ GUARDAR</span>
+    <span class="etiq">${escapar(NOMBRE_TIPO[tipoDe(n)])}${n.temas[0] ? ` · ${escapar(NOMBRE_TEMA[n.temas[0]] || "")}` : ""}</span>
+    ${cifra ? `<span class="num ${cifra.length > 7 ? "largo" : ""}">${escapar(cifra)}</span><span class="medida">${escapar(n.cifra_etiqueta || "")}</span>`
+      : `<span class="num largo">${n.tipo === "ALERTA" ? "⚠" : "✦"}</span>`}
+    <span class="tit">${escapar(n.titulo_es || n.titulo)}</span>
+    <span class="fuente">${escapar(n.fuente)} · ${fechaBreve(n.publicado_en || n.listo_en)} · toca para ver la ficha</span></div>`;
+}
+function pintarMazo() {
+  const quedan = mazo.cartas.slice(mazo.hechas);
+  $("#mazo").innerHTML = `<div class="mazo-cab"><strong class="titulo-letra" style="font-size:1.2rem">${quedan.length ? `${quedan.length} por revisar` : "Listo"}</strong>
+      <button type="button" id="mazo-cerrar" aria-label="Cerrar">✕ Cerrar</button></div>
+    <div class="pila">${quedan.length ? quedan.slice(0, 3).map((n, i) => cartaHtml(n, i)).reverse().join("")
+      : `<div class="vacio"><b>✓ Estás al día</b><span class="sub">Revisaste todas las noticias nuevas.</span></div>`}</div>
+    ${quedan.length ? `<div class="mazo-botones"><button type="button" id="mazo-no" aria-label="Marcar como leída">✕</button>
+      <button type="button" class="ver" id="mazo-ver">Ver ficha</button>
+      <button type="button" class="si" id="mazo-si" aria-label="Guardar en favoritas">★</button></div>
+      <p class="sub" style="text-align:center;margin:0">Izquierda: leída · Derecha: guardar en favoritas</p>` : ""}`;
+  $("#mazo-cerrar").onclick = cerrarMazo;
+  if (!quedan.length) return;
+  $("#mazo-no").onclick = () => decidir(false);
+  $("#mazo-si").onclick = () => decidir(true);
+  $("#mazo-ver").onclick = () => abrirFicha(quedan[0]);
+  const carta = $("#carta-arriba");
+  let x0 = null, y0 = 0, dx = 0;
+  carta.addEventListener("pointerdown", (e) => { x0 = e.clientX; y0 = e.clientY; dx = 0; carta.classList.add("arrastre"); carta.setPointerCapture(e.pointerId); });
+  carta.addEventListener("pointermove", (e) => {
+    if (x0 == null) return;
+    dx = e.clientX - x0;
+    carta.style.transform = `translateX(${dx}px) rotate(${dx / 18}deg)`;
+    carta.querySelector(".sello.der").style.opacity = Math.max(0, Math.min(1, dx / 100));
+    carta.querySelector(".sello.izq").style.opacity = Math.max(0, Math.min(1, -dx / 100));
+  });
+  carta.addEventListener("pointerup", (e) => {
+    if (x0 == null) return;
+    const mov = Math.abs(dx) + Math.abs(e.clientY - y0);
+    x0 = null; carta.classList.remove("arrastre");
+    if (dx > 100) return decidir(true);
+    if (dx < -100) return decidir(false);
+    carta.style.transform = "";
+    carta.querySelectorAll(".sello").forEach((el) => el.style.opacity = 0);
+    if (mov < 8) abrirFicha(quedan[0]);
+  });
+}
+function decidir(guardar) {
+  const n = mazo.cartas[mazo.hechas], carta = $("#carta-arriba");
+  mazo.cambio = true;
+  if (guardar) fetch(`/api/noticias/${n.noticia_id}/favorita`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ favorita: true }) });
+  fetch(`/api/noticias/${n.noticia_id}/leida`, { method: "POST", keepalive: true });
+  if (carta) { carta.style.transform = `translateX(${guardar ? 140 : -140}%) rotate(${guardar ? 16 : -16}deg)`; carta.style.opacity = 0; }
+  mazo.hechas++;
+  setTimeout(() => mazo && pintarMazo(), matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 260);
+  if (guardar) toast("Guardada en favoritas");
+}
+
+// Boletín semanal en infografía
+let boletinSemana = null, boletinDatos = null;
+function rangoSemana(d) {
+  const a = aFecha(d.desde), b = aFecha(d.hasta);
+  return a.getMonth() === b.getMonth() ? `${a.getDate()} al ${b.getDate()} de ${MESES_LARGOS[b.getMonth()]}`
+    : `${a.getDate()} de ${MESES_LARGOS[a.getMonth()]} al ${b.getDate()} de ${MESES_LARGOS[b.getMonth()]}`;
+}
+async function cargarBoletin(semana) {
+  boletinSemana = semana || null;
+  const r = await fetch(`/api/noticias/boletin${semana ? `?semana=${semana}` : ""}`).catch(() => null);
+  const cont = $("#not-boletin");
+  if (!r || !r.ok) { cont.innerHTML = `<div class="bloque"><p class="sub">No se pudo cargar el boletín.</p></div>`; return; }
+  const d = boletinDatos = await r.json();
+  if (!semana) { try { localStorage.setItem("boletin-visto", d.desde); } catch (e) {} }
+  const max = Math.max(1, ...d.por_tema.map((t) => t.n));
+  cont.innerHTML = `<div class="portada">
+      <div class="nav"><button type="button" id="bol-ant" ${d.anterior ? "" : "disabled"} aria-label="Semana anterior">‹</button>
+        <span class="sem">${d.en_curso ? "Semana en curso · " : "Boletín semanal · "}${rangoSemana(d)}</span>
+        <button type="button" id="bol-sig" ${d.siguiente ? "" : "disabled"} aria-label="Semana siguiente">›</button></div>
+      <h2>Tu semana en anestesia</h2>
+      <div class="cuenta"><div><b>${d.total}</b><span>publicaciones</span></div><div><b>${d.alertas.length}</b><span>alertas</span></div>
+        <div><b>${d.sin_leer}</b><span>sin leer</span></div></div>
+    </div>
+    ${d.total ? `
+    ${d.alertas.length ? `<div class="bloque"><span class="rotulo">Alertas de seguridad</span>${d.alertas.map((n, i) =>
+      `<button type="button" class="alerta" data-bol="alerta-${i}"><span>⚠</span><span>${escapar(n.titulo_es || n.titulo)}</span></button>`).join("")}</div>` : ""}
+    ${d.destacadas.length ? `<div class="bloque"><span class="rotulo">${d.destacadas.some((n) => n.cifra) ? "Cifras de la semana" : "Lo más importante"}</span>
+      ${d.destacadas.map((n, i) => `<button type="button" class="cifra-sem tipo-${tipoDe(n)}" data-bol="dest-${i}">
+        <span class="num">${escapar(n.cifra || NOMBRE_TIPO[tipoDe(n)])}</span>
+        <span class="que">${escapar(n.cifra_etiqueta || n.titulo_es || n.titulo)}<small>${escapar(n.cifra_etiqueta ? (n.titulo_es || n.titulo) : n.fuente)}</small></span></button>`).join("")}</div>` : ""}
+    <div class="bloque"><span class="rotulo">Por tema</span>
+      ${d.por_tema.slice(0, 6).map((t) => `<div class="tema-barra"><span>${escapar(NOMBRE_TEMA[t.clave] || t.nombre)}</span>
+        <span class="pista"><i style="width:${t.n / max * 100}%"></i></span><b>${t.n}</b></div>`).join("")}
+      <div class="tipos">${Object.entries(d.por_tipo).sort((a, b) => b[1] - a[1]).map(([k, v]) =>
+        `<span class="tipo-${NOMBRE_TIPO[k] ? k : "OTRO"}">${v} ${escapar((NOMBRE_TIPO[k] || "Otra").toLowerCase())}${v === 1 ? "" : (/[aeiou]$/.test(NOMBRE_TIPO[k] || "a") ? "s" : "es")}</span>`).join("")}</div>
+    </div>
+    <div class="bloque" style="grid-template-columns:1fr 1fr">
+      <button type="button" id="bol-ver">▶ Ver como historias</button><button type="button" id="bol-compartir">↗ Compartir</button></div>`
+    : `<div class="bloque"><p class="sub" style="margin:0">No llegaron publicaciones de tus temas esta semana.</p></div>`}`;
+  $("#bol-ant").onclick = () => cargarBoletin(d.anterior);
+  $("#bol-sig").onclick = () => cargarBoletin(d.siguiente);
+  const todas = [...d.alertas, ...d.destacadas];
+  cont.querySelectorAll("[data-bol]").forEach((b) => b.onclick = () => {
+    const [tipo, i] = b.dataset.bol.split("-");
+    abrirHistorias(todas, tipo === "alerta" ? Number(i) : d.alertas.length + Number(i));
+  });
+  if ($("#bol-ver")) $("#bol-ver").onclick = () => abrirHistorias(todas, 0);
+  if ($("#bol-compartir")) $("#bol-compartir").onclick = () => compartirBoletin(d);
+}
+async function compartirBoletin(d) {
+  const lineas = [`🩺 Tu semana en anestesia · ${rangoSemana(d)}`, `${d.total} publicaciones${d.alertas.length ? ` · ${d.alertas.length} alertas` : ""}`, ""];
+  for (const n of d.alertas) lineas.push(`⚠ ${n.titulo_es || n.titulo}${n.enlace ? `\n${n.enlace}` : ""}`);
+  for (const n of d.destacadas) lineas.push(`• ${n.cifra ? `${n.cifra} ${n.cifra_etiqueta || ""}: ` : ""}${n.titulo_es || n.titulo}${n.enlace ? `\n${n.enlace}` : ""}`);
+  lineas.push("", "Resúmenes hechos por IA: lee el artículo original antes de cambiar una conducta clínica.");
+  const texto = lineas.join("\n");
+  try {
+    if (navigator.share) { await navigator.share({ title: "Tu semana en anestesia", text: texto }); return; }
+    await navigator.clipboard.writeText(texto);
+    toast("Boletín copiado: pégalo en WhatsApp");
+  } catch (e) {
+    if (e && e.name === "AbortError") return;
+    toast("No se pudo compartir");
+  }
+}
+
 async function accionNoticia(b) {
   const art = b.closest("[data-noticia]"), id = art.dataset.noticia, accion = b.dataset.accion;
+  if (accion === "ficha") {
+    const n = notDatos.noticias.find((x) => String(x.noticia_id) === id);
+    if (n) abrirFicha(n);
+    return;
+  }
   if (accion === "favorita") {
     const fav = b.getAttribute("aria-pressed") !== "true";
     const r = await fetch(`/api/noticias/${id}/favorita`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ favorita: fav }) });
@@ -2348,6 +2947,20 @@ async function cargarAntiguedadPagos() {
       Toca una franja para verlas.</p>${htmlAntiguedad(d)}`;
   enlazarAntiguedad(cont);
 }
+// El boletín sale cada lunes con lo de la semana anterior: se avisa en Inicio hasta que se abra
+async function avisoBoletin() {
+  const r = await fetch("/api/noticias/boletin").catch(() => null);
+  if (!r || !r.ok) return;
+  const d = await r.json();
+  let visto = null;
+  try { visto = localStorage.getItem("boletin-visto"); } catch (e) {}
+  if (!d.total || visto === d.desde || $("#inicio-boletin")) return;
+  const caja = $("#inicio-historias");
+  caja.insertAdjacentHTML("beforebegin", `<button type="button" class="tarea tono-ok" id="inicio-boletin"><span class="franja"></span>
+    <span><strong>📰 Tu boletín semanal está listo</strong><span class="sub">${rangoSemana(d)} · ${d.total} publicaciones${d.alertas.length ? ` · ${d.alertas.length} alertas` : ""}</span></span>
+    <span class="accion">Ver</span></button>`);
+  $("#inicio-boletin").onclick = () => { mostrarPestana("noticias"); setTimeout(() => $("#not-boletin").scrollIntoView({ behavior: "smooth" }), 300); };
+}
 async function cargarInicio() {
   const hoy = new Date();
   $("#ini-fecha").textContent = `${["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"][hoy.getDay()]} ${hoy.getDate()} de ${MESES_LARGOS[hoy.getMonth()]}`;
@@ -2378,12 +2991,16 @@ async function cargarInicio() {
         <span class="chip PROGRAMADA">${MESES_LARGOS[aFecha(p.periodo).getMonth()]}</span></div>
         <div class="item-cab"><strong class="valor">≈ ${pesos(p.te_llega)}</strong><span class="sub">${plural(p.cirugias, "cirugía", "cirugías")}</span></div>
         <p class="sub" style="margin:4px 0 0">Estimado con lo que AP te ha pagado antes. El detalle está en Finanzas.</p></div>` : ""}
+    <div id="inicio-historias" class="oculto"><div class="titulo-seccion">Lo nuevo en anestesia</div>
+      <div class="historias-fila" id="inicio-historias-fila"></div></div>
     <div class="titulo-seccion">Lo que te deben, por antigüedad</div>
     <section class="card" id="inicio-antiguedad">${htmlAntiguedad(d)}</section>
     <button type="button" class="boton primario grande" id="inicio-escanear">📷 Escanear una orden</button>`;
   cont.querySelectorAll(".tarea").forEach((b) => b.onclick = tareas[b.dataset.i].ir);
   enlazarAntiguedad($("#inicio-antiguedad"));
   $("#inicio-escanear").onclick = () => mostrarPestana("nueva");
+  cargarHistorias();
+  avisoBoletin();
 }
 let consultaLista = 0;  // para descartar respuestas viejas si llegan después de una más nueva
 async function cargarCirugias() {

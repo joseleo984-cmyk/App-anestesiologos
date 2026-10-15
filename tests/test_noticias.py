@@ -103,6 +103,7 @@ def admin(cliente, monkeypatch):
         c.commit()
     monkeypatch.setattr(noticias, "_cliente", lambda: transporte({"rss.revista.org": RSS, "sociedad.org": ATOM}))
     monkeypatch.setattr(noticias, "resumir", resumen_falso)
+    monkeypatch.setattr(noticias, "datos_infografia", lambda lote: {})
     return cliente
 
 
@@ -257,3 +258,59 @@ def test_la_conexion_se_cierra_antes_de_la_tarea_en_segundo_plano(cliente, monke
     monkeypatch.setattr(noticias, "revisar_en_segundo_plano", tarea)
     assert cliente.get("/api/noticias").status_code == 200
     assert vistas == [0]
+
+
+def test_historias_y_boletin(admin, conn, monkeypatch):
+    def con_infografia(lote):
+        out = resumen_falso(lote)
+        for n in lote:
+            if "Sugammadex" in n["titulo"]:
+                out[n["noticia_id"]].update(relevancia=5, cifra="−33 %", cifra_etiqueta="complicaciones pulmonares",
+                                            pacientes=1200, conclusion="Menos complicaciones con sugammadex.",
+                                            diseno="ECA", poblacion="Adultos", intervencion="Sugammadex",
+                                            comparador="Neostigmina", evento="complicaciones", grupo_a="Sugammadex",
+                                            valor_a=8, grupo_b="Neostigmina", valor_b=12)
+            elif "guia" in n["titulo"]:
+                out[n["noticia_id"]].update(tipo="GUIA", relevancia=2, cifra=None, cifra_etiqueta="sobra",
+                                            pacientes=0, conclusion="Nueva guía.", diseno="INVENTADO",
+                                            grupo_a="A", valor_a=150, grupo_b="B", valor_b=3)
+        return out
+    monkeypatch.setattr(noticias, "resumir", con_infografia)
+    c = admin
+    for nombre, url in [("Revista", "https://rss.revista.org/feed"), ("Sociedad", "https://sociedad.org/atom")]:
+        c.post("/api/noticias/fuentes", json={"nombre": nombre, "tipo": "RSS", "url": url})
+    c.get("/api/noticias")  # revisa en segundo plano
+
+    h = c.get("/api/noticias/historias").json()["historias"]
+    assert [n["cifra"] for n in h] == ["−33 %"]                 # la guía tiene relevancia 2: no es historia
+    assert h[0]["pacientes"] == 1200 and h[0]["conclusion"].startswith("Menos")
+    assert (h[0]["diseno"], h[0]["valor_a"], h[0]["grupo_b"]) == ("ECA", 8, "Neostigmina")
+    guia = conn.execute("SELECT cifra_etiqueta, pacientes, diseno, valor_a, grupo_a FROM noticia WHERE titulo LIKE 'Nueva guia%'").fetchone()
+    # sin cifra no hay etiqueta; 0 pacientes = null; diseño inválido y un porcentaje imposible no se guardan
+    assert guia == {"cifra_etiqueta": None, "pacientes": None, "diseno": None, "valor_a": None, "grupo_a": None}
+
+    # por defecto, la semana completa anterior (el boletín sale los lunes)
+    from datetime import date, timedelta
+    assert c.get("/api/noticias/boletin").json()["hasta"] < str(date.today() - timedelta(days=date.today().weekday()))
+    b = c.get("/api/noticias/boletin", params={"semana": str(date.today())}).json()
+    assert b["total"] == 2 and b["sin_leer"] == 2 and b["en_curso"] is True and b["alertas"] == []
+    assert [n["cifra"] for n in b["destacadas"]] == ["−33 %", None]
+    assert {t["clave"]: t["n"] for t in b["por_tema"]} == {"FARMACOLOGIA": 1, "VIA_AEREA": 1, "GUIAS": 1}
+    # leída: sale de las historias
+    c.post(f"/api/noticias/{h[0]['noticia_id']}/leida")
+    assert c.get("/api/noticias/historias").json()["historias"] == []
+    # semana sin noticias
+    vacia = c.get("/api/noticias/boletin", params={"semana": "2020-01-08"}).json()
+    assert vacia["total"] == 0 and vacia["desde"] == "2020-01-06" and vacia["siguiente"] is not None
+
+
+def test_completa_infografia_de_noticias_viejas(admin, conn, monkeypatch):
+    c = admin
+    c.post("/api/noticias/fuentes", json={"nombre": "Revista", "tipo": "RSS", "url": "https://rss.revista.org/feed"})
+    c.get("/api/noticias")
+    assert conn.execute("SELECT count(*) AS n FROM noticia WHERE estado = 'LISTA' AND conclusion IS NULL").fetchone()["n"] == 1
+    monkeypatch.setattr(noticias, "datos_infografia", lambda lote: {n["noticia_id"]: {
+        "id": n["noticia_id"], "relevancia": 9, "cifra": "8 %", "cifra_etiqueta": "x", "pacientes": None,
+        "conclusion": "Conclusión.", "diseno": "COHORTE"} for n in lote})
+    assert noticias.completar_infografia(conn) == 1
+    assert conn.execute("SELECT relevancia, cifra FROM noticia WHERE estado = 'LISTA'").fetchone() == {"relevancia": 5, "cifra": "8 %"}

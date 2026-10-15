@@ -878,6 +878,19 @@ def ver_noticias(tareas: BackgroundTasks, ver: Literal["nuevas", "anteriores", "
             "revisadas_en": noticias.ultima_revision(conn), "revisando": revisando}
 
 
+@app.get("/api/noticias/historias")
+def historias_de_noticias(conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
+    """Lo más relevante sin leer, para verlo como historias."""
+    return {"historias": noticias.historias(conn, anestesiologo_id)}
+
+
+@app.get("/api/noticias/boletin")
+def boletin_semanal(semana: Optional[date] = None, conn=Depends(get_conn, scope="function"),
+                    anestesiologo_id=Depends(anestesiologo_actual)):
+    """Boletín de la semana que contiene `semana` (por defecto, la actual)."""
+    return noticias.boletin(conn, anestesiologo_id, semana)
+
+
 @app.get("/api/noticias/sin-leer")
 def noticias_sin_leer(conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
     return {"sin_leer": noticias.sin_leer(conn, anestesiologo_id)}
