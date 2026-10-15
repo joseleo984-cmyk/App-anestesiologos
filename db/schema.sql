@@ -408,3 +408,20 @@ CREATE INDEX IF NOT EXISTS idx_restablecimiento_anest ON restablecimiento_clave 
 -- 27. Aceptación de los términos de uso y de la política de datos: versión y fecha
 ALTER TABLE anestesiologo ADD COLUMN IF NOT EXISTS terminos_version VARCHAR(20);
 ALTER TABLE anestesiologo ADD COLUMN IF NOT EXISTS terminos_aceptados_en TIMESTAMPTZ;
+
+-- 28. Consumo de la IA por lectura y por anestesiólogo (tokens y costo estimado en USD)
+CREATE TABLE IF NOT EXISTS uso_ia (
+    uso_id             BIGSERIAL PRIMARY KEY,
+    anestesiologo_id   BIGINT REFERENCES anestesiologo(anestesiologo_id) ON DELETE SET NULL,  -- NULL: tareas del sistema
+    documento_id       BIGINT,
+    tipo               VARCHAR(30) NOT NULL,      -- orden, reporte_pago, relacion, volante, extracto, noticias…
+    modelo             VARCHAR(60) NOT NULL,
+    tokens_entrada     INTEGER NOT NULL DEFAULT 0,
+    tokens_salida      INTEGER NOT NULL DEFAULT 0,
+    tokens_cache_lectura INTEGER NOT NULL DEFAULT 0,
+    tokens_cache_escritura INTEGER NOT NULL DEFAULT 0,
+    costo_usd          NUMERIC(12,6),
+    creado_en          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_uso_ia_fecha ON uso_ia (creado_en);
+CREATE INDEX IF NOT EXISTS idx_uso_ia_anest ON uso_ia (anestesiologo_id, creado_en);

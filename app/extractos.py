@@ -21,7 +21,7 @@ from typing import Optional
 
 from psycopg.types.json import Jsonb
 
-from app import extraccion, finanzas
+from app import extraccion, finanzas, uso_ia
 
 log = logging.getLogger(__name__)
 
@@ -412,7 +412,7 @@ def leer_parte(archivos: list, numero_parte: int, total_partes: int, contexto: d
     if contexto.get("banco"):
         pedido += f" Banco: {contexto['banco']}."
     pedido += " Extrae el encabezado (si aparece) y todos los movimientos."
-    return extraccion._llamar_claude(archivos, INSTRUCCIONES_EXTRACTO, ESQUEMA_PARTE, pedido, "low", None)
+    return extraccion._llamar_claude(archivos, INSTRUCCIONES_EXTRACTO, ESQUEMA_PARTE, pedido, "low", None, tipo="extracto")
 
 
 def clasificar(filas: list[dict]) -> dict[int, dict]:
@@ -423,7 +423,8 @@ def clasificar(filas: list[dict]) -> dict[int, dict]:
         lineas = "\n".join(f"{inicio + i}|{f['fecha']}|{f['descripcion']}|{f['valor']}|{f['naturaleza']}"
                            for i, f in enumerate(lote))
         datos = extraccion._llamar_claude([], INSTRUCCIONES_CATEGORIAS, ESQUEMA_CATEGORIAS,
-                                          "Filas (indice|fecha|descripción|valor|naturaleza):\n" + lineas, "low", None)
+                                          "Filas (indice|fecha|descripción|valor|naturaleza):\n" + lineas, "low", None,
+                                          tipo="extracto_categorias")
         for item in datos.get("items", []):
             resultado[item["indice"]] = item
     return resultado
@@ -553,6 +554,7 @@ def crear_importacion(conn, anestesiologo_id: int, nombre: str, preparado: dict)
 def procesar(importacion_id: int, anestesiologo_id: int, preparado: dict) -> None:
     """Lee el extracto parte por parte, guardando el avance para que la pantalla lo muestre."""
     from app.repositorio import conectar
+    uso_ia.en_nombre_de(anestesiologo_id)
     with conectar() as conn:
         try:
             encabezado: dict = {}

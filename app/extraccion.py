@@ -10,7 +10,7 @@ from pillow_heif import register_heif_opener
 
 register_heif_opener()  # permite abrir fotos HEIC de iPhone/Mac
 
-from app import config
+from app import config, uso_ia
 from app.modelos import VolanteExtraido, OrdenExtraida, ReportePagoExtraido
 
 TIPOS_IMAGEN = {"image/jpeg", "image/png", "image/webp", "image/gif", "image/heic"}
@@ -159,7 +159,8 @@ Archivo = tuple[bytes, str]  # (contenido, tipo MIME)
 
 
 def _llamar_claude(archivos: list[Archivo], instrucciones: str, esquema: dict, pedido: str,
-                   esfuerzo: str, client: anthropic.Anthropic | None, modelo: str | None = None) -> dict:
+                   esfuerzo: str, client: anthropic.Anthropic | None, modelo: str | None = None,
+                   tipo: str = "otro") -> dict:
     """Envía el documento (una o varias páginas) a Claude y devuelve el JSON que cumple el esquema."""
     client = client or anthropic.Anthropic()
     # Si un filtro de seguridad rechaza la solicitud, la API la reintenta con otro modelo.
@@ -182,6 +183,7 @@ def _llamar_claude(archivos: list[Archivo], instrucciones: str, esquema: dict, p
             **reintento,
         ) as flujo:
             respuesta = flujo.get_final_message()
+        uso_ia.registrar(tipo, respuesta)  # también si la lectura luego falla: los tokens se cobran igual
     except (anthropic.AuthenticationError, anthropic.PermissionDeniedError) as e:
         raise ExtraccionError("La clave de Claude (ANTHROPIC_API_KEY) no es válida o no tiene crédito. "
                               "Revísala en la configuración de Render.") from e
@@ -205,7 +207,8 @@ def extraer_orden(archivos: list[Archivo], client: anthropic.Anthropic | None = 
     pedido = ("Extrae los datos de esta orden." if len(archivos) == 1 else
               f"Estos {len(archivos)} archivos son fotos o páginas de la MISMA orden (por ejemplo la orden y su "
               "autorización). Combina la información de todos y extrae los datos de esa única orden.")
-    return OrdenExtraida.model_validate(_llamar_claude(archivos, INSTRUCCIONES, ESQUEMA, pedido, "high", client))
+    return OrdenExtraida.model_validate(_llamar_claude(archivos, INSTRUCCIONES, ESQUEMA, pedido, "high", client,
+                                                       tipo="orden"))
 
 
 # ---------------------------------------------------------------- reportes de pago
@@ -268,7 +271,7 @@ Copia los datos tal como están; nunca inventes un valor que no se lee: usa null
 def extraer_reporte_pago(datos: bytes, media_type: str, client: anthropic.Anthropic | None = None) -> ReportePagoExtraido:
     return ReportePagoExtraido.model_validate(_llamar_claude(
         [(datos, media_type)], INSTRUCCIONES_PAGO, ESQUEMA_PAGO, "Extrae todas las líneas de este reporte de pagos.",
-        "medium", client))
+        "medium", client, tipo="reporte_pago"))
 
 
 # ------------------------------------------------- relación / liquidación de AP (pago global de una clínica)
@@ -354,7 +357,7 @@ def extraer_relacion(archivos: list[Archivo], client: anthropic.Anthropic | None
     pedido = "Extrae los datos de esta relación de órdenes." if len(archivos) == 1 else (
         f"Estos {len(archivos)} archivos son las páginas de la MISMA relación de órdenes. Extrae sus datos.")
     return relacion_a_reporte(_llamar_claude(archivos, INSTRUCCIONES_RELACION, ESQUEMA_RELACION, pedido,
-                                             "medium", client))
+                                             "medium", client, tipo="relacion"))
 
 
 _VALORES_VOLANTE = ["probienestar", "compensacion_ordinaria", "compensacion_extraordinaria", "auxilio_sindical",
@@ -403,4 +406,4 @@ Si un concepto no aparece, devuelve null. Nunca inventes valores."""
 def extraer_volante(datos: bytes, media_type: str, client: anthropic.Anthropic | None = None) -> VolanteExtraido:
     return VolanteExtraido.model_validate(_llamar_claude(
         [(datos, media_type)], INSTRUCCIONES_VOLANTE, ESQUEMA_VOLANTE, "Extrae los valores de este volante.",
-        "low", client))
+        "low", client, tipo="volante"))

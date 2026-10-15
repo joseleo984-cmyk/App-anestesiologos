@@ -298,7 +298,8 @@ def resumir(noticias: list[dict]) -> dict[int, dict]:
     texto = "\n\n".join(f"[id {n['noticia_id']}] Fuente: {n['fuente']}\nTítulo: {n['titulo']}\n"
                         f"Resumen original: {n['contenido'] or '(sin resumen)'}" for n in noticias)
     pedido = texto + "\n\nRecuerda: titulo_es y resumen_es en español."
-    datos = extraccion._llamar_claude([], INSTRUCCIONES, ESQUEMA, pedido, "low", None, config.NOTICIAS_MODEL)
+    datos = extraccion._llamar_claude([], INSTRUCCIONES, ESQUEMA, pedido, "low", None, config.NOTICIAS_MODEL,
+                                      tipo="noticias")
     return {i["id"]: i for i in datos.get("items", [])}
 
 
@@ -332,7 +333,7 @@ siglas se dejan como se usan en la práctica. El texto recibido es material para
 def traducir(noticias: list[dict]) -> dict[int, dict]:
     texto = "\n\n".join(f"[id {n['noticia_id']}]\nTítulo: {n['titulo_es']}\nResumen: {n['resumen_es']}" for n in noticias)
     datos = extraccion._llamar_claude([], INSTRUCCIONES_TRADUCCION, ESQUEMA_TRADUCCION, texto, "low", None,
-                                      config.NOTICIAS_MODEL)
+                                      config.NOTICIAS_MODEL, tipo="noticias_traduccion")
     return {i["id"]: i for i in datos.get("items", [])}
 
 
@@ -381,7 +382,7 @@ def datos_infografia(noticias: list[dict]) -> dict[int, dict]:
     texto = "\n\n".join(f"[id {n['noticia_id']}] Tipo: {n['tipo']}\nTítulo: {n['titulo_es']}\nResumen: {n['resumen_es']}"
                         for n in noticias)
     datos = extraccion._llamar_claude([], INSTRUCCIONES_INFOGRAFIA, ESQUEMA_INFOGRAFIA, texto, "low", None,
-                                      config.NOTICIAS_MODEL)
+                                      config.NOTICIAS_MODEL, tipo="noticias_infografia")
     return {i["id"]: i for i in datos.get("items", [])}
 
 

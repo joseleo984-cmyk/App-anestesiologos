@@ -1064,6 +1064,11 @@
         arriba para que las apruebes.</p>
       <div id="lista-usuarios"><p class="sub">Cargando…</p></div>
     </section>
+    <section class="card">
+      <h2>Consumo de inteligencia artificial</h2>
+      <p class="sub">Lecturas con IA de este mes por anestesiólogo, con el costo estimado en dólares según la tarifa de la API.</p>
+      <div id="uso-ia"><p class="sub">Cargando…</p></div>
+    </section>
     <form class="card" id="form-copia" novalidate>
       <h2>Copia de seguridad</h2>
       <p class="sub">Descarga toda la base de datos (cirugías, pacientes, pagos, finanzas, noticias…) en un archivo
@@ -4368,7 +4373,31 @@ $("#form-clave").onsubmit = async (ev) => {
   aviso(estado, "ok", "Contraseña actualizada.");
 };
 
+const NOMBRE_USO = { orden: "Órdenes", reporte_pago: "Reportes de pago", relacion: "Relaciones de AP", volante: "Volantes",
+  extracto: "Extractos", extracto_categorias: "Categorías de extractos", noticias: "Noticias", noticias_traduccion: "Traducción de noticias",
+  noticias_infografia: "Infografía de noticias" };
+const usd = (v) => `US$ ${Number(v).toLocaleString("es-CO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+async function cargarUsoIA() {
+  const cont = $("#uso-ia");
+  const r = await fetch("/api/uso-ia").catch(() => null);
+  if (!r || !r.ok) { cont.innerHTML = `<p class="sub">No se pudo cargar el consumo.</p>`; return; }
+  const d = await r.json();
+  if (!d.por_anestesiologo.length) { cont.innerHTML = `<p class="sub">Aún no hay lecturas con IA este mes.</p>`; return; }
+  const total = d.por_anestesiologo.reduce((s, f) => s + Number(f.costo_usd), 0);
+  cont.innerHTML = `<div class="kpis"><div class="kpi"><div class="etiqueta">Total del mes</div><div class="cifra">${usd(total)}</div></div>
+      <div class="kpi"><div class="etiqueta">Lecturas</div><div class="cifra">${formatoMiles(d.por_anestesiologo.reduce((s, f) => s + f.lecturas, 0))}</div></div></div>
+    <div class="tabla-scroll"><table class="inf-tabla"><thead><tr><th>Anestesiólogo</th><th>Lecturas</th><th>Tokens</th><th>Costo</th></tr></thead><tbody>
+    ${d.por_anestesiologo.map((f) => `<tr><td>${escapar(f.nombre)}</td><td>${formatoMiles(f.lecturas)}</td>
+      <td>${formatoMiles(Number(f.entrada) + Number(f.salida) + Number(f.cache))}</td><td>${usd(f.costo_usd)}</td></tr>`).join("")}
+    </tbody></table></div>
+    <p class="sub" style="margin:10px 0 4px">Por tipo de lectura:</p>
+    <div class="tabla-scroll"><table class="inf-tabla"><thead><tr><th>Tipo</th><th>Lecturas</th><th>Tokens promedio</th><th>Costo</th></tr></thead><tbody>
+    ${d.por_tipo.map((t) => `<tr><td>${escapar(NOMBRE_USO[t.tipo] || t.tipo)}</td><td>${formatoMiles(t.lecturas)}</td>
+      <td>${formatoMiles(t.tokens_promedio || 0)}</td><td>${usd(t.costo_usd)}</td></tr>`).join("")}
+    </tbody></table></div>`;
+}
 async function cargarUsuarios() {
+  cargarUsoIA();
   const cont = $("#lista-usuarios");
   const r = await fetch("/api/usuarios");
   if (!r.ok) { cont.innerHTML = `<p class="aviso err">No se pudieron cargar las cuentas.</p>`; return; }

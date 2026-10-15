@@ -24,8 +24,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from rapidfuzz import fuzz
 
-from app import (almacenamiento, auth, cartera, catalogo, correo, config, copia, exportar, extraccion, extractos, finanzas, inicio,
-                 liquidacion, noticias, repositorio)
+from app import (almacenamiento, auth, cartera, catalogo, config, copia, correo, exportar, extraccion, extractos,
+                 finanzas, inicio, liquidacion, noticias, repositorio, uso_ia)
 from app.modelos import (ClaveCopia, CompromisoEntrada, CuentaEntrada, Favorita, FuenteNoticias, ImportacionConfirmada, MetaEntrada,
                          MovimientoEntrada, OrdenConfirmada, PartidaEntrada, Sugerencia, TemasNoticias)
 
@@ -365,6 +365,12 @@ def registrarse(datos: Registro, request: Request, conn=Depends(get_conn, scope=
     return {"ok": True}
 
 
+@app.get("/api/uso-ia")
+def consumo_de_ia(desde: Optional[date] = None, conn=Depends(get_conn, scope="function"), _=Depends(admin_actual)):
+    """Consumo de la IA desde una fecha (por defecto, el mes en curso): por anestesiólogo y por tipo de lectura."""
+    return {"desde": desde, "por_anestesiologo": uso_ia.resumen(conn, desde), "por_tipo": uso_ia.por_tipo(conn, desde)}
+
+
 @app.post("/api/usuarios/{usuario_id}/aprobar")
 def aprobar_registro(usuario_id: int, conn=Depends(get_conn, scope="function"), _=Depends(admin_actual)):
     if not repositorio.aprobar_solicitud(conn, usuario_id):
@@ -524,6 +530,7 @@ def subir_documento(archivos: list[UploadFile] = File(default=[]), archivo: Opti
         documento_id = repositorio.crear_documento(conn, anestesiologo_id, ubicaciones, hash_sha256)
     conn.commit()
 
+    uso_ia.en_nombre_de(anestesiologo_id, documento_id)
     try:
         orden = extraccion.extraer_orden(paginas)
     except extraccion.ExtraccionError as e:
@@ -747,6 +754,7 @@ def subir_reporte_pago(archivo: UploadFile, conn=Depends(get_conn, scope="functi
     existente = repositorio.buscar_reporte_por_hash(conn, anestesiologo_id, hash_sha256)
     if existente:
         raise HTTPException(409, {"mensaje": "Este reporte ya se había subido.", "reporte_id": existente["reporte_id"]})
+    uso_ia.en_nombre_de(anestesiologo_id)
     try:
         reporte = extraccion.extraer_reporte_pago(datos, tipo)
     except extraccion.ExtraccionError as e:
@@ -778,6 +786,7 @@ def subir_relacion_ap(archivos: list[UploadFile] = File(...), pagador: Optional[
     existente = repositorio.buscar_reporte_por_hash(conn, anestesiologo_id, hash_sha256)
     if existente:
         raise HTTPException(409, {"mensaje": "Esta relación ya se había subido.", "reporte_id": existente["reporte_id"]})
+    uso_ia.en_nombre_de(anestesiologo_id)
     try:
         relacion = extraccion.extraer_relacion(paginas)
     except extraccion.ExtraccionError as e:
@@ -837,6 +846,7 @@ def comparar_volante(reporte_id: int, archivo: UploadFile, conn=Depends(get_conn
     if reporte is None:
         raise HTTPException(404, "Reporte no encontrado.")
     datos, tipo = _leer_subida(archivo)
+    uso_ia.en_nombre_de(anestesiologo_id)
     try:
         volante = extraccion.extraer_volante(datos, tipo)
     except extraccion.ExtraccionError as e:
@@ -992,6 +1002,7 @@ def comprometerse(meta_id: int, c: CompromisoEntrada, conn=Depends(get_conn, sco
 def subir_volante(archivo: UploadFile, conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
     """Sube el volante de AP de un mes: queda como el ingreso real de ese mes."""
     datos, tipo = _leer_subida(archivo)
+    uso_ia.en_nombre_de(anestesiologo_id)
     try:
         volante = extraccion.extraer_volante(datos, tipo)
     except extraccion.ExtraccionError as e:
