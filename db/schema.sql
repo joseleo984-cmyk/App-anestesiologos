@@ -25,14 +25,16 @@ CREATE TABLE anestesiologo (
 -- ---------------------------------------------------------------------
 CREATE TABLE paciente (
     paciente_id        BIGSERIAL PRIMARY KEY,
+    -- cada anestesiólogo tiene su propia ficha del paciente: lo que escribe uno no cambia lo que ve otro
+    anestesiologo_id   BIGINT NOT NULL REFERENCES anestesiologo(anestesiologo_id) ON DELETE CASCADE,
     tipo_documento     VARCHAR(5)   NOT NULL DEFAULT 'CC'
                        CHECK (tipo_documento IN ('CC','TI','CE','RC','PA','PPT','CN','MS','AS')),
     numero_documento   VARCHAR(20)  NOT NULL,
     nombres            VARCHAR(100) NOT NULL,
     apellidos          VARCHAR(100) NOT NULL,
-    creado_en          TIMESTAMPTZ  NOT NULL DEFAULT now(),
-    UNIQUE (tipo_documento, numero_documento)
+    creado_en          TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
+CREATE UNIQUE INDEX IF NOT EXISTS paciente_anestesiologo_documento ON paciente (anestesiologo_id, tipo_documento, numero_documento);
 
 -- ---------------------------------------------------------------------
 -- 3. Aseguradora (EPS, medicina prepagada o compañía de pólizas)

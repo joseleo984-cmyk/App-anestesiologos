@@ -289,3 +289,48 @@ ALTER TABLE anestesiologo ADD COLUMN IF NOT EXISTS estado_registro VARCHAR(10) N
     CHECK (estado_registro IN ('PENDIENTE', 'APROBADA'));
 ALTER TABLE anestesiologo ADD COLUMN IF NOT EXISTS telefono VARCHAR(30);
 ALTER TABLE anestesiologo ADD COLUMN IF NOT EXISTS autoriza_datos_en TIMESTAMPTZ;  -- autorización de tratamiento de datos (Ley 1581)
+
+-- 24. Pacientes y coberturas aislados por anestesiólogo. Antes un paciente se identificaba solo por su
+--     documento y la orden de un anestesiólogo podía cambiar el nombre que veía otro. Cada anestesiólogo que
+--     tiene cirugías de un paciente compartido recibe su propia copia del paciente y de sus coberturas.
+ALTER TABLE paciente ADD COLUMN IF NOT EXISTS anestesiologo_id BIGINT REFERENCES anestesiologo(anestesiologo_id) ON DELETE CASCADE;
+ALTER TABLE paciente DROP CONSTRAINT IF EXISTS paciente_tipo_documento_numero_documento_key;
+DO $$
+DECLARE
+  par RECORD; cob RECORD; dueno BIGINT; nuevo BIGINT; nueva_cob BIGINT;
+BEGIN
+  FOR par IN SELECT DISTINCT paciente_id, anestesiologo_id FROM cirugia ORDER BY paciente_id, anestesiologo_id LOOP
+    SELECT anestesiologo_id INTO dueno FROM paciente WHERE paciente_id = par.paciente_id;
+    IF dueno IS NULL THEN
+      UPDATE paciente SET anestesiologo_id = par.anestesiologo_id WHERE paciente_id = par.paciente_id;
+    ELSIF dueno <> par.anestesiologo_id THEN
+      SELECT n.paciente_id INTO nuevo FROM paciente n JOIN paciente o ON o.paciente_id = par.paciente_id
+       WHERE n.anestesiologo_id = par.anestesiologo_id AND n.tipo_documento = o.tipo_documento
+         AND n.numero_documento = o.numero_documento;
+      IF nuevo IS NULL THEN
+        INSERT INTO paciente (anestesiologo_id, tipo_documento, numero_documento, nombres, apellidos, creado_en)
+        SELECT par.anestesiologo_id, tipo_documento, numero_documento, nombres, apellidos, creado_en
+          FROM paciente WHERE paciente_id = par.paciente_id
+        RETURNING paciente_id INTO nuevo;
+      END IF;
+      FOR cob IN SELECT DISTINCT cb.cobertura_id, cb.aseguradora_id, cb.numero_poliza, cb.plan, cb.activa
+                   FROM cirugia c JOIN cobertura cb ON cb.cobertura_id = c.cobertura_id
+                  WHERE c.paciente_id = par.paciente_id AND c.anestesiologo_id = par.anestesiologo_id LOOP
+        SELECT cobertura_id INTO nueva_cob FROM cobertura
+         WHERE paciente_id = nuevo AND aseguradora_id = cob.aseguradora_id AND numero_poliza IS NOT DISTINCT FROM cob.numero_poliza;
+        IF nueva_cob IS NULL THEN
+          INSERT INTO cobertura (paciente_id, aseguradora_id, numero_poliza, plan, activa)
+          VALUES (nuevo, cob.aseguradora_id, cob.numero_poliza, cob.plan, cob.activa) RETURNING cobertura_id INTO nueva_cob;
+        END IF;
+        UPDATE cirugia SET cobertura_id = nueva_cob
+         WHERE cobertura_id = cob.cobertura_id AND anestesiologo_id = par.anestesiologo_id;
+      END LOOP;
+      UPDATE cirugia SET paciente_id = nuevo WHERE paciente_id = par.paciente_id AND anestesiologo_id = par.anestesiologo_id;
+      RAISE NOTICE 'Paciente % compartido: copia % para el anestesiólogo %', par.paciente_id, nuevo, par.anestesiologo_id;
+    END IF;
+  END LOOP;
+END $$;
+-- pacientes sin ninguna cirugía (no tienen dueño posible)
+DELETE FROM paciente WHERE anestesiologo_id IS NULL AND NOT EXISTS (SELECT 1 FROM cirugia c WHERE c.paciente_id = paciente.paciente_id);
+ALTER TABLE paciente ALTER COLUMN anestesiologo_id SET NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS paciente_anestesiologo_documento ON paciente (anestesiologo_id, tipo_documento, numero_documento);

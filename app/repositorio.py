@@ -95,14 +95,15 @@ def obtener_documento(conn, documento_id: int, anestesiologo_id: int) -> Optiona
 
 
 # ------------------------------------------------------------ catálogos
-def _upsert_paciente(conn, p) -> int:
+def _upsert_paciente(conn, anestesiologo_id: int, p) -> int:
+    """La ficha del paciente es de cada anestesiólogo: corregir el nombre no cambia lo que ven los demás."""
     return conn.execute(
-        """INSERT INTO paciente (tipo_documento, numero_documento, nombres, apellidos)
-           VALUES (%s, %s, %s, %s)
-           ON CONFLICT (tipo_documento, numero_documento)
+        """INSERT INTO paciente (anestesiologo_id, tipo_documento, numero_documento, nombres, apellidos)
+           VALUES (%s, %s, %s, %s, %s)
+           ON CONFLICT (anestesiologo_id, tipo_documento, numero_documento)
            DO UPDATE SET nombres = EXCLUDED.nombres, apellidos = EXCLUDED.apellidos
            RETURNING paciente_id""",
-        (p.tipo_documento, p.numero_documento, p.nombres, p.apellidos),
+        (anestesiologo_id, p.tipo_documento, p.numero_documento, p.nombres, p.apellidos),
     ).fetchone()["paciente_id"]
 
 
@@ -216,9 +217,9 @@ def _obtener_o_crear_cirujano(conn, nombre: Optional[str]) -> Optional[int]:
     ).fetchone()["cirujano_id"]
 
 
-def _resolver_relaciones(conn, orden: OrdenConfirmada) -> dict:
-    """Crea o reutiliza paciente, cobertura, clínica y cirujano de la orden."""
-    paciente_id = _upsert_paciente(conn, orden.paciente)
+def _resolver_relaciones(conn, anestesiologo_id: int, orden: OrdenConfirmada) -> dict:
+    """Crea o reutiliza paciente y cobertura (del anestesiólogo), clínica y cirujano (catálogos comunes)."""
+    paciente_id = _upsert_paciente(conn, anestesiologo_id, orden.paciente)
     cobertura_id = None
     if orden.aseguradora:
         aseguradora_id = _upsert_aseguradora(conn, orden.aseguradora)
@@ -260,7 +261,7 @@ def guardar_orden(conn, anestesiologo_id: int, orden: OrdenConfirmada, documento
         if doc["estado"] == "VALIDADO":
             raise DocumentoYaValidado(doc["cirugia_id"])
 
-    r = _resolver_relaciones(conn, orden)
+    r = _resolver_relaciones(conn, anestesiologo_id, orden)
     cirugia_id = conn.execute(
         """INSERT INTO cirugia (paciente_id, cobertura_id, clinica_id, cirujano_id, anestesiologo_id,
                                 documento_id, fecha_procedimiento, estado, valor_honorarios,
@@ -286,7 +287,7 @@ def actualizar_orden(conn, anestesiologo_id: int, cirugia_id: int, orden: OrdenC
     ).fetchone()
     if not existe:
         return False
-    r = _resolver_relaciones(conn, orden)
+    r = _resolver_relaciones(conn, anestesiologo_id, orden)
     conn.execute(
         """UPDATE cirugia
               SET paciente_id = %s, cobertura_id = %s, clinica_id = %s, cirujano_id = %s,

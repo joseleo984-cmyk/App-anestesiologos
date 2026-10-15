@@ -89,6 +89,29 @@ def test_aislamiento_entre_anestesiologos(app_multi, monkeypatch):
     assert admin.get(f"/api/cirugias/{cid}").json()["cirujano"] == "ANA RUIZ"
 
 
+def test_el_mismo_paciente_es_independiente_para_cada_anestesiologo(app_multi):
+    """Dos anestesiólogos con el mismo paciente (mismo documento): cada uno ve y corrige su propia ficha."""
+    admin = entrar(EMAIL, PASSWORD)
+    otro = entrar_y_cambiar("otro@clinica.co", crear_cuenta(admin)["clave_temporal"])
+    paciente = {"tipo_documento": "CC", "numero_documento": "900111222", "nombres": "Ana", "apellidos": "Ficticia"}
+    poliza = {"nombre": "Sura", "tipo": "PREPAGADA", "numero_poliza": "P-1", "plan": "Oro"}
+    mia = admin.post("/api/cirugias", json={**CONFIRMAR, "paciente": paciente, "aseguradora": poliza}).json()["cirugia_id"]
+    suya = otro.post("/api/cirugias", json={**CONFIRMAR, "paciente": {**paciente, "nombres": "Anita", "apellidos": "Otra"},
+                                            "aseguradora": {**poliza, "plan": "Plata"}}).json()["cirugia_id"]
+    a, b = admin.get(f"/api/cirugias/{mia}").json(), otro.get(f"/api/cirugias/{suya}").json()
+    assert (a["paciente"]["nombres"], a["aseguradora"]["plan"]) == ("Ana", "Oro")
+    assert (b["paciente"]["nombres"], b["aseguradora"]["plan"]) == ("Anita", "Plata")
+    # corregir el nombre en una cuenta no cambia la otra
+    assert otro.put(f"/api/cirugias/{suya}", json={**CONFIRMAR, "paciente": {**paciente, "nombres": "Ana María"}}).status_code == 200
+    assert admin.get(f"/api/cirugias/{mia}").json()["paciente"]["nombres"] == "Ana"
+    assert otro.get(f"/api/cirugias/{suya}").json()["paciente"]["nombres"] == "Ana María"
+    # y cada uno tiene su propia fila de paciente y de cobertura
+    with psycopg.connect(app_multi) as c:
+        assert c.execute("SELECT count(*) FROM paciente WHERE numero_documento = '900111222'").fetchone()[0] == 2
+        assert c.execute("""SELECT count(DISTINCT cb.cobertura_id) FROM cirugia ci JOIN cobertura cb USING (cobertura_id)
+                             WHERE ci.cirugia_id IN (%s, %s)""", (mia, suya)).fetchone()[0] == 2
+
+
 def test_desactivar_y_restablecer_cierran_sesiones(app_multi):
     admin = entrar(EMAIL, PASSWORD)
     nueva = crear_cuenta(admin)
