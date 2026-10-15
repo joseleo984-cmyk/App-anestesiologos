@@ -180,3 +180,76 @@ def test_limite_de_fallos_por_conexion(anonimo):
         assert anonimo.post("/api/login", json={"email": f"nadie{i}@x.co", "password": "x"}).status_code == 401
     assert anonimo.post("/api/login", json={"email": EMAIL, "password": PASSWORD}).status_code == 429
     main._fallos_por_ip.clear()
+
+
+def test_olvide_mi_contrasena(anonimo, monkeypatch):
+    from app import correo
+    assert anonimo.get("/api/olvide-clave").json() == {"correo": False}
+    assert anonimo.post("/api/olvide-clave", json={"email": EMAIL}).status_code == 503   # sin correo: al administrador
+    enviados = []
+    monkeypatch.setattr(correo, "configurado", lambda: True)
+    monkeypatch.setattr(correo, "enviar", lambda destino, asunto, texto, html: enviados.append((destino, texto)))
+    monkeypatch.setattr(config, "APP_URL", "https://app.ejemplo.co")
+    # correo que no existe: misma respuesta y no se envía nada
+    r = anonimo.post("/api/olvide-clave", json={"email": "nadie@x.co"})
+    assert r.status_code == 200 and not enviados
+    assert anonimo.post("/api/olvide-clave", json={"email": " PRUEBA@ejemplo.com "}).status_code == 200
+    destino, texto = enviados[0]
+    assert destino == EMAIL and "https://app.ejemplo.co/restablecer?token=" in texto
+    token = texto.split("token=")[1].split()[0]
+    from app.repositorio import conectar
+    with conectar() as c:  # solo se guarda la huella del token
+        assert c.execute("SELECT count(*) AS n FROM restablecimiento_clave WHERE token_hash = %s", (token,)).fetchone()["n"] == 0
+    # sesión abierta antes del cambio: se cierra
+    vieja = TestClient(main.app)
+    vieja.post("/api/login", json={"email": EMAIL, "password": PASSWORD})
+    assert anonimo.post("/api/restablecer", json={"token": token, "nueva": "corta"}).status_code == 422
+    assert anonimo.post("/api/restablecer", json={"token": token, "nueva": "clave-recuperada-1"}).status_code == 200
+    assert vieja.get("/api/yo").status_code == 401
+    assert anonimo.post("/api/restablecer", json={"token": token, "nueva": "otra-clave-123"}).status_code == 400  # un solo uso
+    assert anonimo.post("/api/login", json={"email": EMAIL, "password": "clave-recuperada-1"}).status_code == 200
+    # enlace vencido
+    anonimo.post("/api/olvide-clave", json={"email": EMAIL})
+    token2 = enviados[-1][1].split("token=")[1].split()[0]
+    with conectar() as c:
+        c.execute("UPDATE restablecimiento_clave SET expira_en = now() - interval '1 minute'")
+        c.commit()
+    assert anonimo.post("/api/restablecer", json={"token": token2, "nueva": "otra-clave-123"}).status_code == 400
+    # máximo 3 enlaces por hora por cuenta (ya van 2)
+    for _ in range(3):
+        anonimo.post("/api/olvide-clave", json={"email": EMAIL})
+    assert len(enviados) == 3
+
+
+def test_restablecer_desbloquea_la_cuenta(anonimo, monkeypatch):
+    from app import correo
+    enviados = []
+    monkeypatch.setattr(correo, "configurado", lambda: True)
+    monkeypatch.setattr(correo, "enviar", lambda destino, asunto, texto, html: enviados.append(texto))
+    for _ in range(5):
+        anonimo.post("/api/login", json={"email": EMAIL, "password": "mala-clave"})
+    assert anonimo.post("/api/login", json={"email": EMAIL, "password": PASSWORD}).status_code == 429
+    anonimo.post("/api/olvide-clave", json={"email": EMAIL})
+    token = enviados[0].split("token=")[1].split()[0]
+    assert anonimo.post("/api/restablecer", json={"token": token, "nueva": "clave-recuperada-1"}).status_code == 200
+    assert anonimo.post("/api/login", json={"email": EMAIL, "password": "clave-recuperada-1"}).status_code == 200
+
+
+def test_proveedores_de_correo(monkeypatch):
+    import httpx
+    from app import correo
+    for v in ("CORREO_REMITENTE", "BREVO_API_KEY", "RESEND_API_KEY", "SMTP_HOST", "SMTP_USUARIO"):
+        monkeypatch.delenv(v, raising=False)
+    assert correo.proveedor() is None
+    monkeypatch.setenv("CORREO_REMITENTE", "ap@ejemplo.co")
+    monkeypatch.setenv("BREVO_API_KEY", "clave-falsa")
+    pedidos = []
+
+    def responder(req):
+        pedidos.append(req)
+        return httpx.Response(201, json={"messageId": "1"})
+    correo.enviar("dr@ejemplo.co", "Asunto", "texto", "<p>html</p>", cliente=httpx.Client(transport=httpx.MockTransport(responder)))
+    assert pedidos[0].url.host == "api.brevo.com" and pedidos[0].headers["api-key"] == "clave-falsa"
+    error = httpx.Client(transport=httpx.MockTransport(lambda req: httpx.Response(401, text="no")))
+    with pytest.raises(correo.CorreoError):
+        correo.enviar("dr@ejemplo.co", "A", "t", "h", cliente=error)

@@ -19,6 +19,8 @@ CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-opus-5-5")
 # Modelo para resumir noticias (opcional): puede ser uno más económico que el de las órdenes
 NOTICIAS_MODEL = os.environ.get("NOTICIAS_MODEL", "").strip() or None
 MAX_ARCHIVO_MB = int(os.environ.get("MAX_ARCHIVO_MB", "20"))
+# Dirección pública de la app, para los enlaces de los correos (si falta, se toma de la solicitud)
+APP_URL = os.environ.get("APP_URL", "").strip().rstrip("/")
 # Registro propio de anestesiólogos (quedan pendientes hasta que el administrador los apruebe). "no" lo cierra.
 REGISTRO_ABIERTO = os.environ.get("REGISTRO_ABIERTO", "si").strip().lower() not in ("no", "false", "0")
 # Ciudad que se usa cuando la orden no la trae y la clínica no tiene una conocida (vacío = ninguna)

@@ -6,9 +6,11 @@ Flujo:
   3. POST /api/documentos/{id}/confirmar  guarda la cirugía (estado VALIDADO)
   4. GET  /api/cirugias              lista las cirugías del anestesiólogo
 """
+from html import escape as html_escape
 import hashlib
 import io
 import logging
+import secrets
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -22,7 +24,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from rapidfuzz import fuzz
 
-from app import (almacenamiento, auth, cartera, catalogo, config, copia, exportar, extraccion, extractos, finanzas, inicio,
+from app import (almacenamiento, auth, cartera, catalogo, correo, config, copia, exportar, extraccion, extractos, finanzas, inicio,
                  liquidacion, noticias, repositorio)
 from app.modelos import (ClaveCopia, CompromisoEntrada, CuentaEntrada, Favorita, FuenteNoticias, ImportacionConfirmada, MetaEntrada,
                          MovimientoEntrada, OrdenConfirmada, PartidaEntrada, Sugerencia, TemasNoticias)
@@ -213,6 +215,81 @@ def cambiar_mi_clave(datos: CambioClave, response: Response, conn=Depends(get_co
     version = repositorio.cambiar_clave(conn, cuenta["anestesiologo_id"], auth.hash_password(datos.nueva), False)
     conn.commit()
     poner_cookie(response, cuenta["anestesiologo_id"], version)  # esta sesión sigue; las demás se cierran
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------- «olvidé mi contraseña»
+class OlvideClave(BaseModel):
+    email: str = Field(max_length=150)
+
+
+class NuevaClave(BaseModel):
+    token: str = Field(min_length=20, max_length=200)
+    nueva: str = Field(min_length=10, max_length=200)
+
+
+MAX_OLVIDE_HORA = 5
+_olvide_por_ip: dict[str, list[float]] = {}
+
+
+@app.get("/restablecer", include_in_schema=False)
+def pagina_restablecer():
+    return FileResponse(STATIC / "restablecer.html", headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
+
+
+@app.get("/api/olvide-clave")
+def olvide_clave_disponible():
+    """Si el envío de correos no está configurado, la pantalla manda a pedir una clave temporal al administrador."""
+    return {"correo": correo.configurado()}
+
+
+def _enviar_enlace(destino: str, nombre: str, enlace: str) -> None:
+    texto = (f"Hola, {nombre}.\n\nPara crear una contraseña nueva en Auditorías AP abre este enlace (sirve una sola vez "
+             f"y vence en {repositorio.MINUTOS_ENLACE_CLAVE} minutos):\n\n{enlace}\n\n"
+             "Si no lo pediste, ignora este correo: tu contraseña no cambia.")
+    html = (f"<p>Hola, {html_escape(nombre)}.</p><p>Para crear una contraseña nueva en <strong>Auditorías AP</strong> toca el botón. "
+            f"El enlace sirve una sola vez y vence en {repositorio.MINUTOS_ENLACE_CLAVE} minutos.</p>"
+            f"<p><a href=\"{html_escape(enlace)}\" style=\"background:#0d7470;color:#fff;padding:12px 18px;border-radius:10px;"
+            f"text-decoration:none;display:inline-block\">Crear contraseña nueva</a></p>"
+            "<p style=\"color:#56686a\">Si no lo pediste, ignora este correo: tu contraseña no cambia.</p>")
+    try:
+        correo.enviar(destino, "Restablecer tu contraseña de Auditorías AP", texto, html)
+    except correo.CorreoError as e:
+        log.warning("No se pudo enviar el enlace para restablecer la clave: %s", e)
+
+
+@app.post("/api/olvide-clave")
+def olvide_clave(datos: OlvideClave, request: Request, tareas: BackgroundTasks, conn=Depends(get_conn, scope="function")):
+    """Envía un enlace para crear una clave nueva. Responde lo mismo exista o no la cuenta (no revela correos)."""
+    respuesta = {"ok": True, "mensaje": "Si el correo está registrado, en unos minutos te llega un enlace para crear una "
+                                        "contraseña nueva. Revisa también el correo no deseado."}
+    if not correo.configurado():
+        raise HTTPException(503, "El envío de correos no está configurado: pídele una clave temporal al administrador de AP.")
+    ip, ahora = (request.client.host if request.client else "?"), time.time()
+    recientes = [t for t in _olvide_por_ip.get(ip, []) if ahora - t < 3600]
+    if len(recientes) >= MAX_OLVIDE_HORA:
+        raise HTTPException(429, "Demasiadas solicitudes desde esta conexión. Intenta más tarde.")
+    _olvide_por_ip[ip] = recientes + [ahora]
+    usuario = repositorio.buscar_anestesiologo_por_email(conn, datos.email)
+    if not usuario or not usuario["activo"] or usuario["estado_registro"] != "APROBADA":
+        return respuesta
+    token = secrets.token_urlsafe(32)
+    if not repositorio.crear_enlace_clave(conn, usuario["anestesiologo_id"], hashlib.sha256(token.encode()).hexdigest()):
+        return respuesta  # ya pidió varios en la última hora: no se manda otro
+    conn.commit()
+    base = config.APP_URL or str(request.base_url).rstrip("/")
+    tareas.add_task(_enviar_enlace, usuario["email"], usuario["nombre"], f"{base}/restablecer?token={token}")
+    return respuesta
+
+
+@app.post("/api/restablecer")
+def restablecer_con_enlace(datos: NuevaClave, conn=Depends(get_conn, scope="function")):
+    cuenta = repositorio.usar_enlace_clave(conn, hashlib.sha256(datos.token.encode()).hexdigest())
+    if cuenta is None:
+        conn.rollback()
+        raise HTTPException(400, "El enlace no sirve: ya se usó o venció. Pide uno nuevo en «Olvidé mi contraseña».")
+    repositorio.cambiar_clave(conn, cuenta, auth.hash_password(datos.nueva), False)  # cierra las sesiones abiertas
+    conn.commit()
     return {"ok": True}
 
 

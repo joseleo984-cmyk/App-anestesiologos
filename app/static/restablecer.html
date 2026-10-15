@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nueva contraseña · Auditorías AP</title>
+<link rel="icon" type="image/png" href="/static/icono-192.png">
+<link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+<link rel="manifest" href="/static/manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Auditorías AP">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#0d7470">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;600;700&family=Sora:wght@700&display=swap">
+<script>
+  // Apariencia elegida (Automático / Claro / Oscuro): se aplica antes de pintar, sin parpadeo
+  try { const t = localStorage.getItem("tema"); if (t === "claro" || t === "oscuro") document.documentElement.dataset.tema = t; } catch (e) {}
+</script>
+<style>
+  :root { --bg: #f3f6f6; --card: #ffffff; --text: #14201f; --muted: #56686a; --line: #d6e0df;
+          --accent: #0d7470; --accent-text: #ffffff; --err-bg: #fde8e8; --err-text: #a61b1b; }
+  :root { color-scheme: light; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-tema="claro"]) { color-scheme: dark; --bg: #0f1514; --card: #172020; --text: #e3ecea; --muted: #93a6a3; --line: #2a3735;
+            --accent: #35b3a9; --accent-text: #06201e; --err-bg: #3d1c1c; --err-text: #f1a3a3; }
+  }
+  :root[data-tema="oscuro"] { color-scheme: dark; --bg: #0f1514; --card: #172020; --text: #e3ecea; --muted: #93a6a3; --line: #2a3735;
+            --accent: #35b3a9; --accent-text: #06201e; --err-bg: #3d1c1c; --err-text: #f1a3a3; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 16px/1.45 "Figtree", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  h1 { font-family: "Sora", "Figtree", system-ui, sans-serif; letter-spacing: -.01em; }
+  main { max-width: 400px; margin: 0 auto; padding: 48px 16px; }
+  h1 { font-size: 1.35rem; margin: 0 0 4px; }
+  p { color: var(--muted); margin: 0 0 20px; }
+  form { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
+  label { display: block; font-size: .85rem; color: var(--muted); margin: 12px 0 4px; }
+  label:first-child { margin-top: 0; }
+  input { width: 100%; font: inherit; padding: 10px; border-radius: 8px; border: 1px solid var(--line);
+          background: var(--bg); color: var(--text); }
+  button { width: 100%; margin-top: 20px; font: inherit; font-weight: 600; padding: 12px; border-radius: 10px;
+           border: 0; background: var(--accent); color: var(--accent-text); cursor: pointer; }
+  button:disabled { opacity: .6; }
+  .error { background: var(--err-bg); color: var(--err-text); padding: 10px 12px; border-radius: 8px; margin-top: 12px; }
+  .ok { background: color-mix(in srgb, var(--accent) 14%, transparent); padding: 12px; border-radius: 10px; color: var(--text); }
+  .cambiar { text-align: center; margin: 16px 0 0; }
+  .cambiar a { color: var(--accent); font-weight: 600; }
+  .oculto { display: none !important; }
+  .trampa { position: absolute; left: -5000px; width: 1px; height: 1px; overflow: hidden; }
+  .autoriza { display: flex; gap: 8px; align-items: flex-start; font-size: .82rem; color: var(--muted); margin-top: 14px; }
+  .autoriza input { width: auto; margin-top: 3px; }
+  .nota { font-size: .8rem; margin: 6px 0 0; }
+</style>
+</head>
+<body>
+<main>
+  <img src="/static/icono-192.png" alt="" width="72" height="72" style="border-radius:16px;display:block;margin:0 auto 12px">
+  <h1 style="text-align:center">Nueva contraseña</h1>
+  <p style="text-align:center">Auditorías AP</p>
+  <form id="nueva" novalidate>
+    <label for="clave">Contraseña nueva (mínimo 10 caracteres)</label>
+    <input id="clave" type="password" autocomplete="new-password" required>
+    <label for="clave2">Repítela</label>
+    <input id="clave2" type="password" autocomplete="new-password" required>
+    <div id="error"></div>
+    <button type="submit">Guardar contraseña</button>
+  </form>
+  <div id="listo" class="oculto ok"><strong>✓ Contraseña cambiada.</strong> Ya puedes entrar con ella.
+    <a href="/login" style="display:block;margin-top:10px;font-weight:600;color:var(--accent)">Ir a iniciar sesión</a></div>
+</main>
+<script>
+const token = new URLSearchParams(location.search).get("token") || "";
+history.replaceState(null, "", "/restablecer");  // que el token no quede en el historial
+const caja = document.getElementById("error");
+function error(t) { caja.innerHTML = `<div class="error"></div>`; caja.firstChild.textContent = t; }
+if (!token) error("Falta el enlace completo. Ábrelo desde el correo o pide uno nuevo en «Olvidé mi contraseña».");
+document.getElementById("nueva").onsubmit = async (ev) => {
+  ev.preventDefault();
+  const nueva = document.getElementById("clave").value, boton = ev.submitter;
+  caja.innerHTML = "";
+  if (nueva.length < 10) return error("La contraseña debe tener al menos 10 caracteres.");
+  if (nueva !== document.getElementById("clave2").value) return error("Las contraseñas no coinciden.");
+  boton.disabled = true;
+  try {
+    const r = await fetch("/api/restablecer", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token, nueva }) });
+    const cuerpo = await r.json().catch(() => null);
+    if (!r.ok) return error(cuerpo && typeof cuerpo.detail === "string" ? cuerpo.detail : "No se pudo cambiar la contraseña.");
+    document.getElementById("nueva").classList.add("oculto");
+    document.getElementById("listo").classList.remove("oculto");
+  } catch {
+    error("Sin conexión. Intenta de nuevo.");
+  } finally {
+    boton.disabled = false;
+  }
+};
+</script>
+</body>
+</html>

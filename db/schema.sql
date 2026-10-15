@@ -394,3 +394,13 @@ ALTER TABLE anestesiologo ADD COLUMN IF NOT EXISTS autoriza_datos_en TIMESTAMPTZ
 -- 25. Bloqueo temporal de la cuenta tras varios intentos fallidos de contraseña
 ALTER TABLE anestesiologo ADD COLUMN IF NOT EXISTS intentos_fallidos INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE anestesiologo ADD COLUMN IF NOT EXISTS bloqueado_hasta TIMESTAMPTZ;
+
+-- 26. «Olvidé mi contraseña»: enlaces de un solo uso (se guarda solo la huella del token)
+CREATE TABLE IF NOT EXISTS restablecimiento_clave (
+    token_hash         CHAR(64) PRIMARY KEY,
+    anestesiologo_id   BIGINT NOT NULL REFERENCES anestesiologo(anestesiologo_id) ON DELETE CASCADE,
+    creado_en          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    expira_en          TIMESTAMPTZ NOT NULL,
+    usado_en           TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_restablecimiento_anest ON restablecimiento_clave (anestesiologo_id, creado_en);

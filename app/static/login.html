@@ -66,6 +66,14 @@
     <input id="password" type="password" autocomplete="current-password" required>
     <div id="error"></div>
     <button type="submit">Entrar</button>
+    <p class="cambiar" style="margin:12px 0 0"><a href="#olvide" id="ir-olvide">Olvidé mi contraseña</a></p>
+  </form>
+  <form id="olvide" class="oculto" novalidate>
+    <h1 style="font-size:1.15rem;margin:0 0 4px">Olvidé mi contraseña</h1>
+    <p class="nota" style="margin:0 0 6px">Escribe tu correo y te enviamos un enlace para crear una contraseña nueva.</p>
+    <label for="o-email">Correo</label><input id="o-email" type="email" autocomplete="username" required>
+    <div id="error-olvide"></div>
+    <button type="submit">Enviarme el enlace</button>
   </form>
   <p class="cambiar oculto" id="ir-registro">¿Eres anestesiólogo de AP y no tienes cuenta? <a href="#registro">Regístrate</a></p>
 
@@ -93,13 +101,32 @@
 <script>
 const $ = (s) => document.querySelector(s);
 function vista() {
-  const registro = location.hash === "#registro";
-  $("#login").classList.toggle("oculto", registro);
-  $("#texto-login").classList.toggle("oculto", registro);
+  const registro = location.hash === "#registro", olvide = location.hash === "#olvide";
+  $("#login").classList.toggle("oculto", registro || olvide);
+  $("#olvide").classList.toggle("oculto", !olvide);
+  $("#texto-login").classList.toggle("oculto", registro || olvide);
   $("#ir-registro").classList.toggle("oculto", registro || !registroAbierto);
   $("#registro").classList.toggle("oculto", !registro || $("#registro-listo").classList.contains("visto"));
-  $("#ir-login").classList.toggle("oculto", !registro);
+  $("#ir-login").classList.toggle("oculto", !registro && !olvide);
+  if (registro || olvide) $("#ir-registro").classList.add("oculto");
 }
+$("#olvide").onsubmit = async (ev) => {
+  ev.preventDefault();
+  const caja = $("#error-olvide"), boton = ev.submitter, email = $("#o-email").value.trim();
+  caja.innerHTML = "";
+  if (!email) return error(caja, "Escribe tu correo.");
+  boton.disabled = true;
+  try {
+    const r = await fetch("/api/olvide-clave", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
+    const cuerpo = await r.json().catch(() => null);
+    if (!r.ok) return error(caja, cuerpo && typeof cuerpo.detail === "string" ? cuerpo.detail : "No se pudo enviar el enlace.");
+    caja.innerHTML = `<div class="ok" style="margin-top:12px"></div>`; caja.firstChild.textContent = cuerpo.mensaje;
+  } catch {
+    error(caja, "Sin conexión. Intenta de nuevo.");
+  } finally {
+    boton.disabled = false;
+  }
+};
 let registroAbierto = false;
 fetch("/api/registro").then((r) => r.ok ? r.json() : null).then((d) => { registroAbierto = !!(d && d.abierto); vista(); });
 window.addEventListener("hashchange", vista);

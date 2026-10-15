@@ -562,10 +562,42 @@ def cambiar_clave(conn, anestesiologo_id: int, password_hash: str, temporal: boo
     """Guarda la clave nueva y cierra las sesiones abiertas. Devuelve la nueva versión de sesión."""
     return conn.execute(
         """UPDATE anestesiologo SET password_hash = %s, debe_cambiar_clave = %s,
-                  version_sesion = version_sesion + 1
+                  version_sesion = version_sesion + 1, intentos_fallidos = 0, bloqueado_hasta = NULL
             WHERE anestesiologo_id = %s RETURNING version_sesion""",
         (password_hash, temporal, anestesiologo_id),
     ).fetchone()["version_sesion"]
+
+
+MINUTOS_ENLACE_CLAVE = 60
+MAX_ENLACES_HORA = 3
+
+
+def crear_enlace_clave(conn, anestesiologo_id: int, token_hash: str) -> bool:
+    """Guarda un enlace para restablecer la clave. False si ya se pidieron demasiados en la última hora."""
+    recientes = conn.execute(
+        """SELECT count(*) AS n FROM restablecimiento_clave
+            WHERE anestesiologo_id = %s AND creado_en > now() - interval '1 hour'""", (anestesiologo_id,)).fetchone()["n"]
+    if recientes >= MAX_ENLACES_HORA:
+        return False
+    conn.execute(
+        """INSERT INTO restablecimiento_clave (token_hash, anestesiologo_id, expira_en)
+           VALUES (%s, %s, now() + make_interval(mins => %s))""", (token_hash, anestesiologo_id, MINUTOS_ENLACE_CLAVE))
+    return True
+
+
+def usar_enlace_clave(conn, token_hash: str) -> Optional[int]:
+    """Marca el enlace como usado (y anula los demás de esa cuenta). Devuelve la cuenta, o None si no sirve."""
+    fila = conn.execute(
+        """UPDATE restablecimiento_clave r SET usado_en = now()
+             FROM anestesiologo a
+            WHERE r.token_hash = %s AND r.usado_en IS NULL AND r.expira_en > now()
+              AND a.anestesiologo_id = r.anestesiologo_id AND a.activo AND a.estado_registro = 'APROBADA'
+           RETURNING r.anestesiologo_id""", (token_hash,)).fetchone()
+    if fila is None:
+        return None
+    conn.execute("UPDATE restablecimiento_clave SET usado_en = now() WHERE anestesiologo_id = %s AND usado_en IS NULL",
+                 (fila["anestesiologo_id"],))
+    return fila["anestesiologo_id"]
 
 
 # ------------------------------------------------------------ administración de cuentas

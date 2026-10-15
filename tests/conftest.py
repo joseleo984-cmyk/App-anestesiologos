@@ -41,4 +41,5 @@ def limites_limpios():
     from app import main
     main._fallos_por_ip.clear()
     main._registros_por_ip.clear()
+    main._olvide_por_ip.clear()
     yield
