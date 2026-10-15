@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Auditorías AP</title>
 <link rel="icon" type="image/png" href="/static/icono-192.png">
 <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
@@ -11,40 +11,52 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Auditorías AP">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="theme-color" content="#0b6bcb">
+<meta name="theme-color" content="#0d7470">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Sora:wght@600;700&display=swap">
 <script>
   // Apariencia elegida (Automático / Claro / Oscuro): se aplica antes de pintar, sin parpadeo
   try { const t = localStorage.getItem("tema"); if (t === "claro" || t === "oscuro") document.documentElement.dataset.tema = t; } catch (e) {}
 </script>
 <style>
   :root {
-    --bg: #f6f7f9; --card: #ffffff; --text: #1b1f24; --muted: #5b6470; --line: #d9dde3;
-    --accent: #0b6bcb; --accent-text: #ffffff; --warn-bg: #fff4d6; --warn-line: #e0a800;
-    --ok-bg: #e5f5ea; --ok-text: #1d6b35; --err-bg: #fde8e8; --err-text: #a61b1b;
+    /* Identidad: verde quirófano; los colores de estado se reservan para el cobro */
+    --bg: #f3f6f6; --card: #ffffff; --text: #14201f; --muted: #56686a; --line: #d6e0df;
+    --accent: #0d7470; --accent-text: #ffffff; --accent-bg: #e0f1ef; --warn-bg: #fff1d1; --warn-line: #d39a00;
+    --warn-text: #8a5a00; --ok-bg: #e3f4e8; --ok-text: #1f7a43; --err-bg: #fde6e6; --err-text: #b42323;
+    --info-bg: #e5eefa; --info-text: #2563b0;
+    --letra: "Figtree", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --letra-titulo: "Sora", "Figtree", system-ui, -apple-system, sans-serif;
     --serie-1: #2a78d6; --serie-2: #eb6834; --serie-3: #1baf7a; --rejilla: #e8eaee; --eje: #c3c7ce; --libre: #e3e6ea;
   }
   :root { color-scheme: light; }
   @media (prefers-color-scheme: dark) {
     :root:not([data-tema="claro"]) { color-scheme: dark;
-      --bg: #12151a; --card: #1b2028; --text: #e7eaee; --muted: #9aa4b1; --line: #313844;
-      --accent: #4b9cf0; --accent-text: #0b0f14; --warn-bg: #3a3014; --warn-line: #c99a1a;
-      --ok-bg: #173323; --ok-text: #8fd9a8; --err-bg: #3d1c1c; --err-text: #f1a3a3;
+      --bg: #0f1514; --card: #172020; --text: #e3ecea; --muted: #93a6a3; --line: #2a3735;
+      --accent: #35b3a9; --accent-text: #06201e; --accent-bg: #163331; --warn-bg: #3a2d10; --warn-line: #c99a1a;
+      --warn-text: #e8b34a; --ok-bg: #173322; --ok-text: #6fd294; --err-bg: #3d1c1c; --err-text: #f19a9a;
+      --info-bg: #18263a; --info-text: #7fb0f0;
       --serie-1: #3987e5; --serie-2: #d95926; --serie-3: #199e70; --rejilla: #262c36; --eje: #3a424f; --libre: #2a313c;
     }
   }
   :root[data-tema="oscuro"] { color-scheme: dark;
-      --bg: #12151a; --card: #1b2028; --text: #e7eaee; --muted: #9aa4b1; --line: #313844;
-      --accent: #4b9cf0; --accent-text: #0b0f14; --warn-bg: #3a3014; --warn-line: #c99a1a;
-      --ok-bg: #173323; --ok-text: #8fd9a8; --err-bg: #3d1c1c; --err-text: #f1a3a3;
+      --bg: #0f1514; --card: #172020; --text: #e3ecea; --muted: #93a6a3; --line: #2a3735;
+      --accent: #35b3a9; --accent-text: #06201e; --accent-bg: #163331; --warn-bg: #3a2d10; --warn-line: #c99a1a;
+      --warn-text: #e8b34a; --ok-bg: #173322; --ok-text: #6fd294; --err-bg: #3d1c1c; --err-text: #f19a9a;
+      --info-bg: #18263a; --info-text: #7fb0f0;
       --serie-1: #3987e5; --serie-2: #d95926; --serie-3: #199e70; --rejilla: #262c36; --eje: #3a424f; --libre: #2a313c;
     }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text);
-         font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  main { max-width: 720px; margin: 0 auto; padding: 16px; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.45 var(--letra);
+         -webkit-tap-highlight-color: transparent; }
+  main { max-width: 720px; margin: 0 auto; padding: 12px max(16px, env(safe-area-inset-right)) calc(100px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+  h1, h2, .titulo-letra { font-family: var(--letra-titulo); letter-spacing: -.01em; text-wrap: balance; }
   h1 { font-size: 1.35rem; margin: 4px 0 16px; }
   h2 { font-size: 1.05rem; margin: 0 0 12px; }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+  .valor, .cifra, .kpi .cifra { font-variant-numeric: tabular-nums; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; margin-bottom: 14px; }
+  button { min-height: 44px; }
   button, .boton { font: inherit; border-radius: 10px; border: 1px solid var(--line); background: var(--card);
                    color: var(--text); padding: 10px 14px; cursor: pointer; }
   .primario { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; }
@@ -105,14 +117,32 @@
   textarea { width: 100%; font: inherit; padding: 9px 10px; border-radius: 8px; border: 1px solid var(--line);
              background: var(--bg); color: var(--text); min-height: 64px; resize: vertical; }
   /* Pestañas */
-  .pestanas { display: flex; gap: 4px; background: var(--card); border: 1px solid var(--line); border-radius: 12px;
-              padding: 4px; margin-bottom: 16px; position: sticky; top: 0; z-index: 5; }
-  .pestanas button { flex: 1; border: 0; background: transparent; padding: 9px 4px; font-weight: 600; color: var(--muted);
-                     font-size: .95rem; }
-  .pestanas button[aria-selected="true"] { background: var(--accent); color: var(--accent-text); }
-  @media (max-width: 430px) { .pestanas { gap: 2px; padding: 3px; } .pestanas button { font-size: .72rem; padding: 9px 1px; letter-spacing: -.01em; } }
-  .pestanas button { position: relative; }
-  .globo { position: absolute; top: 1px; right: 1px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px;
+  /* Navegación: barra inferior al alcance del pulgar, con el botón central para escanear */
+  .barra-inferior { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; background: var(--card);
+    border-top: 1px solid var(--line); display: grid; grid-template-columns: repeat(5, 1fr); align-items: end;
+    padding: 4px max(8px, env(safe-area-inset-right)) calc(4px + env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); }
+  .barra-inferior > button { border: 0; background: transparent; display: grid; justify-items: center; gap: 1px; padding: 6px 0 4px;
+    font-size: .7rem; font-weight: 600; color: var(--muted); position: relative; border-radius: 12px; }
+  .barra-inferior > button[aria-selected="true"] { color: var(--accent); }
+  .barra-inferior svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+  .barra-inferior .escanear { color: var(--text); }
+  .barra-inferior .escanear .circulo { width: 52px; height: 52px; border-radius: 50%; background: var(--accent); color: var(--accent-text);
+    display: grid; place-items: center; margin-top: -24px; box-shadow: 0 6px 16px -6px rgba(13, 116, 112, .7); }
+  .barra-inferior .escanear .circulo svg { width: 28px; height: 28px; stroke-width: 2.3; }
+  .barra-inferior .escanear[aria-selected="true"] { color: var(--accent); }
+  @media (min-width: 760px) { .barra-inferior { left: 50%; right: auto; transform: translateX(-50%); width: 520px; border: 1px solid var(--line);
+    border-bottom: 0; border-radius: 18px 18px 0 0; } }
+  .fondo-hoja { position: fixed; inset: 0; z-index: 30; background: rgba(0, 0, 0, .35); }
+  .hoja-mas { position: fixed; left: 0; right: 0; bottom: 0; z-index: 31; background: var(--card); border-radius: 20px 20px 0 0;
+    padding: 8px max(16px, env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    max-width: 560px; margin: 0 auto; box-shadow: 0 -10px 30px rgba(0, 0, 0, .18); }
+  .hoja-mas .agarre { width: 40px; height: 5px; border-radius: 3px; background: var(--line); margin: 0 auto 10px; }
+  .hoja-mas .opciones { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .hoja-mas .opciones button { display: grid; gap: 2px; text-align: left; padding: 14px; border-radius: 14px; position: relative; }
+  .hoja-mas .opciones button strong { font-size: 1rem; }
+  .hoja-mas .opciones button span.sub { font-size: .8rem; }
+  .hoja-mas .opciones button[aria-selected="true"] { border-color: var(--accent); background: var(--accent-bg); }
+  .globo { position: absolute; top: 2px; right: calc(50% - 22px); min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px;
     background: #d03b3b; color: #fff; font-size: .65rem; line-height: 16px; font-weight: 700; text-align: center; }
   .noticia { border-top: 1px solid var(--line); padding: 12px 0; }
   .noticia:first-child { border-top: 0; }
@@ -237,6 +267,76 @@
           border: 1px solid var(--line); color: var(--muted); }
   .chip.PAGADA { background: var(--ok-bg); color: var(--ok-text); border-color: transparent; }
   .chip.CANCELADA { text-decoration: line-through; }
+  .chip.PROGRAMADA { background: var(--info-bg); color: var(--info-text); border-color: transparent; }
+  .chip.FACTURADA, .chip.SIN_VALOR { background: var(--warn-bg); color: var(--warn-text); border-color: transparent; }
+  .chip.ATRASADA { background: var(--err-bg); color: var(--err-text); border-color: transparent; }
+  /* Lista agrupada por mes */
+  .grupo-mes { display: flex; justify-content: space-between; align-items: baseline; font-size: .75rem; font-weight: 700;
+    letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 18px 4px 6px; }
+  .grupo-mes:first-child { margin-top: 0; }
+  .lista-mes { background: var(--card); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+  .cir { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 10px; align-items: center; width: 100%;
+    text-align: left; border: 0; border-top: 1px solid var(--line); border-radius: 0; background: transparent; padding: 11px 12px; }
+  .cir:first-child { border-top: 0; }
+  .cir:hover { background: var(--bg); }
+  .cir .dia { text-align: center; line-height: 1.05; }
+  .cir .dia b { display: block; font: 700 1.15rem var(--letra-titulo); }
+  .cir .dia small { font-size: .68rem; color: var(--muted); text-transform: uppercase; }
+  .cir .quien { min-width: 0; }
+  .cir .quien strong { display: block; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cir .quien .sub { display: block; font-size: .82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cir .cuanto { display: grid; justify-items: end; gap: 4px; }
+  .cir.cancelada .quien strong { text-decoration: line-through; color: var(--muted); }
+  .chips-filtro { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 4px; margin: 0 0 4px; scrollbar-width: none; }
+  .chips-filtro::-webkit-scrollbar { display: none; }
+  .chips-filtro button { flex: 0 0 auto; min-height: 36px; padding: 6px 14px; border-radius: 999px; font-size: .88rem; font-weight: 600; white-space: nowrap; }
+  .chips-filtro button[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  .chips-filtro .n { opacity: .75; font-weight: 500; margin-left: 4px; }
+  /* Inicio */
+  .saludo { margin: 4px 2px 14px; }
+  .saludo h1 { margin: 0; font-size: 1.6rem; }
+  .cifras { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .cifras .card { margin: 0; display: grid; gap: 2px; }
+  .cifras .grande-cifra { font: 700 1.55rem var(--letra-titulo); font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+  .titulo-seccion { font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 18px 4px 8px; }
+  .tarea { display: grid; grid-template-columns: 6px minmax(0, 1fr) auto; gap: 12px; align-items: center; width: 100%; text-align: left;
+    background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px 12px 12px 10px; margin-bottom: 8px; }
+  .tarea .franja { align-self: stretch; border-radius: 3px; }
+  .tarea strong { display: block; }
+  .tarea .accion { font-size: .8rem; font-weight: 700; padding: 5px 12px; border-radius: 999px; }
+  .tono-ok .franja { background: var(--ok-text); } .tono-ok .accion { background: var(--ok-bg); color: var(--ok-text); }
+  .tono-err .franja { background: var(--err-text); } .tono-err .accion { background: var(--err-bg); color: var(--err-text); }
+  .tono-warn .franja { background: var(--warn-line); } .tono-warn .accion { background: var(--warn-bg); color: var(--warn-text); }
+  /* Antigüedad de lo que falta por cobrar */
+  .franjas { display: grid; gap: 4px; }
+  .franja-fila { display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: 10px; align-items: center; width: 100%;
+    text-align: left; border: 0; background: transparent; border-radius: 10px; padding: 6px 4px; font-size: .9rem; }
+  .franja-fila:hover { background: var(--bg); }
+  .franja-fila .pista { height: 12px; border-radius: 6px; background: var(--line); overflow: hidden; }
+  .franja-fila .pista i { display: block; height: 100%; border-radius: 6px; min-width: 3px; }
+  .franja-fila .cuanto { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+  .franja-fila .cuanto small { display: block; font-weight: 400; color: var(--muted); font-size: .75rem; }
+  /* Recorrido del cobro */
+  .cobro { border: 1px solid var(--line); border-radius: 14px; padding: 12px; margin: 0 0 12px; background: var(--bg); }
+  .pasos-cobro { list-style: none; margin: 8px 0 0; padding: 0; }
+  .pasos-cobro li { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 10px; position: relative; padding-bottom: 14px; }
+  .pasos-cobro li:last-child { padding-bottom: 0; }
+  .pasos-cobro li::before { content: ""; position: absolute; left: 8px; top: 18px; bottom: 0; width: 2px; background: var(--line); }
+  .pasos-cobro li:last-child::before { display: none; }
+  .pasos-cobro li.hecho::before { background: var(--accent); }
+  .pasos-cobro .punto { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--line); background: var(--card); z-index: 1; }
+  .pasos-cobro li.hecho .punto { background: var(--accent); border-color: var(--accent); }
+  .pasos-cobro li.ahora .punto { border-color: var(--warn-line); background: var(--warn-bg); }
+  .pasos-cobro li.ahora.err .punto { border-color: var(--err-text); background: var(--err-bg); }
+  .pasos-cobro li.ahora.ok .punto { border-color: var(--accent); background: var(--accent-bg); }
+  /* Mensaje breve que aparece y se va */
+  #toast { position: fixed; left: 50%; bottom: calc(92px + env(safe-area-inset-bottom)); transform: translate(-50%, 20px); z-index: 60;
+    background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-weight: 600; font-size: .92rem;
+    opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; max-width: calc(100% - 32px); text-align: center; }
+  #toast.visible { opacity: 1; transform: translate(-50%, 0); }
+  @media (prefers-reduced-motion: reduce) { #toast { transition: none; } }
+  .por-revisar { display: inline-block; margin-left: 8px; vertical-align: middle; font: 700 .75rem var(--letra);
+    padding: 3px 10px; border-radius: 999px; background: var(--warn-bg); color: var(--warn-text); }
   .barra-acciones { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
   .barra-acciones > * { flex: 1 1 auto; }
   details.filtros summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
@@ -288,17 +388,12 @@
     </details>
   </header>
 
-  <nav class="pestanas" role="tablist">
-    <button type="button" role="tab" data-pestana="nueva" aria-selected="true">Nueva</button>
-    <button type="button" role="tab" data-pestana="cirugias" aria-selected="false">Cirugías</button>
-    <button type="button" role="tab" data-pestana="pagos" aria-selected="false">Pagos</button>
-    <button type="button" role="tab" data-pestana="reportes" aria-selected="false">Reportes</button>
-    <button type="button" role="tab" data-pestana="relacion" aria-selected="false">Relación</button>
-    <button type="button" role="tab" data-pestana="finanzas" aria-selected="false">Finanzas</button>
-    <button type="button" role="tab" data-pestana="noticias" aria-selected="false">Noticias<span class="globo oculto" id="not-globo"></span></button>
-  </nav>
+  <div id="pestana-inicio" class="pestana">
+    <div class="saludo"><span class="sub" id="ini-fecha"></span><h1 id="ini-hola">Hola</h1></div>
+    <div id="inicio"><p class="cargando">Cargando…</p></div>
+  </div>
 
-  <div id="pestana-nueva" class="pestana">
+  <div id="pestana-nueva" class="pestana oculto">
   <section class="card" id="paso-subir">
     <h2>Sube la orden</h2>
     <div id="zona" class="zona">
@@ -323,6 +418,7 @@
   </div>
 
   <div id="pestana-cirugias" class="pestana oculto">
+    <div class="chips-filtro" id="chips-lista" role="group" aria-label="Filtro rápido"></div>
     <section class="card">
       <div class="barra-acciones">
         <input id="f-q" type="search" placeholder="Buscar paciente o documento" style="flex:2 1 200px">
@@ -341,19 +437,19 @@
         <div class="fila">
           <div><label for="f-aseguradora">Aseguradora</label><select id="f-aseguradora"><option value="">Todas</option></select></div>
           <div><label for="f-estado">Estado</label><select id="f-estado"><option value="">Todos</option>
-            <option value="PENDIENTE">Pendientes de pago</option><option>PROGRAMADA</option><option>REALIZADA</option><option>FACTURADA</option>
+            <option value="PENDIENTE">Pendientes de pago</option><option value="ATRASADA">Atrasadas (sin pago hace más de 270 días)</option>
+            <option value="SIN_VALOR">Sin valor</option><option>PROGRAMADA</option><option>REALIZADA</option><option>FACTURADA</option>
             <option>PAGADA</option><option>CANCELADA</option></select></div>
         </div>
         <button type="button" id="limpiar-filtros" style="margin-top:12px">Limpiar filtros</button>
       </details>
     </section>
-    <section class="card">
-      <h2 id="titulo-lista">Cirugías</h2>
-      <div id="cirugias"><p class="sub">Cargando…</p></div>
-    </section>
+    <h2 id="titulo-lista" class="titulo-seccion" style="margin-top:4px">Cirugías</h2>
+    <div id="cirugias"><p class="sub">Cargando…</p></div>
   </div>
 
   <div id="pestana-pagos" class="pestana oculto">
+    <section class="card" id="antiguedad-pagos"><h2>Por cobrar</h2><p class="sub">Cargando…</p></section>
     <section class="card">
       <h2>Sube la relación de pagos</h2>
       <p class="sub">El reporte que te entrega la asociación o el pagador con los pacientes que te pagaron.
@@ -674,7 +770,8 @@
   </div>
 
   <form class="card oculto" id="paso-revisar" novalidate>
-    <h2 id="titulo-form">Revisa y confirma</h2>
+    <h2><span id="titulo-form">Revisa y confirma</span><span id="por-revisar" class="por-revisar oculto"></span></h2>
+    <div id="cobro-cirugia"></div>
     <p id="ver-original" class="oculto"></p>
     <div id="avisos"></div>
 
@@ -760,6 +857,30 @@
 
   <p class="sub" id="version" style="text-align:center"></p>
 </main>
+
+<nav class="barra-inferior" role="tablist" aria-label="Secciones">
+  <button type="button" role="tab" data-pestana="inicio" aria-selected="true">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9v11h14V9"/><path d="M10 20v-6h4v6"/></svg>Inicio</button>
+  <button type="button" role="tab" data-pestana="cirugias" aria-selected="false">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>Cirugías</button>
+  <button type="button" role="tab" data-pestana="nueva" aria-selected="false" class="escanear" aria-label="Nueva orden">
+    <span class="circulo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>Nueva</button>
+  <button type="button" role="tab" data-pestana="pagos" aria-selected="false">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h4"/></svg>Pagos</button>
+  <button type="button" id="abrir-mas" aria-selected="false" aria-haspopup="dialog">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></svg>Más<span class="globo oculto" id="mas-globo"></span></button>
+</nav>
+<div class="fondo-hoja oculto" id="fondo-mas"></div>
+<div class="hoja-mas oculto" id="hoja-mas" role="dialog" aria-label="Más secciones">
+  <div class="agarre"></div>
+  <div class="opciones">
+    <button type="button" data-pestana="reportes"><strong>Reportes</strong><span class="sub">Totales, rankings y gráficas</span></button>
+    <button type="button" data-pestana="relacion"><strong>Relación</strong><span class="sub">Órdenes para facturación</span></button>
+    <button type="button" data-pestana="finanzas"><strong>Finanzas</strong><span class="sub">Ingresos, gastos y metas</span></button>
+    <button type="button" data-pestana="noticias"><strong>Noticias</strong><span class="sub">Novedades en anestesia</span><span class="globo oculto" id="not-globo" style="right:10px;top:10px"></span></button>
+  </div>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
 <div id="visor" class="oculto" role="dialog" aria-modal="true" aria-labelledby="visor-titulo">
   <div class="visor-barra">
     <button type="button" id="visor-cerrar" aria-label="Cerrar">✕ Cerrar</button>
@@ -777,6 +898,22 @@ const campo = (id) => document.getElementById(id);
 let modo = { tipo: "manual" };
 let ciudadPorDefecto = null;  // viene de /api/yo  // {tipo: "documento", id} | {tipo: "manual"} | {tipo: "editar", id}
 const PESOS = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
+const DIAS_SEMANA = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+const MESES_LARGOS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+const aFecha = (iso) => { const [a, m, d] = String(iso).slice(0, 10).split("-").map(Number); return new Date(a, m - 1, d); };
+// "15 oct" (y el año si no es el actual, o si se pide)
+function fechaBreve(iso, conAnio = false) {
+  const f = aFecha(iso), meses = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+  return `${f.getDate()} ${meses[f.getMonth()]}${conAnio || f.getFullYear() !== new Date().getFullYear() ? ` ${f.getFullYear()}` : ""}`;
+}
+let tiempoToast;
+function toast(texto) {
+  const t = $("#toast");
+  t.textContent = texto;
+  t.classList.add("visible");
+  clearTimeout(tiempoToast);
+  tiempoToast = setTimeout(() => t.classList.remove("visible"), 2600);
+}
 const pesos = (v) => v === null || v === undefined ? "—" : PESOS.format(v);
 
 // Si la sesión venció, cualquier llamada a la API devuelve 401: volver al inicio de sesión
@@ -919,6 +1056,9 @@ function llenarFormulario(datos) {
   if (datos.observaciones && modo.tipo === "documento")
     avisos.push(`<div class="aviso warn">${escapar(datos.observaciones)}</div>`);
   $("#avisos").innerHTML = avisos.join("");
+  $("#por-revisar").textContent = `${dudosos.length} por revisar`;
+  $("#por-revisar").classList.toggle("oculto", !dudosos.length);
+  if (modo.tipo !== "editar") $("#cobro-cirugia").innerHTML = "";
   aviso($("#error-guardar"), "", "");
   document.querySelectorAll(".pestana").forEach((el) => el.classList.add("oculto"));
   $("#paso-revisar").classList.remove("oculto");
@@ -978,6 +1118,29 @@ async function abrirCirugia(id) {
   if (!r.ok) return alert("No se pudo abrir la cirugía.");
   modo = { tipo: "editar", id };
   llenarFormulario(await r.json());
+  $("#cobro-cirugia").innerHTML = "";
+  const rc = await fetch(`/api/cirugias/${id}/cobro`);
+  if (rc.ok && modo.tipo === "editar" && modo.id === id) pintarCobro(await rc.json());
+}
+
+// Recorrido del cobro: realizada → entregada a AP → en un reporte de pagos → pagada
+const SITUACION = {
+  A_TIEMPO: ["ok", "Dentro de lo normal"], DEMORADA: ["warn", "Más demorada de lo normal"],
+  ATRASADA: ["err", "Atrasada"], PAGADA: ["ok", "Pagada"], PROGRAMADA: ["", "Programada"], CANCELADA: ["", "Cancelada"],
+};
+function pintarCobro(c) {
+  const [tono, texto] = SITUACION[c.situacion] || ["", ""];
+  const tipica = c.demora_tipica == null ? "" : c.demora_base === "CLINICA"
+    ? `${escapar(tipoTitulo(c.clinica))} suele pagar a ${c.demora_tipica} días.` : `Tus pagos suelen llegar a ${c.demora_tipica} días.`;
+  $("#cobro-cirugia").innerHTML = `<div class="cobro">
+    <div class="item-cab"><strong>Cobro</strong>${c.dias != null && c.situacion !== "CANCELADA"
+      ? `<span class="chip ${tono === "err" ? "ATRASADA" : tono === "warn" ? "SIN_VALOR" : "PAGADA"}">${texto} · día ${c.dias}</span>` : ""}</div>
+    <ol class="pasos-cobro">${c.pasos.map((p) => `<li class="${p.hecho ? "hecho" : ""} ${p.clave === c.actual ? `ahora ${tono}` : ""}">
+      <span class="punto"></span>
+      <div><strong>${escapar(p.titulo)}</strong>${p.detalle ? `<div class="sub">${escapar(p.clave === "REALIZADA" ? tipoTitulo(p.detalle) : p.detalle)}</div>` : ""}
+        ${p.clave === c.actual && p.clave !== "REALIZADA" && tipica ? `<div class="sub">${tipica}</div>` : ""}</div>
+      <span class="sub">${p.fecha ? fechaBreve(p.fecha, true) : ""}</span></li>`).join("")}</ol>
+  </div>`;
 }
 
 $("#paso-revisar").onsubmit = async (ev) => {
@@ -997,7 +1160,8 @@ $("#paso-revisar").onsubmit = async (ev) => {
     if (!r.ok) return aviso($("#error-guardar"), "err", mensajeError(cuerpo, "No se pudo guardar."));
     const eraEdicion = modo.tipo === "editar";
     cerrarFormulario();
-    if (!eraEdicion) aviso($("#estado-subida"), "ok", "Cirugía guardada. La encuentras en la pestaña «Cirugías».");
+    toast(eraEdicion ? "Cambios guardados" : "Cirugía guardada");
+    inicioDatos = null;
     cargarOpciones();
     cargarCirugias();
   } catch {
@@ -1122,13 +1286,26 @@ window.addEventListener("dragover", (e) => e.preventDefault());
 window.addEventListener("drop", (e) => e.preventDefault());
 
 // ---------------------------------------------------------------- pestañas
-let pestanaActual = "nueva";
+let pestanaActual = "inicio";
+const EN_MAS = ["reportes", "relacion", "finanzas", "noticias", "usuarios", "clave"];
+function hojaMas(abrir) {
+  $("#hoja-mas").classList.toggle("oculto", !abrir);
+  $("#fondo-mas").classList.toggle("oculto", !abrir);
+}
+$("#abrir-mas").onclick = () => hojaMas($("#hoja-mas").classList.contains("oculto"));
+$("#fondo-mas").onclick = () => hojaMas(false);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") hojaMas(false); });
 function mostrarPestana(nombre) {
   pestanaActual = nombre;
   $("#paso-revisar").classList.add("oculto");
   document.querySelectorAll(".pestana").forEach((el) => el.classList.toggle("oculto", el.id !== `pestana-${nombre}`));
   document.querySelectorAll("[data-pestana]").forEach((b) => b.setAttribute("aria-selected", b.dataset.pestana === nombre));
-  if (nombre === "cirugias") cargarCirugias();
+  $("#abrir-mas").setAttribute("aria-selected", EN_MAS.includes(nombre));
+  hojaMas(false);
+  window.scrollTo({ top: 0 });
+  if (nombre === "inicio") cargarInicio();
+  if (nombre === "cirugias") { cargarCirugias(); if (!inicioDatos) cargarResumen(); }
+  if (nombre === "pagos") cargarAntiguedadPagos();
   if (nombre === "reportes") cargarReporte();
   if (nombre === "pagos") cargarReportesPago();
   if (nombre === "usuarios") cargarUsuarios();
@@ -1723,8 +1900,10 @@ let esAdmin = false, notVer = "nuevas", notDatos = null, notReintentos = 0;
 const TIPO_NOTICIA = { GUIA: "Guía", ESTUDIO: "Estudio", REVISION: "Revisión", ALERTA: "⚠ Alerta", NOTICIA: "Noticia",
   NORMATIVA: "Normativa", OTRO: "" };
 function ponerGlobo(n) {
-  $("#not-globo").textContent = n > 99 ? "99+" : String(n);
-  $("#not-globo").classList.toggle("oculto", !n);
+  for (const g of [$("#not-globo"), $("#mas-globo")]) {
+    g.textContent = n > 99 ? "99+" : String(n);
+    g.classList.toggle("oculto", !n);
+  }
 }
 async function actualizarGlobo() {
   const r = await fetch("/api/noticias/sin-leer").catch(() => null);
@@ -2073,6 +2252,139 @@ const limpiarFiltros = () =>
 $("#limpiar-filtros").onclick = () => { limpiarFiltros(); cargarCirugias(); };
 
 // ---------------------------------------------------------------- lista
+const LIMITE_LISTA = 300;
+const DIAS_ATRASO = 270;
+const ETIQUETA_CIRUGIA = { PROGRAMADA: "Programada", REALIZADA: "Realizada", FACTURADA: "Facturada", PAGADA: "Pagada",
+  CANCELADA: "Cancelada", ATRASADA: "Atrasada", SIN_VALOR: "Sin valor" };
+// Nombres en tipo título (los documentos los traen en mayúsculas)
+const tipoTitulo = (t) => String(t || "").toLowerCase().replace(/(^|[\s(/-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase())
+  .replace(/ (De|Del|Y)\b/g, (m) => m.toLowerCase()).replace(/\b(Eps|Ips|Sas|S\.a\.s)\b/gi, (m) => m.toUpperCase());
+function estadoVisible(c) {
+  if (c.estado === "PAGADA" || c.estado === "CANCELADA" || c.estado === "PROGRAMADA") return c.estado;
+  const dias = (new Date() - aFecha(c.fecha_procedimiento)) / 864e5;
+  if (dias > DIAS_ATRASO) return "ATRASADA";
+  if (c.valor_honorarios == null) return "SIN_VALOR";
+  return c.estado;
+}
+function filaCirugia(c) {
+  const f = aFecha(c.fecha_procedimiento), estado = estadoVisible(c);
+  const proc = (c.procedimientos || [])[0];
+  return `<button type="button" class="cir ${c.estado === "CANCELADA" ? "cancelada" : ""}" data-id="${c.cirugia_id}">
+    <span class="dia"><b>${f.getDate()}</b><small>${DIAS_SEMANA[f.getDay()]}</small></span>
+    <span class="quien"><strong>${escapar(tipoTitulo(c.paciente))}</strong>
+      <span class="sub">${escapar(tipoTitulo(c.clinica))}${proc ? ` · ${escapar(tipoTitulo(proc.nombre))}` : ""}</span>
+      <span class="sub">${escapar(tipoTitulo(c.aseguradora))}${c.cirujano ? ` · ${escapar(tipoTitulo(c.cirujano))}` : ""}</span></span>
+    <span class="cuanto"><span class="valor">${c.valor_honorarios != null ? pesos(c.valor_honorarios) : "—"}</span>
+      <span class="chip ${estado}">${ETIQUETA_CIRUGIA[estado] || escapar(estado)}</span></span>
+  </button>`;
+}
+
+// Chips de filtro rápido (con su conteo cuando se conoce)
+function clinicaSantaAna() {
+  return [...$("#f-clinica").options].find((o) => /santa\s*ana/i.test(o.textContent));
+}
+function pintarChips() {
+  const estado = $("#f-estado").value, clinica = $("#f-clinica").value;
+  const otros = ["#f-desde", "#f-hasta", "#f-cirujano", "#f-aseguradora"].some((id) => $(id).value);
+  const sa = clinicaSantaAna();
+  const d = inicioDatos;
+  const chips = [
+    { nombre: "Todas", activo: !estado && !clinica && !otros, poner: { estado: "", clinica: "" } },
+    { nombre: "Por cobrar", n: d?.por_cobrar.cirugias, activo: estado === "PENDIENTE" && !clinica, poner: { estado: "PENDIENTE", clinica: "" } },
+    { nombre: "Atrasadas", n: d?.atrasadas, activo: estado === "ATRASADA", poner: { estado: "ATRASADA", clinica: "" } },
+    { nombre: "Sin valor", n: d?.sin_valor, activo: estado === "SIN_VALOR", poner: { estado: "SIN_VALOR", clinica: "" } },
+    { nombre: "Pagadas", activo: estado === "PAGADA" && !clinica, poner: { estado: "PAGADA", clinica: "" } },
+    ...(sa ? [{ nombre: "Santa Ana", activo: clinica === sa.value && !estado, poner: { estado: "", clinica: sa.value } }] : []),
+  ];
+  const cont = $("#chips-lista");
+  cont.innerHTML = chips.map((c, i) => `<button type="button" data-i="${i}" aria-pressed="${c.activo}">${c.nombre}${
+    c.n ? `<span class="n">${c.n}</span>` : ""}</button>`).join("");
+  cont.querySelectorAll("button").forEach((b) => b.onclick = () => {
+    const c = chips[b.dataset.i];
+    limpiarFiltros();
+    $("#f-estado").value = c.poner.estado;
+    $("#f-clinica").value = c.poner.clinica;
+    cargarCirugias();
+  });
+}
+function verLista(filtros) {
+  limpiarFiltros();
+  for (const [id, v] of Object.entries(filtros)) $(id).value = v;
+  mostrarPestana("cirugias");
+}
+
+// ---------------------------------------------------------------- inicio
+let inicioDatos = null;
+async function cargarResumen() {
+  const r = await fetch("/api/inicio").catch(() => null);
+  if (!r || !r.ok) return null;
+  inicioDatos = await r.json();
+  if (pestanaActual === "cirugias") pintarChips();
+  return inicioDatos;
+}
+const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`;
+function htmlAntiguedad(d) {
+  const max = Math.max(...d.antiguedad.map((f) => Number(f.valor)), 1);
+  const colores = ["var(--accent)", "var(--info-text)", "var(--warn-line)", "var(--err-text)"];
+  return `<div class="franjas">${d.antiguedad.map((f, i) => `<button type="button" class="franja-fila" data-desde="${f.desde}" data-hasta="${f.hasta ?? ""}">
+      <span>${f.hasta == null ? `+${f.desde - 1} días` : `${f.desde}–${f.hasta} días`}</span>
+      <span class="pista">${f.cirugias ? `<i style="width:${Math.max(3, Number(f.valor) / max * 100)}%;background:${colores[i]}"></i>` : ""}</span>
+      <span class="cuanto">${f.cirugias ? pesosCorto(f.valor) : "—"}<small>${plural(f.cirugias, "cirugía", "cirugías")}</small></span>
+    </button>`).join("")}</div>`;
+}
+function enlazarAntiguedad(cont) {
+  cont.querySelectorAll(".franja-fila").forEach((b) => b.onclick = () => {
+    const menos = (dias) => { const f = new Date(); f.setDate(f.getDate() - dias); return f.toISOString().slice(0, 10); };
+    verLista({ "#f-estado": "PENDIENTE", "#f-hasta": menos(Number(b.dataset.desde)),
+               ...(b.dataset.hasta ? { "#f-desde": menos(Number(b.dataset.hasta)) } : {}) });
+  });
+}
+async function cargarAntiguedadPagos() {
+  const cont = $("#antiguedad-pagos");
+  const d = await cargarResumen();
+  if (!d) { cont.innerHTML = `<h2>Por cobrar</h2><p class="sub">No se pudo cargar.</p>`; return; }
+  cont.innerHTML = `<div class="item-cab"><h2>Por cobrar</h2><span class="valor">${pesos(d.por_cobrar.valor)}</span></div>
+    <p class="sub" style="margin:-6px 0 8px">${plural(d.por_cobrar.cirugias, "cirugía realizada sin pagar", "cirugías realizadas sin pagar")}, por días desde la cirugía.
+      Toca una franja para verlas.</p>${htmlAntiguedad(d)}`;
+  enlazarAntiguedad(cont);
+}
+async function cargarInicio() {
+  const hoy = new Date();
+  $("#ini-fecha").textContent = `${["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"][hoy.getDay()]} ${hoy.getDate()} de ${MESES_LARGOS[hoy.getMonth()]}`;
+  const cont = $("#inicio");
+  const d = await cargarResumen();
+  if (!d) { cont.innerHTML = `<div class="aviso err">No se pudo cargar el resumen. Revisa la conexión.</div>`; return; }
+  const ant = Number(d.cobrado_mes_anterior), este = Number(d.cobrado_mes);
+  const variacion = ant ? Math.round((este - ant) / ant * 100) : null;
+  const tareas = [];
+  if (d.por_aplicar) tareas.push({ tono: "ok", titulo: plural(d.por_aplicar, "pago encontrado", "pagos encontrados"),
+    sub: "En reportes subidos, sin marcar como pagados", accion: "Marcar", ir: () => { mostrarPestana("pagos"); $("#cruzar-todos").click(); } });
+  if (d.atrasadas) tareas.push({ tono: "err", titulo: plural(d.atrasadas, "cirugía atrasada", "cirugías atrasadas"),
+    sub: `Más de ${d.dias_atraso} días sin pago`, accion: "Ver", ir: () => verLista({ "#f-estado": "ATRASADA" }) });
+  if (d.sin_valor) tareas.push({ tono: "warn", titulo: plural(d.sin_valor, "cirugía sin valor", "cirugías sin valor"),
+    sub: "No cuentan en los reportes ni en lo que te deben", accion: "Completar", ir: () => verLista({ "#f-estado": "SIN_VALOR" }) });
+  const p = d.proximo_pago;
+  cont.innerHTML = `<div class="cifras">
+      <div class="card"><span class="sub">Cobrado en ${MESES_LARGOS[hoy.getMonth()]}</span><span class="grande-cifra">${pesosCorto(este)}</span>
+        <span class="sub">${variacion == null ? "&nbsp;" : `${variacion >= 0 ? "▲" : "▼"} ${Math.abs(variacion)} % vs. ${MESES_LARGOS[(hoy.getMonth() + 11) % 12]}`}</span></div>
+      <div class="card"><span class="sub">Por cobrar</span><span class="grande-cifra">${pesosCorto(d.por_cobrar.valor)}</span>
+        <span class="sub">${plural(d.por_cobrar.cirugias, "cirugía", "cirugías")}</span></div>
+    </div>
+    <div class="titulo-seccion">${tareas.length ? "Necesita tu atención" : "Pendientes"}</div>
+    ${tareas.length ? tareas.map((t, i) => `<button type="button" class="tarea tono-${t.tono}" data-i="${i}"><span class="franja"></span>
+        <span><strong>${t.titulo}</strong><span class="sub">${t.sub}</span></span><span class="accion">${t.accion}</span></button>`).join("")
+      : `<div class="aviso ok">✓ Todo al día: no hay pagos por marcar, cirugías atrasadas ni órdenes sin valor.</div>`}
+    ${p ? `<div class="card" style="margin-top:6px"><div class="item-cab"><span class="sub">Próximo pago estimado de AP</span>
+        <span class="chip PROGRAMADA">${MESES_LARGOS[aFecha(p.periodo).getMonth()]}</span></div>
+        <div class="item-cab"><strong class="valor">≈ ${pesos(p.te_llega)}</strong><span class="sub">${plural(p.cirugias, "cirugía", "cirugías")}</span></div>
+        <p class="sub" style="margin:4px 0 0">Estimado con lo que AP te ha pagado antes. El detalle está en Finanzas.</p></div>` : ""}
+    <div class="titulo-seccion">Lo que te deben, por antigüedad</div>
+    <section class="card" id="inicio-antiguedad">${htmlAntiguedad(d)}</section>
+    <button type="button" class="boton primario grande" id="inicio-escanear">📷 Escanear una orden</button>`;
+  cont.querySelectorAll(".tarea").forEach((b) => b.onclick = tareas[b.dataset.i].ir);
+  enlazarAntiguedad($("#inicio-antiguedad"));
+  $("#inicio-escanear").onclick = () => mostrarPestana("nueva");
+}
 let consultaLista = 0;  // para descartar respuestas viejas si llegan después de una más nueva
 async function cargarCirugias() {
   const cont = $("#cirugias");
@@ -2082,28 +2394,32 @@ async function cargarCirugias() {
   $("#filtros-activos").textContent = n ? `(${n} activo${n > 1 ? "s" : ""})` : "";
   $("#excel").href = `/api/cirugias.xlsx?${consulta(f)}`;
   try {
-    const r = await fetch(`/api/cirugias?${consulta(f)}`);
+    pintarChips();
+    const r = await fetch(`/api/cirugias?${consulta({ ...f, limite: LIMITE_LISTA })}`);
     const filas = await r.json();
     if (esta !== consultaLista) return;
     if (!r.ok) throw new Error(mensajeError(filas, "error"));
-    $("#titulo-lista").textContent = `Cirugías (${filas.length})`;
+    $("#titulo-lista").textContent = filas.length === 1 ? "1 cirugía" : `${filas.length}${filas.length >= LIMITE_LISTA ? "+" : ""} cirugías`;
     if (!filas.length) {
       cont.innerHTML = `<p class="sub">${Object.keys(f).length ? "Ninguna cirugía coincide con los filtros." : "Aún no hay cirugías registradas."}</p>`;
       return;
     }
-    cont.innerHTML = filas.map((c) => {
-      const procs = (c.procedimientos || []).map((p) => `${escapar(p.codigo)} ${escapar(p.nombre)}`).join("<br>");
-      return `<button type="button" class="item" data-id="${c.cirugia_id}">
-        <div class="item-cab"><strong>${escapar(c.fecha_procedimiento)} · ${escapar(c.paciente)}</strong>
-          <span class="valor">${c.valor_honorarios != null ? pesos(c.valor_honorarios) : ""}</span></div>
-        <div class="sub">${escapar(c.tipo_documento)} ${escapar(c.numero_documento)} · ${escapar(c.clinica)} · ${escapar(c.aseguradora)}</div>
-        <div class="sub">🩺 ${c.cirujano ? escapar(c.cirujano) : "<em>Sin cirujano</em>"}</div>
-        <div style="margin-top:4px">${procs}</div>
-        <div style="margin-top:6px"><span class="chip ${escapar(c.estado)}">${escapar(c.estado)}</span>
-          ${c.documento_id ? '<span class="sub"> · 📄 con orden original</span>' : ""}</div>
-      </button>`;
-    }).join("");
-    cont.querySelectorAll(".item").forEach((b) => b.onclick = () => abrirCirugia(b.dataset.id));
+    const grupos = [];
+    for (const c of filas) {
+      const clave = c.fecha_procedimiento.slice(0, 7);
+      if (!grupos.length || grupos[grupos.length - 1].clave !== clave) grupos.push({ clave, filas: [], total: 0 });
+      grupos[grupos.length - 1].filas.push(c);
+      if (c.estado !== "CANCELADA") grupos[grupos.length - 1].total += Number(c.valor_honorarios || 0);
+    }
+    const hoy = new Date();
+    cont.innerHTML = grupos.map((g) => {
+      const f = aFecha(g.clave + "-01");
+      return `<div class="grupo-mes"><span>${MESES_LARGOS[f.getMonth()]}${f.getFullYear() !== hoy.getFullYear() ? " " + f.getFullYear() : ""}</span>
+        <span>${g.total ? pesos(g.total) : ""}</span></div>
+      <div class="lista-mes">${g.filas.map(filaCirugia).join("")}</div>`;
+    }).join("") + (filas.length >= LIMITE_LISTA ? `<p class="sub" style="text-align:center">Se muestran las ${LIMITE_LISTA} más recientes. Usa los filtros o la búsqueda para ver otras.</p>` : "");
+    cont.querySelectorAll(".cir").forEach((b) => b.onclick = () => abrirCirugia(Number(b.dataset.id)));
+
   } catch (e) {
     cont.innerHTML = `<p class="aviso err">No se pudo cargar la lista: ${escapar(e.message)}</p>`;
   }
@@ -2490,7 +2806,7 @@ async function cargarReporte() {
 let claveObligatoria = false;
 function exigirCambioClave() {
   claveObligatoria = true;
-  $(".pestanas").classList.add("oculto");
+  $(".barra-inferior").classList.add("oculto");
   $("#aviso-clave-obligatoria").classList.remove("oculto");
   mostrarPestana("clave");
 }
@@ -2715,7 +3031,8 @@ fetch("/api/yo").then((r) => r.ok ? r.json() : null).then((u) => {
   $("#ir-usuarios").classList.toggle("oculto", !u.es_admin);
   esAdmin = !!u.es_admin;
   actualizarGlobo();
-  if (u.debe_cambiar_clave) exigirCambioClave(); else cargarOpciones();
+  $("#ini-hola").textContent = `Hola, ${u.nombre.split(" ").slice(0, 2).join(" ")}`;
+  if (u.debe_cambiar_clave) exigirCambioClave(); else { cargarOpciones(); cargarInicio(); }
 });
 </script>
 </body>

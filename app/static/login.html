@@ -11,24 +11,26 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Auditorías AP">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="theme-color" content="#0b6bcb">
+<meta name="theme-color" content="#0d7470">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;600;700&family=Sora:wght@700&display=swap">
 <script>
   // Apariencia elegida (Automático / Claro / Oscuro): se aplica antes de pintar, sin parpadeo
   try { const t = localStorage.getItem("tema"); if (t === "claro" || t === "oscuro") document.documentElement.dataset.tema = t; } catch (e) {}
 </script>
 <style>
-  :root { --bg: #f6f7f9; --card: #ffffff; --text: #1b1f24; --muted: #5b6470; --line: #d9dde3;
-          --accent: #0b6bcb; --accent-text: #ffffff; --err-bg: #fde8e8; --err-text: #a61b1b; }
+  :root { --bg: #f3f6f6; --card: #ffffff; --text: #14201f; --muted: #56686a; --line: #d6e0df;
+          --accent: #0d7470; --accent-text: #ffffff; --err-bg: #fde8e8; --err-text: #a61b1b; }
   :root { color-scheme: light; }
   @media (prefers-color-scheme: dark) {
-    :root:not([data-tema="claro"]) { color-scheme: dark; --bg: #12151a; --card: #1b2028; --text: #e7eaee; --muted: #9aa4b1; --line: #313844;
-            --accent: #4b9cf0; --accent-text: #0b0f14; --err-bg: #3d1c1c; --err-text: #f1a3a3; }
+    :root:not([data-tema="claro"]) { color-scheme: dark; --bg: #0f1514; --card: #172020; --text: #e3ecea; --muted: #93a6a3; --line: #2a3735;
+            --accent: #35b3a9; --accent-text: #06201e; --err-bg: #3d1c1c; --err-text: #f1a3a3; }
   }
-  :root[data-tema="oscuro"] { color-scheme: dark; --bg: #12151a; --card: #1b2028; --text: #e7eaee; --muted: #9aa4b1; --line: #313844;
-            --accent: #4b9cf0; --accent-text: #0b0f14; --err-bg: #3d1c1c; --err-text: #f1a3a3; }
+  :root[data-tema="oscuro"] { color-scheme: dark; --bg: #0f1514; --card: #172020; --text: #e3ecea; --muted: #93a6a3; --line: #2a3735;
+            --accent: #35b3a9; --accent-text: #06201e; --err-bg: #3d1c1c; --err-text: #f1a3a3; }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text);
-         font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+         font: 16px/1.45 "Figtree", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  h1 { font-family: "Sora", "Figtree", system-ui, sans-serif; letter-spacing: -.01em; }
   main { max-width: 400px; margin: 0 auto; padding: 48px 16px; }
   h1 { font-size: 1.35rem; margin: 0 0 4px; }
   p { color: var(--muted); margin: 0 0 20px; }

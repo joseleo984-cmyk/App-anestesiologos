@@ -21,7 +21,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from rapidfuzz import fuzz
 
-from app import (almacenamiento, auth, catalogo, config, copia, exportar, extraccion, extractos, finanzas, inicio,
+from app import (almacenamiento, auth, cartera, catalogo, config, copia, exportar, extraccion, extractos, finanzas, inicio,
                  liquidacion, noticias, repositorio)
 from app.modelos import (ClaveCopia, CompromisoEntrada, CuentaEntrada, Favorita, FuenteNoticias, ImportacionConfirmada, MetaEntrada,
                          MovimientoEntrada, OrdenConfirmada, PartidaEntrada, Sugerencia, TemasNoticias)
@@ -401,7 +401,7 @@ class Filtros:
                  clinica_id: Optional[int] = None, cirujano_id: Optional[int] = None,
                  aseguradora_id: Optional[str] = Query(default=None, pattern=r"^(\d+|PARTICULAR)$"),
                  estado: Optional[Literal["PROGRAMADA", "REALIZADA", "CANCELADA", "FACTURADA", "PAGADA",
-                                          "PENDIENTE"]] = None,
+                                          "PENDIENTE", "ATRASADA", "SIN_VALOR"]] = None,
                  q: Optional[str] = Query(default=None, max_length=100)):
         self.valores = {"desde": desde, "hasta": hasta, "clinica_id": clinica_id, "cirujano_id": cirujano_id,
                         "aseguradora_id": aseguradora_id, "estado": estado, "q": (q or "").strip() or None}
@@ -511,6 +511,21 @@ def ver_cirugia(cirugia_id: int, conn=Depends(get_conn, scope="function"), anest
     if cirugia is None:
         raise HTTPException(404, "Cirugía no encontrada.")
     return cirugia
+
+
+@app.get("/api/cirugias/{cirugia_id}/cobro")
+def cobro_de_cirugia(cirugia_id: int, conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
+    """Recorrido del cobro: realizada, entregada a AP, en un reporte de pagos y pagada, con los días."""
+    datos = cartera.cobro(conn, anestesiologo_id, cirugia_id)
+    if datos is None:
+        raise HTTPException(404, "Cirugía no encontrada.")
+    return datos
+
+
+@app.get("/api/inicio")
+def pantalla_de_inicio(conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
+    """Resumen de la cartera para la pantalla de Inicio: cobrado, por cobrar, antigüedad y tareas pendientes."""
+    return cartera.resumen(conn, anestesiologo_id)
 
 
 @app.put("/api/cirugias/{cirugia_id}")

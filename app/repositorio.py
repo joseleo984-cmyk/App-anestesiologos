@@ -359,6 +359,9 @@ def obtener_cirugia(conn, anestesiologo_id: int, cirugia_id: int) -> Optional[di
     }
 
 
+DIAS_ATRASO = 270  # igual que finanzas.DIAS_PENDIENTE_MAX: hay clínicas que pagan a ~250 días
+
+
 def _filtros(anestesiologo_id: int, f: dict) -> tuple[str, list]:
     """WHERE común para la lista, el Excel y los reportes."""
     condiciones, params = ["c.anestesiologo_id = %s"], [anestesiologo_id]
@@ -376,6 +379,11 @@ def _filtros(anestesiologo_id: int, f: dict) -> tuple[str, list]:
         condiciones.append("cb.aseguradora_id = %s"); params.append(int(f["aseguradora_id"]))
     if f.get("estado") == "PENDIENTE":  # aún sin pagar (ni pagada ni cancelada)
         condiciones.append("c.estado NOT IN ('PAGADA', 'CANCELADA')")
+    elif f.get("estado") == "ATRASADA":  # sin pagar y más vieja que el plazo máximo de pago
+        condiciones.append("c.estado NOT IN ('PAGADA', 'CANCELADA') AND c.fecha_procedimiento < CURRENT_DATE - %s")
+        params.append(DIAS_ATRASO)
+    elif f.get("estado") == "SIN_VALOR":  # ya hecha y sin valor: no cuenta en los reportes
+        condiciones.append("c.estado <> 'CANCELADA' AND c.valor_honorarios IS NULL AND c.fecha_procedimiento <= CURRENT_DATE")
     elif f.get("estado"):
         condiciones.append("c.estado = %s"); params.append(f["estado"])
     if f.get("q"):
