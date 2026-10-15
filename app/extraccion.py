@@ -262,7 +262,9 @@ empresa (aseguradora, EPS, IPS) bajo cuyo encabezado aparece. No incluyas subtot
   - fecha_servicio: la fecha de la línea (fecha de la atención o cirugía).
   - total, glosas, descuentos, neto: valores en pesos como números enteros (700,405 -> 700405).
   - es_paciente: false si la línea no corresponde a un paciente individual (ej. "HONORARIOS", \
-pagos globales o conceptos); true en los demás casos.
+pagos globales o conceptos); true en los demás casos. Algunas clínicas (ej. Santa Ana) pagan el total de \
+una relación y en la línea ponen el nombre y la cédula del anestesiólogo (el prestador) en vez de un \
+paciente: esa línea es un pago global, es_paciente false.
 
 Reglas: todas las fechas en formato AAAA-MM-DD (en Colombia el formato del documento es día/mes/año). \
 Copia los datos tal como están; nunca inventes un valor que no se lee: usa null."""

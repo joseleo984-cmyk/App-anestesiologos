@@ -6,6 +6,7 @@ ciudad) para no duplicar información cuando llega una nueva orden.
 """
 import re
 import unicodedata
+from datetime import date
 from typing import Optional
 
 import psycopg
@@ -739,6 +740,35 @@ def crear_reporte(conn, anestesiologo_id: int, url_archivo: str, hash_sha256: st
     return reporte_id
 
 
+_TITULOS = {"DR", "DRA", "DOCTOR", "DOCTORA", "MD"}
+
+
+def _palabras(nombre: Optional[str]) -> set[str]:
+    t = unicodedata.normalize("NFKD", nombre or "").encode("ascii", "ignore").decode().upper()
+    return {p for p in re.split(r"[^A-Z]+", t) if len(p) > 1 and p not in _TITULOS}
+
+
+def marcar_pagos_globales(conn, anestesiologo_id: int, reporte_id: int) -> int:
+    """Clínicas como Santa Ana pagan el total de un radicado y en la línea del reporte de AP ponen el nombre y
+    la cédula del anestesiólogo en vez de un paciente. Esas líneas no son pacientes: quedan como pago global."""
+    anest = conn.execute("SELECT nombre FROM anestesiologo WHERE anestesiologo_id = %s", (anestesiologo_id,)).fetchone()
+    rep = conn.execute("SELECT datos_extraidos->>'prestador' AS prestador FROM reporte_pago WHERE reporte_id = %s",
+                       (reporte_id,)).fetchone()
+    nombres = [p for p in (_palabras(anest and anest["nombre"]), _palabras(rep and rep["prestador"])) if len(p) >= 2]
+    lineas = conn.execute("""SELECT detalle_id, paciente, doc_norm(documento_paciente) AS doc, pago_global
+                               FROM pago_detalle WHERE reporte_id = %s""", (reporte_id,)).fetchall()
+    globales = {f["detalle_id"] for f in lineas if f["pago_global"] or (
+        len(_palabras(f["paciente"])) >= 2 and any(_palabras(f["paciente"]) <= n for n in nombres))}
+    # Otras líneas con la misma cédula (la del anestesiólogo) también son pagos globales
+    docs = {f["doc"] for f in lineas if f["detalle_id"] in globales and f["doc"]}
+    globales |= {f["detalle_id"] for f in lineas if f["doc"] in docs}
+    nuevas = [d for d in globales if not next(f for f in lineas if f["detalle_id"] == d)["pago_global"]]
+    for detalle_id in nuevas:
+        conn.execute("""UPDATE pago_detalle SET pago_global = TRUE, es_paciente = FALSE, cirugia_id = NULL
+                         WHERE detalle_id = %s""", (detalle_id,))
+    return len(nuevas)
+
+
 def conciliar(conn, anestesiologo_id: int, reporte_id: int) -> None:
     """Busca la cirugía de cada línea: mismo documento del paciente y la fecha más cercana dentro de la
     ventana (DIAS_ANTES / DIAS_DESPUES), sin pasar de la fecha del pago. Una cirugía no se asigna a dos líneas.
@@ -746,6 +776,8 @@ def conciliar(conn, anestesiologo_id: int, reporte_id: int) -> None:
     la relación, prefiriendo la cirugía con el mismo nº de orden y si no la más reciente."""
     pago = conn.execute("SELECT fecha_proceso, tipo FROM reporte_pago WHERE reporte_id = %s", (reporte_id,)).fetchone()
     relacion = bool(pago) and pago["tipo"] in ("RELACION", "RADICADO")
+    if pago and pago["tipo"] == "PAGOS":
+        marcar_pagos_globales(conn, anestesiologo_id, reporte_id)
     filas = conn.execute(
         """SELECT d.detalle_id, d.documento_paciente, doc_norm(d.documento_paciente) AS doc, d.fecha_servicio,
                   doc_norm(d.numero_orden) AS orden, d.cirugia_id, c.estado
@@ -869,21 +901,26 @@ def obtener_reporte(conn, anestesiologo_id: int, reporte_id: int) -> Optional[di
     filas = conn.execute(
         """SELECT d.detalle_id, d.empresa, d.documento_paciente, d.paciente, d.fecha_servicio, d.factura,
                   d.autorizacion, d.total, d.glosas, d.descuentos, d.neto, d.es_paciente, d.cirugia_id,
-                  d.numero_orden, d.procedimiento,
+                  d.numero_orden, d.procedimiento, d.radicado_id, rr.fecha_proceso AS radicado_fecha,
+                  rr.pagador AS radicado_pagador,
                   c.fecha_procedimiento, c.estado AS estado_cirugia,
                   p.nombres || ' ' || p.apellidos AS paciente_app,
-                  CASE WHEN NOT d.es_paciente THEN 'OTRO_CONCEPTO'
+                  CASE WHEN d.pago_global THEN 'PAGO_GLOBAL'
+                       WHEN NOT d.es_paciente THEN 'OTRO_CONCEPTO'
                        WHEN d.cirugia_id IS NULL THEN 'SIN_CIRUGIA'
                        WHEN c.estado = 'PAGADA' AND %s NOT IN ('APLICADO', 'PAGADO') THEN 'YA_PAGADA'
                        ELSE 'COINCIDE' END AS resultado
              FROM pago_detalle d
              LEFT JOIN cirugia c  ON c.cirugia_id = d.cirugia_id
              LEFT JOIN paciente p ON p.paciente_id = c.paciente_id
+             LEFT JOIN reporte_pago rr ON rr.reporte_id = d.radicado_id
             WHERE d.reporte_id = %s ORDER BY d.detalle_id""",
         (cab["estado"], reporte_id),
     ).fetchall()
     suma = sum((f["neto"] or 0) for f in filas)
     sin_valores = all(f["neto"] is None for f in filas)  # radicado: las líneas no traen valor, solo el total
+    if any(f["resultado"] == "PAGO_GLOBAL" and f["radicado_id"] is None for f in filas):
+        cab["radicados_por_cobrar"] = radicados_por_cobrar(conn, anestesiologo_id)
     return {**cab, "suma_neto": suma,
             "cuadra": None if cab["total_neto"] is None or sin_valores else abs(suma - cab["total_neto"]) <= 1,
             "filas": filas}
@@ -941,6 +978,20 @@ def pagar_radicado(conn, anestesiologo_id: int, reporte_id: int, fecha_pago, val
             (fecha_pago, valor, reporte_id, anestesiologo_id)).rowcount:
         raise DocumentoNoEncontrado()
     return _marcar_pagadas(conn, anestesiologo_id, reporte_id, fecha_pago)
+
+
+def pagar_con_linea(conn, anestesiologo_id: int, detalle_id: int, radicado_id: int) -> int:
+    """La línea de pago global del reporte de AP es el pago de ese radicado: el radicado queda pagado con la
+    fecha del reporte y el neto de la línea. Devuelve cuántas cirugías quedaron pagadas."""
+    linea = conn.execute(
+        """SELECT d.neto, r.fecha_proceso FROM pago_detalle d JOIN reporte_pago r USING (reporte_id)
+            WHERE d.detalle_id = %s AND r.anestesiologo_id = %s AND d.pago_global""",
+        (detalle_id, anestesiologo_id)).fetchone()
+    if linea is None:
+        raise DocumentoNoEncontrado()
+    marcadas = pagar_radicado(conn, anestesiologo_id, radicado_id, linea["fecha_proceso"] or date.today(), linea["neto"])
+    conn.execute("UPDATE pago_detalle SET radicado_id = %s WHERE detalle_id = %s", (radicado_id, detalle_id))
+    return marcadas
 
 
 def radicados_por_cobrar(conn, anestesiologo_id: int) -> list[dict]:

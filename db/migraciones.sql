@@ -395,3 +395,7 @@ ALTER TABLE reporte_pago DROP CONSTRAINT IF EXISTS reporte_pago_estado_check;
 ALTER TABLE reporte_pago ADD CONSTRAINT reporte_pago_estado_check CHECK (estado IN ('LEIDO','APLICADO','PAGADO'));
 ALTER TABLE reporte_pago ADD COLUMN IF NOT EXISTS pagado_en DATE;
 ALTER TABLE reporte_pago ADD COLUMN IF NOT EXISTS valor_pagado NUMERIC(14,2);
+
+-- 31. Pagos globales en el reporte de AP: la línea trae al anestesiólogo en vez del paciente (ej. Santa Ana)
+ALTER TABLE pago_detalle ADD COLUMN IF NOT EXISTS pago_global BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE pago_detalle ADD COLUMN IF NOT EXISTS radicado_id BIGINT REFERENCES reporte_pago(reporte_id) ON DELETE SET NULL;

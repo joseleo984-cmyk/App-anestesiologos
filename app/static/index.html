@@ -585,6 +585,9 @@
 .pago-radicado h3 { margin: 0 0 4px; }
 .faltantes strong { display: block; margin-bottom: 4px; }
 .faltantes button { display: block; width: 100%; }
+.pago-global { margin-top: 6px; }
+.pago-global select { width: 100%; }
+.chip.PAGO_GLOBAL { background: var(--info-bg); color: var(--info-text); border-color: transparent; }
 </style>
 </head>
 <body>
@@ -3883,7 +3886,7 @@ async function cargarCirugias() {
 
 // ---------------------------------------------------------------- pagos
 const RESULTADO = {
-  SIN_CIRUGIA: "⚠ Sin cirugía en la app", OTRO_CONCEPTO: "Otro concepto", YA_PAGADA: "Ya estaba pagada",
+  SIN_CIRUGIA: "⚠ Sin cirugía en la app", OTRO_CONCEPTO: "Otro concepto", PAGO_GLOBAL: "Pago global de la clínica", YA_PAGADA: "Ya estaba pagada",
 };
 const etiquetaResultado = (f) => f.resultado === "COINCIDE"
   ? (f.estado_cirugia === "PAGADA" ? "✓ Pagada" : "✓ Encontrada") : RESULTADO[f.resultado];
@@ -4021,6 +4024,17 @@ async function compararVolante(reporteId, archivo) {
   }
 }
 
+function htmlPagoGlobal(f, rep) {
+  if (f.radicado_id) return `<div class="sub" style="margin-top:4px">✓ Es el pago del radicado de ${escapar(f.radicado_pagador || "la clínica")} del ${escapar(f.radicado_fecha || "—")}.</div>`;
+  const abiertos = rep.radicados_por_cobrar || [];
+  const texto = "En esta línea la clínica pone el nombre y la cédula del anestesiólogo: es el pago total de un radicado, no un paciente.";
+  if (!abiertos.length) return `<p class="sub" style="margin:4px 0 0">${texto} Sube el radicado en «Clínicas que pagan el total» para cruzarlo con este pago.</p>`;
+  return `<div class="pago-global"><p class="sub" style="margin:4px 0 6px">${texto} ¿De cuál radicado es?</p>
+    <div class="fila"><select id="radicado-de-${f.detalle_id}">${abiertos.map((r, i) => `<option value="${r.reporte_id}"${i === 0 ? " selected" : ""}>${
+      escapar(r.fecha_proceso || "sin fecha")} · ${escapar(r.pagador || "Radicado")} · ${r.total_neto != null ? pesos(r.total_neto) : "sin total"} · ${r.cirugias} cirugías</option>`).join("")}</select>
+    <button type="button" class="primario" data-pagar-radicado="${f.detalle_id}" style="flex:0 0 auto">Es su pago</button></div></div>`;
+}
+
 function pintarReportePago(rep) {
   if (rep.tipo === "RADICADO") return pintarRadicado(rep);
   const relacion = rep.tipo === "RELACION";
@@ -4045,7 +4059,8 @@ function pintarReportePago(rep) {
     ${cuadre}
     <p>${plural(cuenta("COINCIDE"), "pago encontrado en tus cirugías", "pagos encontrados en tus cirugías")} ·
        ${plural(cuenta("SIN_CIRUGIA"), "sin cirugía en la app", "sin cirugía en la app")} ·
-       ${plural(cuenta("OTRO_CONCEPTO"), "otro concepto", "otros conceptos")}</p>
+       ${plural(cuenta("OTRO_CONCEPTO"), "otro concepto", "otros conceptos")}${
+       cuenta("PAGO_GLOBAL") ? ` · ${plural(cuenta("PAGO_GLOBAL"), "pago global de clínica", "pagos globales de clínica")}` : ""}</p>
     <div>${rep.filas.map((f) => `<div class="linea-pago">
       <div class="item-cab"><strong>${escapar(f.paciente || "—")}</strong><span class="valor">${pesos(f.neto)}</span></div>
       <div class="sub">${[f.documento_paciente, f.fecha_servicio, f.empresa, f.procedimiento, f.numero_orden && `orden ${f.numero_orden}`]
@@ -4053,6 +4068,7 @@ function pintarReportePago(rep) {
         ${Number(f.glosas) ? ` · glosas ${pesos(f.glosas)}` : ""}${Number(f.descuentos) ? ` · descuentos ${pesos(f.descuentos)}` : ""}</div>
       <div style="margin-top:4px"><span class="chip ${f.resultado}">${etiquetaResultado(f)}</span>
         ${f.cirugia_id ? `<span class="sub"> · cirugía del ${escapar(f.fecha_procedimiento)} (${escapar(f.paciente_app)})</span>` : ""}</div>
+      ${f.resultado === "PAGO_GLOBAL" ? htmlPagoGlobal(f, rep) : ""}
     </div>`).join("")}</div>
     ${rep.estado === "APLICADO" && !porAplicar ? `<div class="aviso ok">${relacion ? "Esta relación" : "Este reporte"} ya se aplicó.</div>` : ""}
     <div class="acciones-pago">
@@ -4063,6 +4079,20 @@ function pintarReportePago(rep) {
     </div>
     ${cuenta("SIN_CIRUGIA") ? `<p class="sub">Los pagos «sin cirugía en la app» son pacientes que no registraste, o con otro documento o una fecha muy distinta. Regístralos en «Nueva» y luego toca «Volver a cruzar».</p>` : ""}
   </section>`;
+  document.querySelectorAll("#detalle-pago [data-pagar-radicado]").forEach((b) => b.onclick = async () => {
+    const sel = $(`#radicado-de-${b.dataset.pagarRadicado}`);
+    if (!sel.value) return toast("Elige el radicado que paga esta línea");
+    if (!confirm("¿Registrar esta línea como el pago de ese radicado? Sus cirugías quedarán pagadas con la fecha de este reporte.")) return;
+    b.disabled = true;
+    const r = await fetch(`/api/pagos/lineas/${b.dataset.pagarRadicado}/radicado`, { method: "POST",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify({ radicado_id: Number(sel.value) }) });
+    const cuerpo = await r.json().catch(() => null);
+    if (!r.ok) { b.disabled = false; return toast(mensajeError(cuerpo, "No se pudo registrar el pago.")); }
+    toast(`Radicado pagado: ${cuerpo.marcadas} cirugía${cuerpo.marcadas === 1 ? "" : "s"} pagada${cuerpo.marcadas === 1 ? "" : "s"}`);
+    inicioDatos = null;
+    pintarReportePago(cuerpo.reporte);
+    cargarReportesPago();
+  });
   const aplicar = $("#aplicar-pago");
   if (aplicar) aplicar.onclick = async () => {
     aplicar.disabled = true;

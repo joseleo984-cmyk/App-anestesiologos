@@ -475,3 +475,37 @@ def test_separar_nombre():
     assert separar_nombre("Ana Pérez Gómez") == ("Ana", "Pérez Gómez")
     assert separar_nombre("Ana María Pérez Gómez") == ("Ana María", "Pérez Gómez")
     assert separar_nombre("Ana") == ("Ana", "SIN APELLIDO")
+
+
+def test_pago_global_de_santa_ana_en_el_reporte_de_ap_paga_el_radicado(con_reporte, con_radicado, conn):
+    c = con_reporte
+    conn.execute("UPDATE anestesiologo SET nombre = 'Dra. Ana Ficticia López' WHERE anestesiologo_id = 1")
+    conn.commit()
+    uno = crear(c, "72000730", "2026-01-05")
+    radicado = subir_radicado(c, pagador="Clínica Santa Ana (ficticia)").json()
+    c.post(f"/api/pagos/{radicado['reporte_id']}/aplicar")
+
+    # En la línea de Santa Ana viene la anestesióloga (nombre y cédula), no un paciente
+    santa_ana = {"empresa": "CLINICA SANTA ANA (FICTICIA)", "documento_paciente": "99887766", "paciente": "FICTICIA LOPEZ",
+                 "fecha_servicio": "2025-12-15", "factura": "9", "autorizacion": None, "total": 847275, "glosas": 0,
+                 "descuentos": 42364, "neto": 804911, "es_paciente": True}
+    otra = {**santa_ana, "paciente": "ANA F", "neto": 1000, "total": 1000, "descuentos": 0}
+    c.poner_reporte({**REPORTE, "total_neto": None, "filas": [REPORTE["filas"][0], santa_ana, otra]})
+    rep = subir(c).json()
+    assert [f["resultado"] for f in rep["filas"]] == ["SIN_CIRUGIA", "PAGO_GLOBAL", "PAGO_GLOBAL"]
+    assert [r["reporte_id"] for r in rep["radicados_por_cobrar"]] == [radicado["reporte_id"]]
+    assert c.get("/api/inicio").json()["por_aplicar"] == 0
+
+    linea = rep["filas"][1]["detalle_id"]
+    r = c.post(f"/api/pagos/lineas/{linea}/radicado", json={"radicado_id": radicado["reporte_id"]})
+    assert r.status_code == 200, r.text
+    assert r.json()["marcadas"] == 1
+    assert r.json()["reporte"]["filas"][1]["radicado_id"] == radicado["reporte_id"]
+    d = c.get(f"/api/cirugias/{uno}").json()
+    assert d["estado"] == "PAGADA" and d["fecha_pago"] == REPORTE["fecha_proceso"]
+    pagado = c.get(f"/api/pagos/{radicado['reporte_id']}").json()
+    assert pagado["estado"] == "PAGADO" and pagado["valor_pagado"] == 804911
+
+    # Una línea de paciente no se puede usar como pago de un radicado
+    paciente = rep["filas"][0]["detalle_id"]
+    assert c.post(f"/api/pagos/lineas/{paciente}/radicado", json={"radicado_id": radicado["reporte_id"]}).status_code == 404

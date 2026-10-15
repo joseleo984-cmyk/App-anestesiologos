@@ -878,6 +878,24 @@ def crear_faltantes_del_radicado(reporte_id: int, conn=Depends(get_conn, scope="
     return {**resultado, "radicado": repositorio.obtener_reporte(conn, anestesiologo_id, reporte_id)}
 
 
+class LineaRadicado(BaseModel):
+    radicado_id: int
+
+
+@app.post("/api/pagos/lineas/{detalle_id}/radicado")
+def linea_paga_radicado(detalle_id: int, datos: LineaRadicado, conn=Depends(get_conn, scope="function"),
+                        anestesiologo_id=Depends(anestesiologo_actual)):
+    """La línea de pago global del reporte de AP (ej. Santa Ana) es el pago de ese radicado."""
+    try:
+        marcadas = repositorio.pagar_con_linea(conn, anestesiologo_id, detalle_id, datos.radicado_id)
+    except repositorio.DocumentoNoEncontrado:
+        conn.rollback()
+        raise HTTPException(404, "Línea o radicado no encontrado.")
+    reporte_id = conn.execute("SELECT reporte_id FROM pago_detalle WHERE detalle_id = %s", (detalle_id,)).fetchone()["reporte_id"]
+    conn.commit()
+    return {"marcadas": marcadas, "reporte": repositorio.obtener_reporte(conn, anestesiologo_id, reporte_id)}
+
+
 @app.post("/api/pagos/{reporte_id}/pagar")
 def pagar_radicado(reporte_id: int, pago: PagoRadicado, conn=Depends(get_conn, scope="function"),
                    anestesiologo_id=Depends(anestesiologo_actual)):

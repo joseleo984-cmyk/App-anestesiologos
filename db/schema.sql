@@ -185,7 +185,11 @@ CREATE TABLE IF NOT EXISTS pago_detalle (
     es_paciente        BOOLEAN NOT NULL DEFAULT TRUE,   -- FALSE = otro concepto (ej. honorarios globales)
     numero_orden       VARCHAR(100),                 -- en las relaciones de AP
     procedimiento      VARCHAR(300),
-    cirugia_id         BIGINT REFERENCES cirugia(cirugia_id) ON DELETE SET NULL
+    cirugia_id         BIGINT REFERENCES cirugia(cirugia_id) ON DELETE SET NULL,
+    -- Pago global de una clínica que paga el total (ej. Santa Ana): en vez del paciente trae el nombre y la
+    -- cédula del anestesiólogo. radicado_id: el radicado que paga
+    pago_global        BOOLEAN NOT NULL DEFAULT FALSE,
+    radicado_id        BIGINT REFERENCES reporte_pago(reporte_id) ON DELETE SET NULL
 );
 CREATE INDEX IF NOT EXISTS idx_pago_detalle_reporte ON pago_detalle (reporte_id);
 CREATE INDEX IF NOT EXISTS idx_pago_detalle_cirugia ON pago_detalle (cirugia_id);
