@@ -302,6 +302,26 @@
   .tip-tiva { position: absolute; top: 30px; transform: translateX(-50%); background: var(--card); border: 1px solid var(--line); border-radius: 10px;
     padding: 6px 10px; font-size: .78rem; display: grid; gap: 1px; box-shadow: 0 6px 16px rgba(0, 0, 0, .12); pointer-events: none;
     font-variant-numeric: tabular-nums; white-space: nowrap; }
+  /* Anestesia regional */
+  .bloque-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; width: 100%; text-align: left;
+    border: 0; border-top: 1px solid var(--line); border-radius: 0; background: transparent; padding: 12px 2px; }
+  .bloque-item:first-child { border-top: 0; }
+  .bloque-item strong { display: block; }
+  .bloque-item .sub { font-size: .8rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .bloque-vol { text-align: right; display: grid; gap: 2px; justify-items: end; max-width: 120px; }
+  .bloque-vol b { font: 700 .95rem var(--letra-titulo); color: var(--accent); }
+  .bloque-vol small { font-size: .7rem; color: var(--muted); }
+  .bloque-volumen { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .bloque-volumen div { background: var(--accent-bg); border-radius: 14px; padding: 10px 12px; display: grid; gap: 2px; }
+  .bloque-volumen span { font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .bloque-volumen b { font: 700 1rem/1.25 var(--letra-titulo); color: var(--accent); }
+  .bloque-dato span { font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .bloque-dato p { margin: 2px 0 0; }
+  .bloque-fotos { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin-top: 6px; }
+  .bloque-fotos figure { margin: 0; display: grid; gap: 3px; }
+  .bloque-fotos img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 10px; background: #000; display: block; }
+  .bloque-fotos figcaption { font-size: .75rem; color: var(--muted); }
+  .lista-last { margin: 6px 0 0; padding-left: 1.1em; display: grid; gap: 4px; }
   /* Boletín semanal */
   .boletin { background: var(--card); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; margin-bottom: 14px; }
   .boletin .portada { background: linear-gradient(140deg, var(--accent), #0a4f4c); color: #fff; padding: 16px; display: grid; gap: 4px; }
@@ -801,6 +821,41 @@
       Pendiente de validación por AP.</p>
   </div>
 
+  <div id="pestana-regional" class="pestana oculto">
+    <div class="saludo"><span class="sub">Guía rápida</span><h1>Anestesia regional</h1></div>
+    <section class="card" id="rg-calculadora">
+      <h2>Dosis máxima de anestésico local</h2>
+      <div class="fila">
+        <div><label for="rg-peso">Peso (kg)</label><input id="rg-peso" type="text" inputmode="decimal" autocomplete="off" placeholder="Ej: 70"></div>
+        <div><label for="rg-planeado">Volumen que vas a usar (mL)</label><input id="rg-planeado" type="text" inputmode="decimal" autocomplete="off" placeholder="Opcional"></div>
+      </div>
+      <p class="sub" style="margin:6px 0 0">En obesidad usa el peso ideal o magro.</p>
+      <label>Anestésico</label><div class="inf-preps" id="rg-anestesicos"></div>
+      <label>Concentración</label><div class="inf-preps" id="rg-concs"></div>
+      <label class="principal"><input type="checkbox" id="rg-epi"> Con epinefrina</label>
+      <div id="rg-dosis"></div>
+    </section>
+    <section class="card">
+      <h2>Bloqueos</h2>
+      <input id="rg-q" type="search" placeholder="Buscar bloqueo o cirugía (ej: cadera, mama)">
+      <div class="chips-filtro" id="rg-regiones" style="margin-top:10px"></div>
+      <div id="rg-lista"></div>
+    </section>
+    <section class="card" style="border-color:var(--err-text)">
+      <h2 style="color:var(--err-text)">Toxicidad sistémica (LAST)</h2>
+      <ol class="lista-last" style="padding-left:1.3em">
+        <li>Detén la inyección, pide ayuda y el carro de LAST. Vía aérea con O₂ al 100 %; evita la hipoxia y la acidosis.</li>
+        <li>Convulsiones: benzodiacepina (evita el propofol si hay inestabilidad).</li>
+        <li><strong>Emulsión lipídica al 20 %</strong> apenas haya signos graves.</li>
+        <li>Paro: RCP; epinefrina en dosis bajas (≤ 1 µg/kg); evita vasopresina, betabloqueadores, calcioantagonistas y lidocaína. Considera circulación extracorpórea.</li>
+      </ol>
+      <div id="rg-last-dosis" style="margin-top:8px"></div>
+      <p class="sub" style="margin:6px 0 0">Según la lista de chequeo de ASRA (2020).</p>
+    </section>
+    <p class="sub" style="margin:0 4px 16px">Contenido orientativo pendiente de validación por AP. Las imágenes y la técnica detallada están en NYSORA
+      (enlace en cada bloqueo); la app solo muestra imágenes propias de AP.</p>
+  </div>
+
   <div id="pestana-noticias" class="pestana oculto">
     <div class="titulo-seccion" id="not-historias-titulo" style="margin-top:4px">Lo más relevante</div>
     <div class="historias-fila" id="not-historias"></div>
@@ -1150,12 +1205,14 @@
     <button type="button" data-pestana="finanzas"><strong>Finanzas</strong><span class="sub">Ingresos, gastos y metas</span></button>
     <button type="button" data-pestana="infusiones"><strong>Infusiones</strong><span class="sub">Vasopresores e inotrópicos</span></button>
     <button type="button" data-pestana="tiva"><strong>TIVA</strong><span class="sub">Propofol y remifentanilo (TCI)</span></button>
+    <button type="button" data-pestana="regional"><strong>Regional</strong><span class="sub">Bloqueos, volúmenes y dosis</span></button>
     <button type="button" data-pestana="noticias"><strong>Noticias</strong><span class="sub">Novedades en anestesia</span><span class="globo oculto" id="not-globo" style="right:10px;top:10px"></span></button>
   </div>
 </div>
 <div id="toast" role="status" aria-live="polite"></div>
 <div id="historia" class="oculto" role="dialog" aria-modal="true" aria-label="Historias de noticias"></div>
 <div id="capa-ficha" class="capa oculto"><div class="ficha" id="ficha" role="dialog" aria-modal="true" aria-label="Ficha de la noticia"></div></div>
+<div id="capa-bloque" class="capa oculto"><div class="ficha" id="ficha-bloque" role="dialog" aria-modal="true" aria-label="Bloqueo"></div></div>
 <div id="mazo" class="oculto" role="dialog" aria-modal="true" aria-label="Revisar noticias nuevas"></div>
 <div id="visor" class="oculto" role="dialog" aria-modal="true" aria-labelledby="visor-titulo">
   <div class="visor-barra">
@@ -1169,6 +1226,7 @@
 
 <script src="/static/infusiones.js"></script>
 <script src="/static/tiva.js"></script>
+<script src="/static/regional.js"></script>
 <script>
 const $ = (sel) => document.querySelector(sel);
 const campo = (id) => document.getElementById(id);
@@ -1565,7 +1623,7 @@ window.addEventListener("drop", (e) => e.preventDefault());
 
 // ---------------------------------------------------------------- pestañas
 let pestanaActual = "inicio";
-const EN_MAS = ["reportes", "relacion", "finanzas", "infusiones", "tiva", "noticias", "usuarios", "clave"];
+const EN_MAS = ["reportes", "relacion", "finanzas", "infusiones", "tiva", "regional", "noticias", "usuarios", "clave"];
 function hojaMas(abrir) {
   $("#hoja-mas").classList.toggle("oculto", !abrir);
   $("#fondo-mas").classList.toggle("oculto", !abrir);
@@ -1584,6 +1642,7 @@ function mostrarPestana(nombre) {
   if (nombre === "inicio") cargarInicio();
   if (nombre === "infusiones") abrirInfusiones();
   if (nombre === "tiva") abrirTiva();
+  if (nombre === "regional") abrirRegional();
   if (nombre === "cirugias") { cargarCirugias(); if (!inicioDatos) cargarResumen(); }
   if (nombre === "pagos") cargarAntiguedadPagos();
   if (nombre === "reportes") cargarReporte();
@@ -2641,6 +2700,145 @@ function graficaVelocidad(cont, serie, fin) {
       <text x="${m.i}" y="${m.a - 3}">Bomba (mL/h)${vals.length && vals[vals.length - 1] > tope ? " · el bolo inicial se sale de la escala" : ""}</text>
       <text x="${m.i - 6}" y="${y(tope / 1.15) + 4}" text-anchor="end">${fmtInf(tope / 1.15, 2)}</text></g>
     <path d="${d}" fill="none" stroke="var(--serie-3)" stroke-width="2"/></svg>`;
+}
+
+// ---------------------------------------------------------------- anestesia regional
+const reg = { region: "", q: "", peso: null, magro: false, anestesico: "ropivacaina", conc: 0.375, epi: false, planeado: null };
+let regImagenes = [], regBloque = null;
+function guardarReg() { try { localStorage.setItem("regional", JSON.stringify(reg)); } catch (e) {} }
+function leerReg() { try { Object.assign(reg, JSON.parse(localStorage.getItem("regional") || "{}")); } catch (e) {} }
+
+async function abrirRegional() {
+  leerReg();
+  $("#rg-peso").value = aCampo(reg.peso); $("#rg-planeado").value = aCampo(reg.planeado); $("#rg-q").value = reg.q || "";
+  $("#rg-epi").checked = !!reg.epi;
+  pintarDosisReg(); pintarListaReg(); pintarLastReg();
+  const r = await fetch("/api/regional/imagenes").catch(() => null);
+  regImagenes = r && r.ok ? await r.json() : [];
+  pintarListaReg();
+}
+$("#rg-peso").addEventListener("input", () => { reg.peso = numInf($("#rg-peso").value); guardarReg(); pintarDosisReg(); pintarLastReg(); });
+$("#rg-planeado").addEventListener("input", () => { reg.planeado = numInf($("#rg-planeado").value); guardarReg(); pintarDosisReg(); });
+$("#rg-epi").addEventListener("change", () => { reg.epi = $("#rg-epi").checked; guardarReg(); pintarDosisReg(); });
+$("#rg-q").addEventListener("input", () => { reg.q = $("#rg-q").value; pintarListaReg(); });
+
+function pintarDosisReg() {
+  const a = Regional.ANESTESICOS.find((x) => x.id === reg.anestesico) || Regional.ANESTESICOS[0];
+  if (!a.conc.includes(reg.conc)) reg.conc = a.conc[0];
+  $("#rg-anestesicos").innerHTML = Regional.ANESTESICOS.map((x) => `<button type="button" data-a="${x.id}" aria-pressed="${x.id === a.id}">${escapar(x.nombre)}</button>`).join("");
+  $("#rg-anestesicos").querySelectorAll("[data-a]").forEach((b) => b.onclick = () => { reg.anestesico = b.dataset.a; guardarReg(); pintarDosisReg(); });
+  $("#rg-concs").innerHTML = a.conc.map((c) => `<button type="button" data-c="${c}" aria-pressed="${c === reg.conc}">${fmtInf(c)} %</button>`).join("");
+  $("#rg-concs").querySelectorAll("[data-c]").forEach((b) => b.onclick = () => { reg.conc = Number(b.dataset.c); guardarReg(); pintarDosisReg(); });
+  const d = Regional.dosisMaxima(a.id, reg.peso, reg.conc, reg.epi), res = $("#rg-dosis");
+  if (!d) { res.innerHTML = `<p class="sub" style="margin:8px 0 0">Escribe el peso para calcular la dosis máxima.</p>`; return; }
+  const uso = reg.planeado > 0 ? reg.planeado * d.mgPorMl : null, pct = uso != null ? uso / d.mg * 100 : null;
+  res.innerHTML = `<div class="kpis" style="margin:10px 0 0">
+      <div class="kpi"><div class="etiqueta">Dosis máxima</div><div class="cifra">${fmtInf(d.mg)} mg</div>
+        <div class="sub" style="font-size:.78rem">${fmtInf(d.mgkg)} mg/kg${d.porTope ? " · limitada por el tope absoluto" : ""}${reg.epi ? " · con epinefrina" : ""}</div></div>
+      <div class="kpi"><div class="etiqueta">Volumen máximo al ${fmtInf(reg.conc)} %</div><div class="cifra">${fmtInf(d.ml, 3)} mL</div>
+        <div class="sub" style="font-size:.78rem">${fmtInf(d.mgPorMl)} mg/mL · duración ${escapar(a.duracion)}</div></div>
+    </div>
+    ${uso != null ? `<div class="aviso ${pct > 100 ? "err" : pct > 80 ? "warn" : "ok"}">${pct > 100 ? "⛔" : pct > 80 ? "⚠" : "✓"}
+      ${fmtInf(reg.planeado)} mL al ${fmtInf(reg.conc)} % = ${fmtInf(uso, 3)} mg: el ${fmtInf(pct, 2)} % de la dosis máxima.
+      ${pct > 100 ? "Supera el máximo: baja la concentración o el volumen." : pct > 80 ? "Cerca del máximo: suma también otros bloqueos y la infiltración del cirujano." : ""}</div>` : ""}`;
+}
+
+function pintarListaReg() {
+  const regiones = Regional.REGIONES;
+  $("#rg-regiones").innerHTML = [["", "Todos"], ...regiones].map(([id, n]) =>
+    `<button type="button" data-r="${id}" aria-pressed="${id === (reg.region || "")}">${escapar(n)}</button>`).join("");
+  $("#rg-regiones").querySelectorAll("[data-r]").forEach((b) => b.onclick = () => { reg.region = b.dataset.r; guardarReg(); pintarListaReg(); });
+  const q = (reg.q || "").trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  const sinTilde = (t) => t.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  const lista = Regional.BLOQUEOS.filter((b) => (!reg.region || b.region === reg.region) &&
+    (!q || sinTilde(`${b.nombre} ${b.indicaciones}`).includes(q)));
+  const nombreRegion = Object.fromEntries(regiones);
+  const fotos = (id) => regImagenes.filter((i) => i.bloque === id).length;
+  $("#rg-lista").innerHTML = lista.length ? lista.map((b) => `<button type="button" class="bloque-item" data-b="${b.id}">
+      <span><strong>${escapar(b.nombre)}</strong><span class="sub">${escapar(b.indicaciones)}</span></span>
+      <span class="bloque-vol"><b>${escapar(b.volumen.split(" (")[0])}</b>${fotos(b.id) ? `<small>📷 ${fotos(b.id)}</small>` : `<small>${escapar(nombreRegion[b.region])}</small>`}</span>
+    </button>`).join("") : `<p class="sub">Ningún bloqueo coincide con la búsqueda.</p>`;
+  $("#rg-lista").querySelectorAll("[data-b]").forEach((b) => b.onclick = () => abrirBloque(b.dataset.b));
+}
+
+function abrirBloque(id) {
+  const b = Regional.BLOQUEOS.find((x) => x.id === id);
+  if (!b) return;
+  regBloque = b;
+  const fotos = regImagenes.filter((i) => i.bloque === id);
+  const fila = (t, v) => v ? `<div class="bloque-dato"><span>${t}</span><p>${escapar(v)}</p></div>` : "";
+  $("#ficha-bloque").innerHTML = `<div class="agarre"></div>
+    <div class="arriba"><span class="etiq">${escapar(Object.fromEntries(Regional.REGIONES)[b.region])}</span><span style="flex:1"></span>
+      <button type="button" data-rb="cerrar" aria-label="Cerrar" style="min-height:36px;padding:4px 12px">✕</button></div>
+    <h3>${escapar(b.nombre)}</h3>
+    <div class="bloque-volumen"><div><span>Volumen adulto</span><b>${escapar(b.volumen)}</b></div><div><span>Niños</span><b>${escapar(b.ninos)}</b></div></div>
+    ${fila("Indicaciones", b.indicaciones)}
+    ${fila("Técnica", b.tecnica)}
+    ${fila("Anestésico local", b.anestesico)}
+    ${fila("Evidencia", b.evidencia)}
+    ${fila("Adyuvantes", b.adyuvantes)}
+    ${b.precauciones ? `<div class="aviso warn" style="margin:0">⚠ ${escapar(b.precauciones)}</div>` : ""}
+    <div class="bloque-dato"><span>Imágenes ecográficas de AP</span>
+      ${fotos.length ? `<div class="bloque-fotos">${fotos.map((f) => `<figure><a href="/api/regional/imagenes/${f.imagen_id}" data-visor="${escapar(b.nombre)}">
+          <img src="/api/regional/imagenes/${f.imagen_id}" alt="${escapar(f.descripcion || b.nombre)}" loading="lazy"></a>
+          ${f.descripcion ? `<figcaption>${escapar(f.descripcion)}</figcaption>` : ""}
+          ${esAdmin ? `<button type="button" data-rb="borrar" data-id="${f.imagen_id}" class="enlace" style="border:0;background:none;min-height:0;padding:2px 0">Quitar</button>` : ""}</figure>`).join("")}</div>`
+        : `<p class="sub" style="margin:2px 0 0">Aún no hay imágenes propias de este bloqueo.</p>`}
+      ${esAdmin ? `<button type="button" data-rb="subir" style="margin-top:8px">📷 Subir imagen ecográfica</button>
+        <p class="sub" style="margin:4px 0 0">Solo imágenes propias y anonimizadas: recorta el nombre, el documento y la fecha de la pantalla del ecógrafo.</p>` : ""}
+    </div>
+    <div class="botones">
+      <a class="boton" href="https://www.nysora.com/?s=${encodeURIComponent(b.nysora)}" target="_blank" rel="noopener">Ver técnica e imágenes en NYSORA ↗</a>
+      <button type="button" class="primario" data-rb="dosis">Calcular dosis máxima</button>
+    </div>
+    <p class="sub" style="margin:0">Volúmenes y fármacos orientativos, pendientes de validar con AP. Ajusta a cada paciente.</p>`;
+  $("#capa-bloque").classList.remove("oculto");
+  $("#ficha-bloque").scrollTop = 0;
+  document.body.style.overflow = "hidden";
+}
+function cerrarBloque() { $("#capa-bloque").classList.add("oculto"); document.body.style.overflow = ""; regBloque = null; }
+$("#capa-bloque").addEventListener("click", async (e) => {
+  if (e.target.id === "capa-bloque") return cerrarBloque();
+  const b = e.target.closest("[data-rb]");
+  if (!b) return;
+  if (b.dataset.rb === "cerrar") return cerrarBloque();
+  if (b.dataset.rb === "dosis") { cerrarBloque(); $("#rg-calculadora").scrollIntoView({ behavior: "smooth" }); $("#rg-planeado").focus(); return; }
+  if (b.dataset.rb === "borrar") {
+    if (!confirm("¿Quitar esta imagen?")) return;
+    const r = await fetch(`/api/regional/imagenes/${b.dataset.id}`, { method: "DELETE" });
+    if (r.ok) { regImagenes = regImagenes.filter((i) => String(i.imagen_id) !== b.dataset.id); abrirBloque(regBloque.id); pintarListaReg(); toast("Imagen quitada"); }
+    return;
+  }
+  if (b.dataset.rb === "subir") {
+    const bloque = regBloque.id;
+    elegirArchivo(async (archivo) => {
+      const descripcion = prompt("Descripción corta (opcional), por ejemplo «Raíces C5–C7, aguja en plano»:") || "";
+      const form = new FormData();
+      form.append("bloque", bloque); if (descripcion.trim()) form.append("descripcion", descripcion.trim());
+      form.append("archivo", new Blob([await archivo.arrayBuffer()], { type: archivo.type || "application/octet-stream" }), archivo.name || "imagen");
+      toast("Subiendo imagen…");
+      const r = await fetch("/api/regional/imagenes", { method: "POST", body: form });
+      const cuerpo = await r.json().catch(() => null);
+      if (!r.ok) return toast(mensajeError(cuerpo, "No se pudo subir la imagen."));
+      regImagenes.push(cuerpo);
+      abrirBloque(bloque); pintarListaReg(); toast("Imagen guardada");
+    });
+  }
+});
+(function () {  // deslizar hacia abajo para cerrar
+  let y0 = null;
+  const f = $("#ficha-bloque");
+  f.addEventListener("touchstart", (e) => { y0 = f.scrollTop <= 0 ? e.touches[0].clientY : null; }, { passive: true });
+  f.addEventListener("touchend", (e) => { if (y0 != null && e.changedTouches[0].clientY - y0 > 90) cerrarBloque(); y0 = null; });
+})();
+
+function pintarLastReg() {
+  const l = Regional.rescateLipidico(reg.peso);
+  $("#rg-last-dosis").innerHTML = l ? `<ul class="lista-last">
+      <li><strong>Bolo:</strong> ${escapar(l.bolo)}</li><li><strong>Infusión:</strong> ${escapar(l.infusion)}</li>
+      <li><strong>Si sigue inestable:</strong> repetir el bolo 1–2 veces y duplicar la infusión.</li>
+      <li><strong>Máximo:</strong> ~${fmtInf(l.maximo)} mL (12 mL/kg) en los primeros 30 min.</li></ul>`
+    : `<p class="sub" style="margin:0">Escribe el peso arriba para ver las dosis de emulsión lipídica.</p>`;
 }
 
 // ---------------------------------------------------------------- historias y boletín semanal

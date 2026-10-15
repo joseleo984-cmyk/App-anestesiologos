@@ -272,3 +272,14 @@ ALTER TABLE noticia ADD COLUMN IF NOT EXISTS valor_a NUMERIC(6,2);
 ALTER TABLE noticia ADD COLUMN IF NOT EXISTS grupo_b VARCHAR(120);
 ALTER TABLE noticia ADD COLUMN IF NOT EXISTS valor_b NUMERIC(6,2);
 ALTER TABLE noticia ADD COLUMN IF NOT EXISTS evento VARCHAR(160);
+
+-- 22. Anestesia regional: imágenes ecográficas propias de AP por bloqueo (las sube el administrador)
+CREATE TABLE IF NOT EXISTS regional_imagen (
+    imagen_id          BIGSERIAL PRIMARY KEY,
+    bloque             VARCHAR(40) NOT NULL,
+    url_archivo        TEXT NOT NULL,
+    descripcion        VARCHAR(200),
+    subida_por         BIGINT REFERENCES anestesiologo(anestesiologo_id) ON DELETE SET NULL,
+    subida_en          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_regional_imagen_bloque ON regional_imagen (bloque);

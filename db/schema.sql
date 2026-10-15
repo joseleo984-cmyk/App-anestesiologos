@@ -371,3 +371,14 @@ CREATE OR REPLACE FUNCTION doc_norm(t TEXT) RETURNS TEXT LANGUAGE sql IMMUTABLE 
     FROM (SELECT regexp_replace(upper(regexp_replace(coalesce(t, ''), '[^A-Za-z0-9]', '', 'g')),
                                 '^(CC|TI|CE|RC|PA|PPT|CN|MS|AS|NUIP)(?=[0-9])', '') AS d) x
 $$;
+
+-- 22. Anestesia regional: imágenes ecográficas propias de AP por bloqueo (las sube el administrador)
+CREATE TABLE IF NOT EXISTS regional_imagen (
+    imagen_id          BIGSERIAL PRIMARY KEY,
+    bloque             VARCHAR(40) NOT NULL,
+    url_archivo        TEXT NOT NULL,
+    descripcion        VARCHAR(200),
+    subida_por         BIGINT REFERENCES anestesiologo(anestesiologo_id) ON DELETE SET NULL,
+    subida_en          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_regional_imagen_bloque ON regional_imagen (bloque);

@@ -7,6 +7,7 @@ Flujo:
   4. GET  /api/cirugias              lista las cirugías del anestesiólogo
 """
 import hashlib
+import io
 import logging
 import time
 import uuid
@@ -876,6 +877,74 @@ def ver_noticias(tareas: BackgroundTasks, ver: Literal["nuevas", "anteriores", "
             "temas": [{"clave": c, "nombre": n} for c, n in noticias.TEMAS],
             "hay_fuentes": bool(conn.execute("SELECT 1 FROM noticia_fuente WHERE activa LIMIT 1").fetchone()),
             "revisadas_en": noticias.ultima_revision(conn), "revisando": revisando}
+
+
+# ---------------------------------------------------------------- anestesia regional: imágenes propias
+MAX_LADO_IMAGEN = 1600
+
+
+def _a_jpeg(datos: bytes) -> bytes:
+    """Convierte la imagen a JPEG de máximo 1600 px y sin metadatos (fecha, GPS, equipo)."""
+    from PIL import Image, ImageOps
+    from pillow_heif import register_heif_opener
+    register_heif_opener()
+    try:
+        img = ImageOps.exif_transpose(Image.open(io.BytesIO(datos))).convert("RGB")
+    except Exception as e:  # noqa: BLE001 - cualquier archivo que no sea imagen
+        raise HTTPException(415, "El archivo no es una imagen válida.") from e
+    img.thumbnail((MAX_LADO_IMAGEN, MAX_LADO_IMAGEN))
+    salida = io.BytesIO()
+    img.save(salida, "JPEG", quality=85)
+    return salida.getvalue()
+
+
+@app.get("/api/regional/imagenes")
+def imagenes_regional(conn=Depends(get_conn, scope="function"), _=Depends(anestesiologo_actual)):
+    return conn.execute("""SELECT imagen_id, bloque, descripcion, subida_en FROM regional_imagen
+                            ORDER BY bloque, imagen_id""").fetchall()
+
+
+@app.post("/api/regional/imagenes", status_code=201)
+def subir_imagen_regional(archivo: UploadFile, bloque: str = Form(..., pattern=r"^[a-z_]{2,40}$"),
+                          descripcion: Optional[str] = Form(default=None, max_length=200),
+                          conn=Depends(get_conn, scope="function"), admin=Depends(admin_actual)):
+    """Imagen ecográfica propia de AP para un bloqueo. Debe estar anonimizada (sin nombre ni documento)."""
+    datos = archivo.file.read(config.MAX_ARCHIVO_MB * 1024 * 1024 + 1)
+    if not datos:
+        raise HTTPException(400, "El archivo está vacío.")
+    if len(datos) > config.MAX_ARCHIVO_MB * 1024 * 1024:
+        raise HTTPException(413, f"El archivo supera {config.MAX_ARCHIVO_MB} MB.")
+    jpeg = _a_jpeg(datos)
+    try:
+        ubicacion = almacenamiento.guardar(f"regional-{uuid.uuid4().hex}.jpg", jpeg, "image/jpeg")
+    except almacenamiento.AlmacenamientoError as e:
+        raise HTTPException(502, str(e))
+    fila = conn.execute(
+        """INSERT INTO regional_imagen (bloque, url_archivo, descripcion, subida_por) VALUES (%s, %s, %s, %s)
+           RETURNING imagen_id, bloque, descripcion, subida_en""",
+        (bloque, ubicacion, (descripcion or "").strip() or None, admin["anestesiologo_id"])).fetchone()
+    conn.commit()
+    return fila
+
+
+@app.get("/api/regional/imagenes/{imagen_id}")
+def ver_imagen_regional(imagen_id: int, conn=Depends(get_conn, scope="function"), _=Depends(anestesiologo_actual)):
+    fila = conn.execute("SELECT url_archivo FROM regional_imagen WHERE imagen_id = %s", (imagen_id,)).fetchone()
+    if fila is None:
+        raise HTTPException(404, "Imagen no encontrada.")
+    try:
+        datos = almacenamiento.leer(fila["url_archivo"])
+    except almacenamiento.AlmacenamientoError as e:
+        raise HTTPException(502, str(e))
+    return Response(datos, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=86400"})
+
+
+@app.delete("/api/regional/imagenes/{imagen_id}", status_code=204)
+def borrar_imagen_regional(imagen_id: int, conn=Depends(get_conn, scope="function"), _=Depends(admin_actual)):
+    if conn.execute("DELETE FROM regional_imagen WHERE imagen_id = %s", (imagen_id,)).rowcount == 0:
+        raise HTTPException(404, "Imagen no encontrada.")
+    conn.commit()
+    return Response(status_code=204)
 
 
 @app.get("/api/noticias/historias")
