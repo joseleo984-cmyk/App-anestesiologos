@@ -26,7 +26,7 @@ from pydantic import BaseModel, Field
 from rapidfuzz import fuzz
 
 from app import (almacenamiento, auth, calidad, cartera, catalogo, config, copia, correo, exportar, extraccion, extractos,
-                 finanzas, inicio, liquidacion, noticias, repositorio, uso_ia)
+                 finanzas, inicio, liquidacion, noticias, radicado, repositorio, uso_ia)
 from app.modelos import (ClaveCopia, CompromisoEntrada, CuentaEntrada, Favorita, FuenteNoticias, ImportacionConfirmada, MetaEntrada,
                          MovimientoEntrada, OrdenConfirmada, PartidaEntrada, Sugerencia, TemasNoticias)
 
@@ -860,6 +860,22 @@ def _subir_relacion(conn, anestesiologo_id: int, archivos: list[UploadFile], pag
 class PagoRadicado(BaseModel):
     fecha_pago: date
     valor: Optional[Decimal] = Field(default=None, ge=0, le=Decimal("10000000000"))
+
+
+@app.post("/api/pagos/{reporte_id}/crear-faltantes", status_code=201)
+def crear_faltantes_del_radicado(reporte_id: int, conn=Depends(get_conn, scope="function"),
+                                 anestesiologo_id=Depends(anestesiologo_actual)):
+    """Crea las cirugías de los pacientes del radicado que no están en la app (AP se quedó con las órdenes)."""
+    try:
+        resultado = radicado.crear_faltantes(conn, anestesiologo_id, reporte_id)
+    except repositorio.DocumentoNoEncontrado:
+        conn.rollback()
+        raise HTTPException(404, "Radicado no encontrado.")
+    except ValueError as e:
+        conn.rollback()
+        raise HTTPException(422, str(e))
+    conn.commit()
+    return {**resultado, "radicado": repositorio.obtener_reporte(conn, anestesiologo_id, reporte_id)}
 
 
 @app.post("/api/pagos/{reporte_id}/pagar")

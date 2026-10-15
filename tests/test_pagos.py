@@ -430,3 +430,48 @@ def test_aplicar_una_linea_sin_valor_no_borra_el_valor_de_la_cirugia(con_relacio
     assert c.post(f"/api/pagos/{rep['reporte_id']}/aplicar").json() == {"marcadas": 1}
     d = c.get(f"/api/cirugias/{cid}").json()
     assert d["estado"] == "PAGADA" and d["valor_honorarios"] == 400000
+
+
+def test_crear_desde_el_radicado_las_cirugias_que_faltan(con_radicado, monkeypatch):
+    from app import radicado
+    c = con_radicado
+    dos = crear(c, "32622878", "2026-01-10")
+    # dos líneas del mismo paciente (ficticio) son una sola cirugía; la entidad vacía queda por confirmar
+    filas = [*RADICADO["filas"], {**RADICADO["filas"][0], "procedimiento": "POMEROY"},
+             {"entidad": "SEGUROS FICTICIOS", "paciente": "ANA MARIA PRUEBA GOMEZ", "documento_paciente": "1.043.000.111",
+              "procedimiento": "CESAREA + POMEROY", "numero_orden": None, "fecha_servicio": None, "valor": None}]
+    monkeypatch.setattr(extraccion, "extraer_relacion",
+                        lambda archivos, tipo="relacion": extraccion.relacion_a_reporte({**RADICADO, "filas": filas}))
+    rep = subir_radicado(c, pagador="Clínica Santa Ana (ficticia)").json()
+    assert c.post(f"/api/pagos/{rep['reporte_id']}/aplicar").json() == {"marcadas": 1}
+
+    r = c.post(f"/api/pagos/{rep['reporte_id']}/crear-faltantes")
+    assert r.status_code == 201, r.text
+    cuerpo = r.json()
+    assert cuerpo["creadas"] == 3
+    assert {f["resultado"] for f in cuerpo["radicado"]["filas"]} == {"COINCIDE"}
+    ids = {f["documento_paciente"]: f["cirugia_id"] for f in cuerpo["radicado"]["filas"]}
+    assert ids["32622878"] == dos
+    nueva = c.get(f"/api/cirugias/{ids['1043000111']}").json()
+    assert nueva["estado"] == "FACTURADA"                              # el radicado ya estaba aplicado
+    assert nueva["fecha_procedimiento"] == "2026-01-15" and nueva["valor_honorarios"] is None
+    assert nueva["paciente"]["nombres"] == "ANA MARIA" and nueva["paciente"]["apellidos"] == "PRUEBA GOMEZ"
+    assert nueva["aseguradora"]["tipo"] == "POLIZA"
+    assert [p["nombre"] for p in nueva["procedimientos"]] == ["CESAREA", "POMEROY"]
+    assert "radicado" in nueva["observaciones"]
+    uno = c.get(f"/api/cirugias/{ids['72000730']}").json()           # dos líneas: una cirugía, dos procedimientos
+    assert len(uno["procedimientos"]) == 2
+    tres = c.get(f"/api/cirugias/{ids['55555555']}").json()
+    assert tres["aseguradora"]["nombre"] == radicado.ENTIDAD_POR_CONFIRMAR
+
+    # Repetirlo no duplica nada; al pagar el radicado, las creadas también quedan pagadas
+    assert c.post(f"/api/pagos/{rep['reporte_id']}/crear-faltantes").json()["creadas"] == 0
+    assert c.post(f"/api/pagos/{rep['reporte_id']}/pagar", json={"fecha_pago": "2026-03-20"}).json() == {"marcadas": 4}
+
+
+def test_separar_nombre():
+    from app.radicado import separar_nombre
+    assert separar_nombre("Ana Pérez") == ("Ana", "Pérez")
+    assert separar_nombre("Ana Pérez Gómez") == ("Ana", "Pérez Gómez")
+    assert separar_nombre("Ana María Pérez Gómez") == ("Ana María", "Pérez Gómez")
+    assert separar_nombre("Ana") == ("Ana", "SIN APELLIDO")

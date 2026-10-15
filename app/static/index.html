@@ -583,6 +583,8 @@
 .segmentos button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-bg); color: var(--text); box-shadow: inset 0 0 0 1px var(--accent); }
 .pago-radicado { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
 .pago-radicado h3 { margin: 0 0 4px; }
+.faltantes strong { display: block; margin-bottom: 4px; }
+.faltantes button { display: block; width: 100%; }
 </style>
 </head>
 <body>
@@ -4119,7 +4121,14 @@ function pintarRadicado(rep) {
       <div style="margin-top:4px"><span class="chip ${f.resultado === "COINCIDE" ? f.estado_cirugia : f.resultado}">${etiqueta(f)}</span>
         ${f.cirugia_id ? `<span class="sub"> · cirugía del ${escapar(f.fecha_procedimiento)} (${escapar(f.paciente_app)})</span>` : ""}</div>
     </div>`).join("")}</div>
-    ${cuenta("SIN_CIRUGIA") ? `<p class="sub">Las órdenes «sin cirugía en la app» son pacientes que no registraste, o cuya cédula quedó mal leída (revisa el original). Regístralas en «Nueva» y toca «Volver a cruzar»${pagado ? ": quedarán pagadas con la fecha del pago" : ""}.</p>` : ""}
+    ${cuenta("SIN_CIRUGIA") ? `<div class="aviso warn faltantes">
+      <strong>${cuenta("SIN_CIRUGIA")} paciente${cuenta("SIN_CIRUGIA") === 1 ? "" : "s"} del radicado no está${cuenta("SIN_CIRUGIA") === 1 ? "" : "n"} en la app.</strong>
+      Si AP se quedó con las órdenes, créalas desde el radicado: se usan el paciente, la cédula, la entidad y el procedimiento
+      de la hoja, con la fecha del radicado${pagado ? ", y quedan pagadas con la fecha del pago" : rep.estado === "APLICADO" ? ", y quedan radicadas" : ""}.
+      Después revisa en Cirugías la fecha, el código CUPS y el valor de cada una.
+      <button type="button" class="primario" id="crear-faltantes" style="margin-top:8px">➕ Crear ${cuenta("SIN_CIRUGIA") === 1 ? "la cirugía que falta" : `las ${cuenta("SIN_CIRUGIA")} cirugías que faltan`}</button>
+      <p class="sub" style="margin:8px 0 0">Si la cédula quedó mal leída, compárala con el original: corrígela en la cirugía que ya tienes y toca «Volver a cruzar».</p>
+    </div>` : ""}
     ${pagado ? `<div class="aviso ok">✓ Santa Ana pagó este radicado: ${pesos(rep.valor_pagado)} el ${escapar(rep.pagado_en)}. Sus cirugías quedaron pagadas.</div>` : ""}
     <div class="acciones-pago">
       ${porRadicar ? `<button type="button" class="primario" id="aplicar-pago">Marcar ${porRadicar} cirugía${porRadicar === 1 ? "" : "s"} como radicada${porRadicar === 1 ? "" : "s"}</button>` : ""}
@@ -4160,6 +4169,20 @@ function pintarRadicado(rep) {
     $("#detalle-pago").innerHTML = "";
     inicioDatos = null;
     cargarReportesPago();
+  };
+  const faltantes = $("#crear-faltantes");
+  if (faltantes) faltantes.onclick = async () => {
+    if (!confirm("¿Crear las cirugías que faltan con los datos del radicado? Quedarán con la fecha del radicado y sin valor, para que las revises.")) return;
+    faltantes.disabled = true;
+    const r = await fetch(`/api/pagos/${rep.reporte_id}/crear-faltantes`, { method: "POST" });
+    const cuerpo = await r.json().catch(() => null);
+    if (!r.ok) { faltantes.disabled = false; return toast(mensajeError(cuerpo, "No se pudieron crear las cirugías.")); }
+    toast(`${cuerpo.creadas} cirugía${cuerpo.creadas === 1 ? "" : "s"} creada${cuerpo.creadas === 1 ? "" : "s"}${
+      cuerpo.procedimientos_sin_codigo ? ` · ${cuerpo.procedimientos_sin_codigo} procedimiento${cuerpo.procedimientos_sin_codigo === 1 ? "" : "s"} sin código CUPS` : ""}`);
+    inicioDatos = null;
+    pintarReportePago(cuerpo.radicado);
+    cargarReportesPago();
+    cargarCirugias();
   };
   const formPagar = $("#form-pagar");
   if (formPagar) formPagar.onsubmit = async (ev) => {
