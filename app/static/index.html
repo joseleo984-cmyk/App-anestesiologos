@@ -282,6 +282,26 @@
   table.inf-tabla th:first-child, table.inf-tabla td:first-child { text-align: left; }
   table.inf-tabla td { text-align: right; padding: 9px 6px; border-top: 1px solid var(--line); }
   table.inf-tabla tr.actual td { background: var(--accent-bg); font-weight: 700; }
+  /* TIVA */
+  .tv-modelos { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-top: 8px; }
+  .tv-modelos button { text-align: left; display: grid; gap: 2px; padding: 10px 12px; border-radius: 14px; }
+  .tv-modelos button span { font-size: .72rem; color: var(--muted); line-height: 1.25; }
+  .tv-modelos button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-bg); }
+  .tv-modelos button[aria-pressed="true"] strong { color: var(--accent); }
+  .seg-ancho { display: flex !important; width: 100%; }
+  .seg-ancho button { flex: 1; min-height: 40px; }
+  .seg-ancho button:disabled { opacity: .4; }
+  .tv-evento { align-items: end; }
+  .tv-evento .quitar { flex: 0 0 44px; min-height: 40px; padding: 0; }
+  .leyenda-tiva { display: flex; flex-wrap: wrap; gap: 14px; font-size: .8rem; color: var(--muted); margin: 14px 0 4px; }
+  .leyenda-tiva i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+  .leyenda-tiva i.raya { background: repeating-linear-gradient(90deg, var(--muted) 0 5px, transparent 5px 9px); }
+  .grafica-tiva { position: relative; touch-action: pan-y; }
+  .grafica-tiva svg text { font-size: 10.5px; fill: var(--muted); font-variant-numeric: tabular-nums; }
+  .grafica-tiva.baja { margin-top: 6px; }
+  .tip-tiva { position: absolute; top: 30px; transform: translateX(-50%); background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    padding: 6px 10px; font-size: .78rem; display: grid; gap: 1px; box-shadow: 0 6px 16px rgba(0, 0, 0, .12); pointer-events: none;
+    font-variant-numeric: tabular-nums; white-space: nowrap; }
   /* Boletín semanal */
   .boletin { background: var(--card); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; margin-bottom: 14px; }
   .boletin .portada { background: linear-gradient(140deg, var(--accent), #0a4f4c); color: #fff; padding: 16px; display: grid; gap: 4px; }
@@ -719,6 +739,68 @@
       la preparación y la velocidad de la bomba (doble chequeo) antes de iniciar la infusión.</p>
   </div>
 
+  <div id="pestana-tiva" class="pestana oculto">
+    <div class="saludo"><span class="sub">Simulador TCI</span><h1>TIVA</h1></div>
+    <section class="card">
+      <h2>Paciente</h2>
+      <div class="fila">
+        <div><label for="tv-edad">Edad</label><div style="display:flex;gap:6px">
+          <input id="tv-edad" type="text" inputmode="decimal" autocomplete="off" placeholder="Ej: 45">
+          <select id="tv-unidad-edad" style="width:auto"><option value="años">años</option><option value="meses">meses</option></select></div></div>
+        <div><label>Sexo</label><div class="segmentado seg-ancho" id="tv-sexo">
+          <button type="button" data-sexo="M" aria-pressed="true">Hombre</button><button type="button" data-sexo="F" aria-pressed="false">Mujer</button></div></div>
+      </div>
+      <div class="fila">
+        <div><label for="tv-peso">Peso (kg)</label><input id="tv-peso" type="text" inputmode="decimal" autocomplete="off" placeholder="Ej: 70"></div>
+        <div><label for="tv-talla">Talla (cm)</label><input id="tv-talla" type="text" inputmode="decimal" autocomplete="off" placeholder="Ej: 170"></div>
+      </div>
+    </section>
+    <section class="card">
+      <h2>Fármaco y modelo</h2>
+      <div class="segmentado seg-ancho" id="tv-farmaco">
+        <button type="button" data-farmaco="propofol" aria-pressed="true">Propofol</button>
+        <button type="button" data-farmaco="remifentanilo" aria-pressed="false">Remifentanilo</button></div>
+      <div class="tv-modelos" id="tv-modelos"></div>
+      <label class="principal oculto" id="tv-opioide-fila"><input type="checkbox" id="tv-opioide"> Con opioide asociado (cambia el modelo de Eleveld)</label>
+      <div id="tv-avisos"></div>
+      <label>Jeringa</label>
+      <div class="inf-preps" id="tv-jeringas"></div>
+      <div class="fila"><div><label for="tv-jeringa">Concentración (<span id="tv-unidad-jeringa"></span>)</label><input id="tv-jeringa" type="text" inputmode="decimal"></div><div></div></div>
+    </section>
+    <section class="card">
+      <div class="segmentado seg-ancho" id="tv-modo">
+        <button type="button" data-modo="tci" aria-pressed="true">TCI (objetivo)</button>
+        <button type="button" data-modo="manual" aria-pressed="false">Pauta manual</button></div>
+      <div id="tv-tci">
+        <div class="fila">
+          <div><label for="tv-objetivo">Objetivo (<span id="tv-unidad-objetivo"></span>)</label><input id="tv-objetivo" type="text" inputmode="decimal"></div>
+          <div><label>En</label><div class="segmentado seg-ancho" id="tv-sitio">
+            <button type="button" data-sitio="efecto" aria-pressed="true">Sitio efecto</button><button type="button" data-sitio="plasma" aria-pressed="false">Plasma</button></div></div>
+        </div>
+        <div id="tv-cambios"></div>
+        <button type="button" id="tv-agregar-cambio" style="margin-top:10px">＋ Cambiar el objetivo en otro minuto</button>
+      </div>
+      <div id="tv-manual" class="oculto">
+        <p class="sub" style="margin:8px 0 0">Cada fila da un bolo (opcional) y deja la bomba a esa velocidad desde ese minuto.</p>
+        <div id="tv-eventos"></div>
+        <div class="atajos"><button type="button" id="tv-agregar-evento">＋ Agregar paso</button>
+          <button type="button" id="tv-roberts">Pauta de Roberts (10-8-6)</button></div>
+      </div>
+      <div class="fila">
+        <div><label for="tv-duracion">Duración (min)</label><input id="tv-duracion" type="text" inputmode="decimal"></div>
+        <div><label for="tv-despertar">Despertar con Ce menor a (<span id="tv-unidad-despertar"></span>)</label><input id="tv-despertar" type="text" inputmode="decimal"></div>
+      </div>
+      <details style="margin-top:8px"><summary class="sub">Más opciones</summary>
+        <div class="fila"><div><label for="tv-velmax">Velocidad máxima de la bomba (mL/h)</label><input id="tv-velmax" type="text" inputmode="decimal"></div><div></div></div>
+      </details>
+    </section>
+    <section class="card"><h2>Simulación</h2><div id="tv-resultado"><p class="sub">Completa los datos del paciente.</p></div>
+      <details id="tv-parametros" style="margin-top:12px"></details></section>
+    <p class="sub" style="margin:0 4px 16px">Simulación con modelos poblacionales: la concentración real de cada paciente puede variar 20–30 % o más.
+      Es una guía para la TIVA manual y la docencia, no reemplaza una bomba TCI ni el monitoreo (BIS o EEG) ni el juicio clínico.
+      Pendiente de validación por AP.</p>
+  </div>
+
   <div id="pestana-noticias" class="pestana oculto">
     <div class="titulo-seccion" id="not-historias-titulo" style="margin-top:4px">Lo más relevante</div>
     <div class="historias-fila" id="not-historias"></div>
@@ -1067,6 +1149,7 @@
     <button type="button" data-pestana="relacion"><strong>Relación</strong><span class="sub">Órdenes para facturación</span></button>
     <button type="button" data-pestana="finanzas"><strong>Finanzas</strong><span class="sub">Ingresos, gastos y metas</span></button>
     <button type="button" data-pestana="infusiones"><strong>Infusiones</strong><span class="sub">Vasopresores e inotrópicos</span></button>
+    <button type="button" data-pestana="tiva"><strong>TIVA</strong><span class="sub">Propofol y remifentanilo (TCI)</span></button>
     <button type="button" data-pestana="noticias"><strong>Noticias</strong><span class="sub">Novedades en anestesia</span><span class="globo oculto" id="not-globo" style="right:10px;top:10px"></span></button>
   </div>
 </div>
@@ -1085,6 +1168,7 @@
 </div>
 
 <script src="/static/infusiones.js"></script>
+<script src="/static/tiva.js"></script>
 <script>
 const $ = (sel) => document.querySelector(sel);
 const campo = (id) => document.getElementById(id);
@@ -1481,7 +1565,7 @@ window.addEventListener("drop", (e) => e.preventDefault());
 
 // ---------------------------------------------------------------- pestañas
 let pestanaActual = "inicio";
-const EN_MAS = ["reportes", "relacion", "finanzas", "infusiones", "noticias", "usuarios", "clave"];
+const EN_MAS = ["reportes", "relacion", "finanzas", "infusiones", "tiva", "noticias", "usuarios", "clave"];
 function hojaMas(abrir) {
   $("#hoja-mas").classList.toggle("oculto", !abrir);
   $("#fondo-mas").classList.toggle("oculto", !abrir);
@@ -1499,6 +1583,7 @@ function mostrarPestana(nombre) {
   window.scrollTo({ top: 0 });
   if (nombre === "inicio") cargarInicio();
   if (nombre === "infusiones") abrirInfusiones();
+  if (nombre === "tiva") abrirTiva();
   if (nombre === "cirugias") { cargarCirugias(); if (!inicioDatos) cargarResumen(); }
   if (nombre === "pagos") cargarAntiguedadPagos();
   if (nombre === "reportes") cargarReporte();
@@ -2314,6 +2399,248 @@ function pintarPrepPesoInf() {
     ponerPrepInf({ cantidad: Infusiones.redondear(r.cantidad, 4), unidad: r.unidad, volumen: vol });
     toast("Preparación aplicada");
   };
+}
+
+// ---------------------------------------------------------------- TIVA / TCI (sin servidor)
+const tiva = {
+  farmaco: "propofol", modelo: "eleveld_propofol", modo: "tci", sitio: "efecto",
+  paciente: { edad: null, unidadEdad: "años", sexo: "M", peso: null, talla: null, opioide: true },
+  objetivo: 3, cambios: [], duracion: 120, jeringa: 10, velMax: 1200, despertar: null,
+  manual: [{ min: 0, bolo: null, mlh: null }],
+};
+function guardarTiva() { try { localStorage.setItem("tiva", JSON.stringify(tiva)); } catch (e) {} }
+function leerTiva() {
+  try { const d = JSON.parse(localStorage.getItem("tiva") || "null"); if (d) Object.assign(tiva, d, { paciente: { ...tiva.paciente, ...d.paciente } }); } catch (e) {}
+}
+const edadAnios = () => tiva.paciente.edad == null ? null : tiva.paciente.unidadEdad === "meses" ? tiva.paciente.edad / 12 : tiva.paciente.edad;
+const pacienteTiva = () => ({ ...tiva.paciente, edad: edadAnios() });
+const fTiva = () => Tiva.FARMACOS[tiva.farmaco];
+
+function abrirTiva() {
+  leerTiva();
+  const p = tiva.paciente;
+  $("#tv-edad").value = aCampo(p.edad); $("#tv-peso").value = aCampo(p.peso); $("#tv-talla").value = aCampo(p.talla);
+  $("#tv-unidad-edad").value = p.unidadEdad;
+  pintarTiva();
+}
+[["#tv-edad", "edad"], ["#tv-peso", "peso"], ["#tv-talla", "talla"]].forEach(([id, campo]) =>
+  $(id).addEventListener("input", () => { tiva.paciente[campo] = numInf($(id).value); guardarTiva(); calcularTivaPronto(); }));
+$("#tv-unidad-edad").addEventListener("change", () => { tiva.paciente.unidadEdad = $("#tv-unidad-edad").value; guardarTiva(); calcularTivaPronto(); });
+
+function pintarTiva() {
+  const f = fTiva();
+  if (!f.modelos.includes(tiva.modelo)) tiva.modelo = f.modelos[0];
+  const mod = Tiva.MODELOS[tiva.modelo];
+  if (mod.soloPlasma) tiva.sitio = "plasma";
+  const marcar = (sel, attr, valor) => document.querySelectorAll(`${sel} [${attr}]`).forEach((b) => b.setAttribute("aria-pressed", b.getAttribute(attr) === String(valor)));
+  marcar("#tv-sexo", "data-sexo", tiva.paciente.sexo);
+  marcar("#tv-farmaco", "data-farmaco", tiva.farmaco);
+  marcar("#tv-modo", "data-modo", tiva.modo);
+  marcar("#tv-sitio", "data-sitio", tiva.sitio);
+  $("#tv-sitio [data-sitio=efecto]").disabled = !!mod.soloPlasma;
+  $("#tv-modelos").innerHTML = f.modelos.map((id) => { const m = Tiva.MODELOS[id];
+    return `<button type="button" data-modelo="${id}" aria-pressed="${id === tiva.modelo}"><strong>${escapar(m.nombre)}</strong><span>${escapar(m.detalle)}</span></button>`; }).join("");
+  $("#tv-modelos").querySelectorAll("[data-modelo]").forEach((b) => b.onclick = () => { tiva.modelo = b.dataset.modelo; guardarTiva(); pintarTiva(); });
+  $("#tv-opioide-fila").classList.toggle("oculto", tiva.modelo !== "eleveld_propofol");
+  $("#tv-opioide").checked = !!tiva.paciente.opioide;
+  $("#tv-tci").classList.toggle("oculto", tiva.modo !== "tci");
+  $("#tv-manual").classList.toggle("oculto", tiva.modo !== "manual");
+  $("#tv-unidad-objetivo").textContent = f.conc;
+  $("#tv-objetivo").value = aCampo(tiva.objetivo);
+  $("#tv-duracion").value = aCampo(tiva.duracion);
+  $("#tv-velmax").value = aCampo(tiva.velMax);
+  $("#tv-despertar").value = aCampo(tiva.despertar ?? f.despertar);
+  $("#tv-unidad-despertar").textContent = f.conc;
+  $("#tv-jeringas").innerHTML = f.jeringa.map((c) => `<button type="button" data-jeringa="${c}" aria-pressed="${c === tiva.jeringa}">${c} ${f.cantidad}/mL</button>`).join("");
+  $("#tv-jeringas").querySelectorAll("[data-jeringa]").forEach((b) => b.onclick = () => { tiva.jeringa = Number(b.dataset.jeringa); guardarTiva(); pintarTiva(); });
+  $("#tv-jeringa").value = aCampo(tiva.jeringa);
+  $("#tv-unidad-jeringa").textContent = `${f.cantidad}/mL`;
+  pintarCambiosTiva();
+  pintarManualTiva();
+  calcularTiva();
+}
+document.querySelectorAll("#tv-sexo [data-sexo]").forEach((b) => b.onclick = () => { tiva.paciente.sexo = b.dataset.sexo; guardarTiva(); pintarTiva(); });
+document.querySelectorAll("#tv-farmaco [data-farmaco]").forEach((b) => b.onclick = () => {
+  tiva.farmaco = b.dataset.farmaco; const f = fTiva();
+  tiva.modelo = f.modelos[0]; tiva.objetivo = f.objetivo; tiva.jeringa = f.jeringa[0]; tiva.despertar = null; tiva.cambios = [];
+  tiva.manual = [{ min: 0, bolo: null, mlh: null }];
+  guardarTiva(); pintarTiva();
+});
+document.querySelectorAll("#tv-modo [data-modo]").forEach((b) => b.onclick = () => { tiva.modo = b.dataset.modo; guardarTiva(); pintarTiva(); });
+document.querySelectorAll("#tv-sitio [data-sitio]").forEach((b) => b.onclick = () => { tiva.sitio = b.dataset.sitio; guardarTiva(); pintarTiva(); });
+$("#tv-opioide").addEventListener("change", () => { tiva.paciente.opioide = $("#tv-opioide").checked; guardarTiva(); calcularTiva(); });
+[["#tv-objetivo", "objetivo"], ["#tv-duracion", "duracion"], ["#tv-velmax", "velMax"], ["#tv-despertar", "despertar"], ["#tv-jeringa", "jeringa"]].forEach(([id, campo]) =>
+  $(id).addEventListener("input", () => {
+    tiva[campo] = numInf($(id).value); guardarTiva();
+    if (campo === "jeringa") $("#tv-jeringas").querySelectorAll("[data-jeringa]").forEach((b) => b.setAttribute("aria-pressed", Number(b.dataset.jeringa) === tiva.jeringa));
+    calcularTivaPronto();
+  }));
+
+// cambios de objetivo durante la cirugía
+function pintarCambiosTiva() {
+  const f = fTiva();
+  $("#tv-cambios").innerHTML = tiva.cambios.map((c, i) => `<div class="fila tv-evento" data-i="${i}">
+      <div><label>Desde el minuto</label><input type="text" inputmode="decimal" data-c="min" value="${aCampo(c.min)}"></div>
+      <div><label>Nuevo objetivo (${escapar(f.conc)})</label><input type="text" inputmode="decimal" data-c="valor" value="${aCampo(c.valor)}"></div>
+      <button type="button" class="quitar" data-quitar="${i}" aria-label="Quitar">✕</button></div>`).join("");
+  $("#tv-cambios").querySelectorAll("input").forEach((el) => el.addEventListener("input", () => {
+    const i = Number(el.closest("[data-i]").dataset.i); tiva.cambios[i][el.dataset.c] = numInf(el.value); guardarTiva(); calcularTivaPronto();
+  }));
+  $("#tv-cambios").querySelectorAll("[data-quitar]").forEach((b) => b.onclick = () => { tiva.cambios.splice(Number(b.dataset.quitar), 1); guardarTiva(); pintarCambiosTiva(); calcularTiva(); });
+}
+$("#tv-agregar-cambio").onclick = () => {
+  const ultimo = tiva.cambios.length ? tiva.cambios[tiva.cambios.length - 1].min : 0;
+  tiva.cambios.push({ min: Math.min((ultimo || 0) + 30, (tiva.duracion || 120) - 5), valor: tiva.objetivo });
+  guardarTiva(); pintarCambiosTiva(); calcularTiva();
+};
+
+// pauta manual: bolos y velocidades
+function pintarManualTiva() {
+  const f = fTiva();
+  $("#tv-eventos").innerHTML = tiva.manual.map((e, i) => `<div class="fila tv-evento" data-i="${i}">
+      <div><label>Minuto</label><input type="text" inputmode="decimal" data-c="min" value="${aCampo(e.min)}"></div>
+      <div><label>Bolo (${escapar(f.cantidad)})</label><input type="text" inputmode="decimal" data-c="bolo" value="${aCampo(e.bolo)}" placeholder="0"></div>
+      <div><label>Bomba (mL/h)</label><input type="text" inputmode="decimal" data-c="mlh" value="${aCampo(e.mlh)}" placeholder="sin cambio"></div>
+      ${i ? `<button type="button" class="quitar" data-quitar="${i}" aria-label="Quitar">✕</button>` : `<span></span>`}</div>`).join("");
+  $("#tv-eventos").querySelectorAll("input").forEach((el) => el.addEventListener("input", () => {
+    const i = Number(el.closest("[data-i]").dataset.i); tiva.manual[i][el.dataset.c] = numInf(el.value); guardarTiva(); calcularTivaPronto();
+  }));
+  $("#tv-eventos").querySelectorAll("[data-quitar]").forEach((b) => b.onclick = () => { tiva.manual.splice(Number(b.dataset.quitar), 1); guardarTiva(); pintarManualTiva(); calcularTiva(); });
+  $("#tv-roberts").classList.toggle("oculto", tiva.farmaco !== "propofol");
+}
+$("#tv-agregar-evento").onclick = () => {
+  const ultimo = tiva.manual[tiva.manual.length - 1];
+  tiva.manual.push({ min: (ultimo.min || 0) + 10, bolo: null, mlh: null }); guardarTiva(); pintarManualTiva();
+};
+$("#tv-roberts").onclick = () => {
+  const peso = tiva.paciente.peso;
+  if (!(peso > 0)) return toast("Escribe el peso primero");
+  const mlh = (mgkgh) => Infusiones.redondear(mgkgh * peso / tiva.jeringa, 3);
+  tiva.manual = [{ min: 0, bolo: Infusiones.redondear(peso, 3), mlh: mlh(10) }, { min: 10, bolo: null, mlh: mlh(8) }, { min: 20, bolo: null, mlh: mlh(6) }];
+  guardarTiva(); pintarManualTiva(); calcularTiva();
+  toast("Pauta de Roberts: 1 mg/kg y 10-8-6 mg/kg/h");
+};
+
+let esperaTiva;
+function calcularTivaPronto() { clearTimeout(esperaTiva); esperaTiva = setTimeout(calcularTiva, 250); }
+
+function calcularTiva() {
+  const f = fTiva(), mod = Tiva.MODELOS[tiva.modelo], p = pacienteTiva(), res = $("#tv-resultado");
+  const v = Tiva.validar(tiva.modelo, p);
+  $("#tv-avisos").innerHTML = [...v.errores.map((t) => `<div class="aviso err">${escapar(t)}</div>`),
+    ...v.avisos.map((t) => `<div class="aviso warn">⚠ ${escapar(t)}</div>`)].join("");
+  if (v.errores.length) { res.innerHTML = `<p class="sub" style="margin:0">Completa los datos del paciente para ver la simulación.</p>`; $("#tv-parametros").innerHTML = ""; return; }
+  const k = mod.calcular(p);
+  if (!(tiva.jeringa > 0)) { res.innerHTML = `<div class="aviso err">Escribe la concentración de la jeringa.</div>`; return; }
+  const dur = Math.min(Math.max(tiva.duracion || 120, 5), 720);
+  const despues = 60, umbral = tiva.despertar ?? f.despertar;
+  let serie, objetivos = [];
+  if (tiva.modo === "tci") {
+    if (!(tiva.objetivo > 0)) { res.innerHTML = `<div class="aviso err">Escribe la concentración objetivo.</div>`; return; }
+    objetivos = [{ min: 0, valor: tiva.objetivo }, ...tiva.cambios.filter((c) => c.min > 0 && c.min < dur && c.valor >= 0)].sort((a, b) => a.min - b.min);
+    serie = Tiva.planTCI(k, { objetivos, modo: tiva.sitio, duracion: dur, concJeringa: tiva.jeringa, velocidadMax: tiva.velMax || 1200, despues });
+  } else {
+    const eventos = tiva.manual.filter((e) => e.min >= 0).map((e) => ({ min: e.min, bolo: e.bolo || 0, mlh: e.mlh }));
+    eventos.push({ min: dur, mlh: 0 });
+    serie = Tiva.simularManual(k, eventos, tiva.jeringa, dur + despues);
+  }
+  const fin = serie.find((s) => s.t >= dur - 1e-9) || serie[serie.length - 1];
+  const total = fin.acumulado, porKg = p.peso > 0 ? total / p.peso : null;
+  const tr = tiva.modo === "tci" ? Tiva.tramos(serie, dur) : [];
+  const bolo = tr.length ? tr[0].cantidad : null;
+  const alcanza = tiva.modo === "tci" ? serie.find((s) => s[tiva.sitio === "efecto" ? "ce" : "cp"] >= tiva.objetivo * 0.97) : null;
+  const despertar = Tiva.tiempoHasta(serie, dur, umbral, mod.soloPlasma ? "cp" : "ce");
+  const ultimaVel = tiva.modo === "tci" ? (serie.filter((s) => s.t < dur).slice(-1)[0] || {}).mlh : null;
+  const ceMeta = tiva.modo === "tci" ? objetivos[objetivos.length - 1].valor : null;
+  const bis = k.bis && tiva.modo === "tci" && tiva.sitio === "efecto" ? Tiva.bisPredicho(tiva.objetivo, k.bis) : null;
+  const dosisKg = (cant, min) => p.peso > 0 ? tiva.farmaco === "propofol" ? `${fmtInf(cant / p.peso * 60 / min, 3)} mg/kg/h` : `${fmtInf(cant / p.peso / min, 3)} µg/kg/min` : "";
+  const cifra = (etq, valor, sub = "") => `<div class="kpi"><div class="etiqueta">${etq}</div><div class="cifra">${valor}</div>${sub ? `<div class="sub" style="font-size:.78rem">${sub}</div>` : ""}</div>`;
+  res.innerHTML = `<div class="kpis">
+      ${tiva.modo === "tci" ? cifra("Bolo de inducción (1er minuto)", `${fmtInf(bolo, 3)} ${f.cantidad}`, `${fmtInf(bolo / tiva.jeringa, 3)} mL${p.peso > 0 ? ` · ${fmtInf(bolo / p.peso, 3)} ${f.cantidad}/kg` : ""}`) : ""}
+      ${tiva.modo === "tci" ? cifra("Velocidad al final", `${fmtInf(ultimaVel, 3)} mL/h`, dosisKg((ultimaVel || 0) / 60 * tiva.jeringa, 1)) : ""}
+      ${cifra(`Total en ${fmtInf(dur)} min`, `${fmtInf(total, 3)} ${f.cantidad}`, `${fmtInf(total / tiva.jeringa, 3)} mL${porKg ? ` · ${dosisKg(total, dur)} promedio` : ""}`)}
+      ${tiva.modo === "tci" ? cifra(`Llega al objetivo`, alcanza ? `${fmtInf(alcanza.t, 2)} min` : "—", tiva.sitio === "efecto" ? "en sitio efecto" : "en plasma") : ""}
+      ${cifra(`Despertar estimado`, despertar == null ? `> ${despues} min` : `${fmtInf(despertar, 2)} min`, `${mod.soloPlasma ? "Cp" : "Ce"} < ${fmtInf(umbral)} ${f.conc} al suspender`)}
+      ${bis != null ? cifra("BIS predicho", fmtInf(bis, 2), `con Ce ${fmtInf(tiva.objetivo)} ${f.conc} (Eleveld)`) : ""}
+    </div>
+    <div class="leyenda-tiva"><span><i style="background:var(--serie-1)"></i>Sitio efecto (Ce)</span><span><i style="background:var(--serie-2)"></i>Plasma (Cp)</span>
+      ${tiva.modo === "tci" ? `<span><i class="raya"></i>Objetivo</span>` : ""}</div>
+    <div id="tv-grafica" class="grafica-tiva"></div>
+    <div id="tv-grafica-vel" class="grafica-tiva baja"></div>
+    ${tiva.modo === "tci" ? `<h3 style="margin:16px 0 4px">Velocidades para programar la bomba</h3>
+      <p class="sub" style="margin:0 0 6px">Promedio de cada tramo con la jeringa de ${fmtInf(tiva.jeringa)} ${f.cantidad}/mL. El primer minuto incluye el bolo.</p>
+      <div class="tabla-scroll"><table class="inf-tabla"><thead><tr><th>Minuto</th><th>mL/h</th><th>${tiva.farmaco === "propofol" ? "mg/kg/h" : "µg/kg/min"}</th><th>${f.cantidad}</th></tr></thead><tbody>
+      ${tr.map((t) => `<tr><td>${fmtInf(t.desde)}–${fmtInf(t.hasta)}</td><td>${fmtInf(t.velocidadMedia / tiva.jeringa * 60, 3)}</td>
+        <td>${p.peso > 0 ? (tiva.farmaco === "propofol" ? fmtInf(t.velocidadMedia * 60 / p.peso, 3) : fmtInf(t.velocidadMedia / p.peso, 3)) : "—"}</td><td>${fmtInf(t.cantidad, 3)}</td></tr>`).join("")}
+      </tbody></table></div>` : ""}`;
+  graficaTiva($("#tv-grafica"), serie, { conc: f.conc, objetivo: tiva.modo === "tci", soloPlasma: !!mod.soloPlasma, fin: dur });
+  graficaVelocidad($("#tv-grafica-vel"), serie, dur);
+  $("#tv-parametros").innerHTML = `<summary>Parámetros del modelo ${escapar(mod.nombre)}</summary>
+    <table class="inf-tabla" style="margin-top:6px"><tbody>
+    ${[["V1", k.v1, "L"], ["V2", k.v2, "L"], ["V3", k.v3, "L"], ["CL", k.k10 * k.v1, "L/min"], ["Q2", k.k12 * k.v1, "L/min"], ["Q3", k.k13 * k.v1, "L/min"],
+      ["ke0", k.ke0, "/min"], ["k10", k.k10, "/min"], ["k12", k.k12, "/min"], ["k13", k.k13, "/min"], ["k21", k.k21, "/min"], ["k31", k.k31, "/min"]]
+      .map(([n, val, u]) => `<tr><td>${n}</td><td>${mod.soloPlasma && n === "ke0" ? "no publicado" : `${fmtInf(val, 4)} ${u}`}</td></tr>`).join("")}
+    </tbody></table>`;
+}
+
+// Gráfica de concentraciones (Ce y Cp sobre un solo eje, con el objetivo punteado) y tooltip al tocar
+function graficaTiva(cont, serie, o) {
+  const ancho = Math.max(cont.clientWidth || 320, 260), alto = 220, m = { i: 40, d: 12, a: 24, b: 26 };
+  const tMax = serie[serie.length - 1].t;
+  // el pico plasmático del bolo aplasta la escala: se recorta y se avisa
+  const cpMax = Math.max(...serie.map((s) => s.cp));
+  const base = Math.max(...serie.map((s) => Math.max(s.ce, s.objetivo || 0)), ...serie.filter((s) => s.t > 3).map((s) => s.cp));
+  const yMax = Math.min(cpMax, base * 1.8) * 1.12 || 1;
+  const pasoY = pasoRedondo(yMax, 4);
+  const x = (t) => m.i + t / tMax * (ancho - m.i - m.d), y = (v) => alto - m.b - v / (pasoY * Math.ceil(yMax / pasoY)) * (alto - m.a - m.b);
+  const techo = pasoY * Math.ceil(yMax / pasoY), techoGraf = techo;
+  const linea = (campo) => serie.map((s, i) => `${i ? "L" : "M"}${x(s.t).toFixed(1)},${y(Math.min(s[campo], techoGraf)).toFixed(1)}`).join("");
+  const metas = o.objetivo ? serie.filter((s) => s.t < o.fin).map((s, i) => `${i ? "L" : "M"}${x(s.t).toFixed(1)},${y(s.objetivo).toFixed(1)}`).join("") : "";
+  const pasoX = pasoRedondo(tMax, 5);
+  let rejilla = "";
+  for (let v = 0; v <= techo + 1e-9; v += pasoY)
+    rejilla += `<line x1="${m.i}" x2="${ancho - m.d}" y1="${y(v)}" y2="${y(v)}" stroke="var(--rejilla)"/><text x="${m.i - 6}" y="${y(v) + 4}" text-anchor="end">${fmtInf(v, 3)}</text>`;
+  for (let t = 0; t <= tMax + 1e-9; t += pasoX) rejilla += `<text x="${x(t)}" y="${alto - 8}" text-anchor="middle">${fmtInf(t)}</text>`;
+  cont.innerHTML = `<svg viewBox="0 0 ${ancho} ${alto}" width="100%" height="${alto}" role="img" aria-label="Concentraciones predichas en el tiempo">
+    <g class="ejes">${rejilla}<text x="${m.i - 30}" y="12" text-anchor="start">${escapar(o.conc)}${cpMax > techo ? ` · pico de Cp ${fmtInf(cpMax, 2)} fuera de escala` : ""}</text><text x="${ancho - m.d}" y="${alto - 8}" text-anchor="end">min</text></g>
+    <line x1="${x(o.fin)}" x2="${x(o.fin)}" y1="${m.a}" y2="${alto - m.b}" stroke="var(--eje)" stroke-dasharray="2 3"/>
+    ${metas ? `<path d="${metas}" fill="none" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="5 4"/>` : ""}
+    <path d="${linea("cp")}" fill="none" stroke="var(--serie-2)" stroke-width="2" stroke-linejoin="round"/>
+    ${o.soloPlasma ? "" : `<path d="${linea("ce")}" fill="none" stroke="var(--serie-1)" stroke-width="2" stroke-linejoin="round"/>`}
+    <g class="cursor" style="display:none"><line y1="${m.a}" y2="${alto - m.b}" stroke="var(--text)" stroke-width="1"/>
+      <circle r="4" class="p-cp" fill="var(--serie-2)" stroke="var(--card)" stroke-width="2"/>${o.soloPlasma ? "" : `<circle r="4" class="p-ce" fill="var(--serie-1)" stroke="var(--card)" stroke-width="2"/>`}</g>
+    <rect x="${m.i}" y="0" width="${ancho - m.i - m.d}" height="${alto}" fill="transparent" class="zona-toque"/>
+  </svg><div class="tip-tiva oculto"></div>`;
+  const svg = cont.querySelector("svg"), cur = svg.querySelector(".cursor"), tip = cont.querySelector(".tip-tiva");
+  const mover = (ev) => {
+    const r = svg.getBoundingClientRect(), px = (ev.touches ? ev.touches[0].clientX : ev.clientX) - r.left;
+    const t = Math.max(0, Math.min(tMax, (px - m.i) / (ancho - m.i - m.d) * tMax));
+    const s = serie.reduce((a, b) => Math.abs(b.t - t) < Math.abs(a.t - t) ? b : a);
+    cur.style.display = ""; cur.querySelector("line").setAttribute("x1", x(s.t)); cur.querySelector("line").setAttribute("x2", x(s.t));
+    cur.querySelector(".p-cp").setAttribute("cx", x(s.t)); cur.querySelector(".p-cp").setAttribute("cy", y(s.cp));
+    if (!o.soloPlasma) { cur.querySelector(".p-ce").setAttribute("cx", x(s.t)); cur.querySelector(".p-ce").setAttribute("cy", y(s.ce)); }
+    tip.classList.remove("oculto");
+    tip.innerHTML = `<strong>${fmtInf(s.t, 3)} min</strong>${o.soloPlasma ? "" : `<span>Ce ${fmtInf(s.ce, 3)}</span>`}<span>Cp ${fmtInf(s.cp, 3)}</span><span>${fmtInf(s.mlh, 3)} mL/h</span>`;
+    tip.style.left = `${Math.min(Math.max(x(s.t) / ancho * 100, 18), 82)}%`;
+  };
+  const zona = svg.querySelector(".zona-toque");
+  zona.addEventListener("pointermove", mover); zona.addEventListener("pointerdown", mover);
+  zona.addEventListener("pointerleave", () => { cur.style.display = "none"; tip.classList.add("oculto"); });
+}
+// Velocidad de la bomba (mL/h) en escalones: su propia gráfica, sin segundo eje
+function graficaVelocidad(cont, serie, fin) {
+  const ancho = Math.max(cont.clientWidth || 320, 260), alto = 96, m = { i: 40, d: 12, a: 14, b: 18 };
+  const tMax = serie[serie.length - 1].t;
+  // la primera parte (bolo a la velocidad máxima) aplasta la escala: se recorta al percentil 95
+  const vals = serie.filter((s) => s.t < fin).map((s) => s.mlh).sort((a, b) => a - b);
+  const tope = Math.max(vals[Math.floor(vals.length * 0.95)] || 0, 1) * 1.15;
+  const x = (t) => m.i + t / tMax * (ancho - m.i - m.d), y = (v) => alto - m.b - Math.min(v, tope) / tope * (alto - m.a - m.b);
+  const d = serie.map((s, i) => `${i ? `L${x(s.t).toFixed(1)},${y(serie[i - 1].mlh).toFixed(1)}` : `M${x(0)},${y(s.mlh)}`}L${x(s.t).toFixed(1)},${y(s.mlh).toFixed(1)}`).join("");
+  cont.innerHTML = `<svg viewBox="0 0 ${ancho} ${alto}" width="100%" height="${alto}" role="img" aria-label="Velocidad de la bomba">
+    <g class="ejes"><line x1="${m.i}" x2="${ancho - m.d}" y1="${alto - m.b}" y2="${alto - m.b}" stroke="var(--eje)"/>
+      <text x="${m.i}" y="${m.a - 3}">Bomba (mL/h)${vals.length && vals[vals.length - 1] > tope ? " · el bolo inicial se sale de la escala" : ""}</text>
+      <text x="${m.i - 6}" y="${y(tope / 1.15) + 4}" text-anchor="end">${fmtInf(tope / 1.15, 2)}</text></g>
+    <path d="${d}" fill="none" stroke="var(--serie-3)" stroke-width="2"/></svg>`;
 }
 
 // ---------------------------------------------------------------- historias y boletín semanal
