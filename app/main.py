@@ -548,6 +548,44 @@ def subir_reporte_pago(archivo: UploadFile, conn=Depends(get_conn, scope="functi
     return repositorio.obtener_reporte(conn, anestesiologo_id, reporte_id)
 
 
+@app.post("/api/pagos/relacion", status_code=201)
+def subir_relacion_ap(archivos: list[UploadFile] = File(...), pagador: Optional[str] = Form(default=None),
+                      fecha_pago: Optional[date] = Form(default=None), conn=Depends(get_conn, scope="function"),
+                      anestesiologo_id=Depends(anestesiologo_actual)):
+    """Sube la relación o liquidación de AP de una clínica que paga el total de lo entregado (ej. Santa Ana):
+    una o varias páginas. Se lee con la IA y cada paciente se cruza con su cirugía; al aplicarla, las
+    cirugías quedan pagadas con el valor de la relación."""
+    if len(archivos) > MAX_PAGINAS:
+        raise HTTPException(413, f"Máximo {MAX_PAGINAS} fotos o archivos por relación.")
+    paginas = [_leer_subida(a) for a in archivos]
+    huellas = [hashlib.sha256(d).hexdigest() for d, _ in paginas]
+    hash_sha256 = huellas[0] if len(huellas) == 1 else hashlib.sha256("".join(huellas).encode()).hexdigest()
+    existente = repositorio.buscar_reporte_por_hash(conn, anestesiologo_id, hash_sha256)
+    if existente:
+        raise HTTPException(409, {"mensaje": "Esta relación ya se había subido.", "reporte_id": existente["reporte_id"]})
+    try:
+        relacion = extraccion.extraer_relacion(paginas)
+    except extraccion.ExtraccionError as e:
+        log.warning("No se pudo leer la relación de AP: %s (causa: %r)", e, e.__cause__)
+        raise HTTPException(422, {"mensaje": str(e)})
+    if not relacion.filas:
+        raise HTTPException(422, {"mensaje": "No se encontraron pacientes en el documento. ¿Es una relación de órdenes?"})
+    extra = {"fecha_relacion": relacion.fecha_proceso.isoformat() if relacion.fecha_proceso else None}
+    if (pagador or "").strip():
+        relacion.pagador = pagador.strip()[:200]
+    if fecha_pago:
+        relacion.fecha_proceso = fecha_pago
+    try:
+        ubicaciones = [almacenamiento.guardar(f"relacion-{uuid.uuid4().hex}{EXTENSIONES[t]}", d, t) for d, t in paginas]
+    except almacenamiento.AlmacenamientoError as e:
+        raise HTTPException(502, str(e))
+    extra["paginas"] = ubicaciones
+    reporte_id = repositorio.crear_reporte(conn, anestesiologo_id, ubicaciones[0], hash_sha256, relacion,
+                                           tipo="RELACION", extra=extra)
+    conn.commit()
+    return repositorio.obtener_reporte(conn, anestesiologo_id, reporte_id)
+
+
 @app.get("/api/pagos")
 def listar_reportes_pago(conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
     return repositorio.listar_reportes(conn, anestesiologo_id)
@@ -966,13 +1004,17 @@ def descartar_reporte_pago(reporte_id: int, conn=Depends(get_conn, scope="functi
 
 
 @app.get("/api/pagos/{reporte_id}/archivo")
-def ver_reporte_original(reporte_id: int, conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
-    fila = conn.execute("SELECT url_archivo FROM reporte_pago WHERE reporte_id = %s AND anestesiologo_id = %s",
-                        (reporte_id, anestesiologo_id)).fetchone()
+def ver_reporte_original(reporte_id: int, pagina: int = Query(default=1, ge=1), conn=Depends(get_conn, scope="function"),
+                         anestesiologo_id=Depends(anestesiologo_actual)):
+    fila = conn.execute("""SELECT url_archivo, datos_extraidos->'paginas' AS paginas FROM reporte_pago
+                            WHERE reporte_id = %s AND anestesiologo_id = %s""", (reporte_id, anestesiologo_id)).fetchone()
     if fila is None:
         raise HTTPException(404, "Reporte no encontrado.")
+    paginas = fila["paginas"] or [fila["url_archivo"]]  # las relaciones de AP pueden tener varias páginas
+    if pagina > len(paginas):
+        raise HTTPException(404, "Esa página no existe.")
     try:
-        datos = almacenamiento.leer(fila["url_archivo"])
+        datos = almacenamiento.leer(paginas[pagina - 1])
     except almacenamiento.AlmacenamientoError as e:
         raise HTTPException(502, str(e))
     return Response(datos, media_type=_tipo_real(datos) or "application/octet-stream",

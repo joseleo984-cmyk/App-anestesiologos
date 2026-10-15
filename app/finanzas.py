@@ -73,6 +73,7 @@ def ingresos_por_mes(conn, anestesiologo_id: int, meses: int = 12) -> list[dict]
         """SELECT r.reporte_id, COALESCE(r.periodo_hasta, r.fecha_proceso) AS fecha, r.total_neto,
                   (SELECT SUM(neto) FROM pago_detalle d WHERE d.reporte_id = r.reporte_id) AS suma_neto
              FROM reporte_pago r WHERE r.anestesiologo_id = %s AND COALESCE(r.periodo_hasta, r.fecha_proceso) IS NOT NULL
+              AND r.tipo = 'PAGOS'  -- las relaciones de AP no son ingreso aparte: el pago global va en el reporte
             ORDER BY r.subido_en""", (anestesiologo_id,)).fetchall()
     calculados: dict[date, Decimal] = {}
     for r in reportes:  # varios reportes del mismo mes se suman
@@ -351,7 +352,8 @@ def ingresos_por_cobrar(conn, anestesiologo_id: int, hoy: date) -> Optional[dict
              FROM pago_detalle d JOIN reporte_pago r USING (reporte_id)
              LEFT JOIN cirugia c ON c.cirugia_id = d.cirugia_id
              LEFT JOIN cobertura cb ON cb.cobertura_id = c.cobertura_id
-            WHERE r.anestesiologo_id = %s AND d.es_paciente AND d.neto > 0""", (anestesiologo_id,)).fetchall()
+            WHERE r.anestesiologo_id = %s AND d.es_paciente AND d.neto > 0 AND r.tipo = 'PAGOS'""",
+        (anestesiologo_id,)).fetchall()
     if not pagos:
         return None
     promedio = sum((p["neto"] for p in pagos), Decimal(0)) / len(pagos)

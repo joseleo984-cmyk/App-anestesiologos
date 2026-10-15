@@ -247,3 +247,90 @@ def test_marcar_todas_las_encontradas(con_reporte):
     assert {c.get(f"/api/cirugias/{i}").json()["estado"] for i in (uno, dos)} == {"PAGADA"}
     assert c.get(f"/api/pagos/{rep['reporte_id']}").json()["estado"] == "APLICADO"
     assert c.post("/api/pagos/cruzar-todos").json()["por_aplicar"] == 0
+
+
+# ------------------------------------------------ relación de AP (clínicas que pagan el total, ej. Santa Ana)
+RELACION = {
+    "numero": "0061527", "fecha": "2026-09-01", "mes_facturar": "2026-09", "clinica": None,
+    "anestesiologo": "DRA. PRUEBA", "total": 508360,
+    "filas": [
+        {"entidad": "ENTIDAD UNO", "paciente": "PACIENTE UNO", "documento_paciente": "72.000.730",
+         "procedimiento": "CIRUGIA X", "numero_orden": "OR-77", "fecha_servicio": None, "valor": 300000},
+        {"entidad": "ENTIDAD DOS", "paciente": "PACIENTE DOS", "documento_paciente": "32622878",
+         "procedimiento": "CIRUGIA Y", "numero_orden": None, "fecha_servicio": None, "valor": 208360},
+        {"entidad": None, "paciente": None, "documento_paciente": None, "procedimiento": None,
+         "numero_orden": None, "fecha_servicio": None, "valor": None},            # renglón vacío
+    ],
+}
+
+
+def crear_con_orden(cliente, documento, fecha, orden):
+    datos = {**CONFIRMAR, "fecha_procedimiento": fecha, "numero_orden": orden,
+             "paciente": {**CONFIRMAR["paciente"], "numero_documento": documento}}
+    r = cliente.post("/api/cirugias", json=datos)
+    assert r.status_code == 201, r.text
+    return r.json()["cirugia_id"]
+
+
+@pytest.fixture
+def con_relacion(cliente, monkeypatch):
+    llamadas = []
+
+    def leer(archivos):
+        llamadas.append(len(archivos))
+        return extraccion.relacion_a_reporte(RELACION)
+    monkeypatch.setattr(extraccion, "extraer_relacion", leer)
+    cliente.llamadas_relacion = llamadas
+    return cliente
+
+
+def subir_relacion(cliente, paginas=(b"%PDF-1.7 hoja 1", b"%PDF-1.7 hoja 2"), **campos):
+    return cliente.post("/api/pagos/relacion", data=campos,
+                        files=[("archivos", (f"hoja{i}.pdf", p, "application/pdf")) for i, p in enumerate(paginas)])
+
+
+def test_relacion_de_ap_marca_pagadas_con_su_valor(con_relacion):
+    c = con_relacion
+    otra = crear_con_orden(c, "72000730", "2026-08-25", "OR-99")      # más reciente, pero otra orden
+    uno = crear_con_orden(c, "72000730", "2026-08-10", "OR-77")       # la de la relación (mismo nº de orden)
+    dos = crear(c, "32622878", "2026-08-20")
+    crear(c, "32622878", "2026-10-05")                                # después de la fecha de pago: no
+
+    r = subir_relacion(c, pagador="Clínica Santa Ana (ficticia)", fecha_pago="2026-09-30")
+    assert r.status_code == 201, r.text
+    rep = r.json()
+    assert c.llamadas_relacion == [2]                                 # las dos hojas juntas
+    assert rep["tipo"] == "RELACION" and rep["numero"] == "0061527" and rep["cuadra"] is True and rep["paginas"] == 2
+    assert rep["pagador"] == "Clínica Santa Ana (ficticia)" and rep["fecha_proceso"] == "2026-09-30"
+    assert rep["periodo_desde"] == "2026-09-01" and rep["periodo_hasta"] == "2026-09-30"
+    assert len(rep["filas"]) == 2 and rep["filas"][0]["numero_orden"] == "OR-77"
+    assert [f["cirugia_id"] for f in rep["filas"]] == [uno, dos]
+
+    assert c.post(f"/api/pagos/{rep['reporte_id']}/aplicar").json() == {"marcadas": 2}
+    d = c.get(f"/api/cirugias/{uno}").json()
+    assert d["estado"] == "PAGADA" and d["valor_honorarios"] == 300000 and d["fecha_pago"] == "2026-09-30"
+    assert c.get(f"/api/cirugias/{otra}").json()["estado"] != "PAGADA"
+    assert c.get(f"/api/pagos/{rep['reporte_id']}/archivo?pagina=2").content == b"%PDF-1.7 hoja 2"
+    assert c.get(f"/api/pagos/{rep['reporte_id']}/archivo?pagina=3").status_code == 404
+    assert c.get("/api/pagos").json()[0]["tipo"] == "RELACION"
+
+    # Repetida: se avisa
+    assert subir_relacion(c, pagador="x").status_code == 409
+
+
+def test_relacion_no_cuenta_como_ingreso(con_relacion, conn):
+    from app import finanzas
+    assert subir_relacion(con_relacion).status_code == 201
+    anest = conn.execute("SELECT anestesiologo_id FROM reporte_pago").fetchone()["anestesiologo_id"]
+    assert finanzas.ingresos_por_mes(conn, anest) == []   # el pago global ya viene en el reporte de pagos
+
+
+def test_lectura_de_la_relacion_con_claude():
+    cliente = ClienteFalso(texto=json.dumps(RELACION))
+    r = extraccion.extraer_relacion([(b"%PDF-1.7", "application/pdf"), (b"%PDF-1.7", "application/pdf")],
+                                    client=cliente)
+    kw = cliente.llamadas[0]
+    assert kw["output_config"]["format"]["schema"] is extraccion.ESQUEMA_RELACION
+    assert r.numero == "0061527" and r.fecha_proceso.isoformat() == "2026-09-01" and r.cuadra is True
+    assert [f.documento_paciente for f in r.filas] == ["72000730", "32622878"]
+    assert r.filas[0].neto == 300000 and r.filas[0].numero_orden == "OR-77"

@@ -363,6 +363,19 @@
       </div>
       <div id="estado-pago"></div>
     </section>
+    <section class="card">
+      <h2>Relación de AP de una clínica que paga el total</h2>
+      <p class="sub">Clínicas como Santa Ana de Dios no pagan paciente por paciente sino el total de la relación
+        entregada a AP. Sube la relación o liquidación de AP (todas sus páginas): la app cruza cada paciente con su
+        cirugía y, al aplicarla, las marca pagadas con el valor de la relación.</p>
+      <div class="fila">
+        <div><label for="relacion-pagador">Clínica que paga</label><input id="relacion-pagador" value="Clínica Santa Ana de Dios" autocomplete="off"></div>
+        <div><label for="relacion-fecha">Fecha del pago</label><input id="relacion-fecha" type="date"></div>
+      </div>
+      <p class="sub">Si no pones la fecha del pago se usa la fecha de la relación.</p>
+      <button type="button" class="boton primario" id="elegir-relacion">📄 Elegir relación (PDF o fotos de cada página)</button>
+      <div id="estado-relacion"></div>
+    </section>
     <div id="detalle-pago"></div>
     <div id="liquidacion-pago"></div>
     <section class="card">
@@ -2130,6 +2143,32 @@ const zonaPago = $("#zona-pago");
 ["dragleave", "drop"].forEach((t) => zonaPago.addEventListener(t, (e) => { e.preventDefault(); zonaPago.classList.remove("encima"); }));
 zonaPago.addEventListener("drop", (e) => subirReportePago(e.dataTransfer.files[0]));
 
+async function subirRelacion(archivos) {
+  const estado = $("#estado-relacion");
+  $("#detalle-pago").innerHTML = $("#liquidacion-pago").innerHTML = "";
+  estado.innerHTML = `<div class="cargando">Leyendo la relación con la IA y cruzándola con tus cirugías… puede tardar hasta un minuto.<br><span class="sub">${archivos.length} archivo${archivos.length === 1 ? "" : "s"}</span></div>`;
+  const form = new FormData();
+  try {
+    for (const a of archivos) form.append("archivos", new Blob([await a.arrayBuffer()], { type: a.type || "application/octet-stream" }), a.name || "relacion");
+    if ($("#relacion-pagador").value.trim()) form.append("pagador", $("#relacion-pagador").value.trim());
+    if ($("#relacion-fecha").value) form.append("fecha_pago", $("#relacion-fecha").value);
+    const r = await fetch("/api/pagos/relacion", { method: "POST", body: form });
+    const cuerpo = await r.json().catch(() => null);
+    if (r.status === 409 && cuerpo?.detail?.reporte_id) {
+      aviso(estado, "warn", "Esta relación ya se había subido. Te muestro la que ya está guardada.");
+      return mostrarReportePago(cuerpo.detail.reporte_id);
+    }
+    if (!r.ok) return aviso(estado, "err", mensajeError(cuerpo, `No se pudo leer la relación (error ${r.status}).`));
+    aviso(estado, "", "");
+    pintarReportePago(cuerpo);
+    cargarReportesPago();
+    $("#detalle-pago").scrollIntoView({ behavior: "smooth" });
+  } catch (e) {
+    aviso(estado, "err", `No se pudo enviar la relación (${e.message || e}).`);
+  }
+}
+$("#elegir-relacion").addEventListener("click", () => elegirArchivo(subirRelacion, true));
+
 async function mostrarReportePago(id) {
   const r = await fetch(`/api/pagos/${id}`);
   if (r.ok) pintarReportePago(await r.json());
@@ -2199,31 +2238,38 @@ async function compararVolante(reporteId, archivo) {
 }
 
 function pintarReportePago(rep) {
-  mostrarLiquidacion(rep.reporte_id);
+  const relacion = rep.tipo === "RELACION";
+  // La relación de AP no lleva volante propio: el pago global ya viene en el reporte de pagos
+  if (relacion) $("#liquidacion-pago").innerHTML = ""; else mostrarLiquidacion(rep.reporte_id);
+  const paginas = rep.paginas || 1;
   const cuenta = (res) => rep.filas.filter((f) => f.resultado === res).length;
   const porAplicar = rep.filas.filter((f) => f.resultado === "COINCIDE" && f.estado_cirugia !== "PAGADA").length;
   const plural = (n, uno, varios) => `<strong>${n}</strong> ${n === 1 ? uno : varios}`;
   const cuadre = rep.cuadra === true
-    ? `<div class="aviso ok">✓ Las ${rep.filas.length} líneas suman el total del reporte (${pesos(rep.total_neto)}).</div>`
+    ? `<div class="aviso ok">✓ Las ${rep.filas.length} líneas suman el total ${relacion ? "de la relación" : "del reporte"} (${pesos(rep.total_neto)}).</div>`
     : rep.cuadra === false
       ? `<div class="aviso err">⚠ Las líneas leídas suman ${pesos(rep.suma_neto)} pero el reporte dice ${pesos(rep.total_neto)}. Revisa el original antes de aplicar: puede faltar o estar mal leída alguna línea.</div>`
       : `<div class="aviso warn">El reporte no muestra un total general para comprobar la lectura. Suma de líneas: ${pesos(rep.suma_neto)}.</div>`;
   $("#detalle-pago").innerHTML = `<section class="card">
-    <h2>${escapar(rep.pagador || "Reporte de pagos")}</h2>
-    <p class="sub">Proceso: ${escapar(rep.fecha_proceso || "—")} · Periodo: ${escapar(rep.periodo_desde || "—")} a ${escapar(rep.periodo_hasta || "—")}
-      · <a href="/api/pagos/${rep.reporte_id}/archivo" data-visor="Reporte de pagos">📄 Ver original</a></p>
+    <h2>${relacion ? "Relación de AP · " : ""}${escapar(rep.pagador || (relacion ? "Clínica" : "Reporte de pagos"))}</h2>
+    <p class="sub">${relacion
+      ? `${rep.numero ? `Nº ${escapar(rep.numero)} · ` : ""}Mes a facturar: ${escapar((rep.periodo_desde || "—").slice(0, 7))} · Fecha del pago: ${escapar(rep.fecha_proceso || "—")}`
+      : `Proceso: ${escapar(rep.fecha_proceso || "—")} · Periodo: ${escapar(rep.periodo_desde || "—")} a ${escapar(rep.periodo_hasta || "—")}`}
+      · <a href="/api/pagos/${rep.reporte_id}/archivo" data-visor="${relacion ? "Relación de AP" : "Reporte de pagos"}">📄 Ver original</a>${
+      paginas > 1 ? " · " + Array.from({ length: paginas }, (_, i) => `<a href="/api/pagos/${rep.reporte_id}/archivo?pagina=${i + 1}" data-visor="Relación · página ${i + 1}">página ${i + 1}</a>`).join(" · ") : ""}</p>
     ${cuadre}
     <p>${plural(cuenta("COINCIDE"), "pago encontrado en tus cirugías", "pagos encontrados en tus cirugías")} ·
        ${plural(cuenta("SIN_CIRUGIA"), "sin cirugía en la app", "sin cirugía en la app")} ·
        ${plural(cuenta("OTRO_CONCEPTO"), "otro concepto", "otros conceptos")}</p>
     <div>${rep.filas.map((f) => `<div class="linea-pago">
       <div class="item-cab"><strong>${escapar(f.paciente || "—")}</strong><span class="valor">${pesos(f.neto)}</span></div>
-      <div class="sub">${escapar(f.documento_paciente || "")} · ${escapar(f.fecha_servicio || "")} · ${escapar(f.empresa || "")}
+      <div class="sub">${[f.documento_paciente, f.fecha_servicio, f.empresa, f.procedimiento, f.numero_orden && `orden ${f.numero_orden}`]
+          .filter(Boolean).map(escapar).join(" · ")}
         ${Number(f.glosas) ? ` · glosas ${pesos(f.glosas)}` : ""}${Number(f.descuentos) ? ` · descuentos ${pesos(f.descuentos)}` : ""}</div>
       <div style="margin-top:4px"><span class="chip ${f.resultado}">${etiquetaResultado(f)}</span>
         ${f.cirugia_id ? `<span class="sub"> · cirugía del ${escapar(f.fecha_procedimiento)} (${escapar(f.paciente_app)})</span>` : ""}</div>
     </div>`).join("")}</div>
-    ${rep.estado === "APLICADO" && !porAplicar ? `<div class="aviso ok">Este reporte ya se aplicó.</div>` : ""}
+    ${rep.estado === "APLICADO" && !porAplicar ? `<div class="aviso ok">${relacion ? "Esta relación" : "Este reporte"} ya se aplicó.</div>` : ""}
     <div class="acciones-pago">
       ${porAplicar ? `<button type="button" class="primario" id="aplicar-pago">
         Marcar ${porAplicar} cirugía${porAplicar === 1 ? "" : "s"} como pagada${porAplicar === 1 ? "" : "s"}</button>` : ""}
@@ -2265,7 +2311,7 @@ async function cargarReportesPago() {
   const filas = await r.json().catch(() => []);
   if (!r.ok || !filas.length) { cont.innerHTML = `<p class="sub">Aún no has subido reportes de pago.</p>`; return; }
   cont.innerHTML = filas.map((p) => `<button type="button" class="item" data-reporte="${p.reporte_id}">
-    <div class="item-cab"><strong>${escapar(p.fecha_proceso || p.subido_en.slice(0, 10))} · ${escapar(p.pagador || "Reporte")}</strong>
+    <div class="item-cab"><strong>${escapar(p.fecha_proceso || p.subido_en.slice(0, 10))} · ${p.tipo === "RELACION" ? "Relación AP · " : ""}${escapar(p.pagador || "Reporte")}</strong>
       <span class="valor">${pesos(p.total_neto)}</span></div>
     <div class="sub">${p.encontradas} de ${p.lineas} pagos encontrados · <span class="chip">${p.estado === "APLICADO" ? "APLICADO" : "SIN APLICAR"}</span></div>
   </button>`).join("");

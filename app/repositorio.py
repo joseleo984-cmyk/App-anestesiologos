@@ -608,21 +608,24 @@ def buscar_reporte_por_hash(conn, anestesiologo_id: int, hash_sha256: str) -> Op
 
 
 def crear_reporte(conn, anestesiologo_id: int, url_archivo: str, hash_sha256: str,
-                  reporte: ReportePagoExtraido) -> int:
+                  reporte: ReportePagoExtraido, tipo: str = "PAGOS", extra: Optional[dict] = None) -> int:
     reporte_id = conn.execute(
         """INSERT INTO reporte_pago (anestesiologo_id, pagador, fecha_proceso, periodo_desde, periodo_hasta,
-                                     total_neto, url_archivo, hash_sha256, datos_extraidos)
-           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING reporte_id""",
+                                     total_neto, url_archivo, hash_sha256, datos_extraidos, tipo, numero)
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING reporte_id""",
         (anestesiologo_id, reporte.pagador, reporte.fecha_proceso, reporte.periodo_desde, reporte.periodo_hasta,
-         reporte.total_neto, url_archivo, hash_sha256, Jsonb(reporte.model_dump(mode="json"))),
+         reporte.total_neto, url_archivo, hash_sha256, Jsonb({**reporte.model_dump(mode="json"), **(extra or {})}),
+         tipo, reporte.numero),
     ).fetchone()["reporte_id"]
     for f in reporte.filas:
         conn.execute(
             """INSERT INTO pago_detalle (reporte_id, empresa, documento_paciente, paciente, fecha_servicio,
-                                         factura, autorizacion, total, glosas, descuentos, neto, es_paciente)
-               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                                         factura, autorizacion, total, glosas, descuentos, neto, es_paciente,
+                                         numero_orden, procedimiento)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
             (reporte_id, f.empresa, f.documento_paciente, f.paciente, f.fecha_servicio, f.factura,
-             f.autorizacion, f.total, f.glosas, f.descuentos, f.neto, f.es_paciente),
+             f.autorizacion, f.total, f.glosas, f.descuentos, f.neto, f.es_paciente,
+             (f.numero_orden or "")[:100] or None, (f.procedimiento or "")[:300] or None),
         )
     conciliar(conn, anestesiologo_id, reporte_id)
     return reporte_id
@@ -630,11 +633,14 @@ def crear_reporte(conn, anestesiologo_id: int, url_archivo: str, hash_sha256: st
 
 def conciliar(conn, anestesiologo_id: int, reporte_id: int) -> None:
     """Busca la cirugía de cada línea: mismo documento del paciente y la fecha más cercana dentro de la
-    ventana (DIAS_ANTES / DIAS_DESPUES), sin pasar de la fecha del pago. Una cirugía no se asigna a dos líneas."""
-    pago = conn.execute("SELECT fecha_proceso FROM reporte_pago WHERE reporte_id = %s", (reporte_id,)).fetchone()
+    ventana (DIAS_ANTES / DIAS_DESPUES), sin pasar de la fecha del pago. Una cirugía no se asigna a dos líneas.
+    En las relaciones de AP las líneas no suelen traer fecha: se busca hasta DIAS_ANTES antes de la fecha de
+    la relación, prefiriendo la cirugía con el mismo nº de orden y si no la más reciente."""
+    pago = conn.execute("SELECT fecha_proceso, tipo FROM reporte_pago WHERE reporte_id = %s", (reporte_id,)).fetchone()
+    relacion = bool(pago) and pago["tipo"] == "RELACION"
     filas = conn.execute(
         """SELECT d.detalle_id, d.documento_paciente, doc_norm(d.documento_paciente) AS doc, d.fecha_servicio,
-                  d.cirugia_id, c.estado
+                  doc_norm(d.numero_orden) AS orden, d.cirugia_id, c.estado
              FROM pago_detalle d LEFT JOIN cirugia c ON c.cirugia_id = d.cirugia_id
             WHERE d.reporte_id = %s AND d.es_paciente AND d.documento_paciente IS NOT NULL
             ORDER BY d.detalle_id""",
@@ -645,7 +651,7 @@ def conciliar(conn, anestesiologo_id: int, reporte_id: int) -> None:
     # El mismo paciente con la misma fecha en varias líneas del reporte (AP paga por separado cada
     # procedimiento de una cirugía): todas esas líneas van a la misma cirugía
     misma_cirugia: dict[tuple, int] = {}
-    clave = lambda f: (f["doc"], f["fecha_servicio"])
+    clave = lambda f: (f["doc"], f["fecha_servicio"], f["orden"] if relacion else None)
     for f in filas:
         if f["estado"] == "PAGADA":
             misma_cirugia[clave(f)] = f["cirugia_id"]
@@ -656,8 +662,12 @@ def conciliar(conn, anestesiologo_id: int, reporte_id: int) -> None:
             conn.execute("UPDATE pago_detalle SET cirugia_id = %s WHERE detalle_id = %s",
                          (misma_cirugia[clave(f)], f["detalle_id"]))
             continue
+        fecha, despues = f["fecha_servicio"], DIAS_DESPUES
+        if relacion and fecha is None and pago["fecha_proceso"]:
+            fecha, despues = pago["fecha_proceso"], 0
         candidatas = conn.execute(
             """SELECT c.cirugia_id,
+                      CASE WHEN %(orden)s <> '' AND doc_norm(c.numero_orden) = %(orden)s THEN 0 ELSE 1 END AS orden,
                       CASE WHEN %(fecha)s::date IS NULL THEN 0
                            ELSE abs(c.fecha_procedimiento - %(fecha)s::date) END AS distancia
                  FROM cirugia c JOIN paciente p ON p.paciente_id = c.paciente_id
@@ -670,9 +680,9 @@ def conciliar(conn, anestesiologo_id: int, reporte_id: int) -> None:
                   AND NOT EXISTS (SELECT 1 FROM pago_detalle d JOIN reporte_pago r USING (reporte_id)
                                    WHERE d.cirugia_id = c.cirugia_id AND r.estado = 'APLICADO'
                                      AND r.reporte_id <> %(rep)s)
-                ORDER BY distancia, c.fecha_procedimiento DESC""",
-            {"fecha": f["fecha_servicio"], "anest": anestesiologo_id, "doc": f["documento_paciente"],
-             "antes": DIAS_ANTES, "despues": DIAS_DESPUES, "pago": pago["fecha_proceso"] if pago else None,
+                ORDER BY orden, distancia, c.fecha_procedimiento DESC""",
+            {"fecha": fecha, "anest": anestesiologo_id, "doc": f["documento_paciente"], "orden": f["orden"] or "",
+             "antes": DIAS_ANTES, "despues": despues, "pago": pago["fecha_proceso"] if pago else None,
              "rep": reporte_id},
         ).fetchall()
         elegida = next((c["cirugia_id"] for c in candidatas if c["cirugia_id"] not in usadas), None)
@@ -740,7 +750,8 @@ def aplicar_todos(conn, anestesiologo_id: int) -> int:
 def obtener_reporte(conn, anestesiologo_id: int, reporte_id: int) -> Optional[dict]:
     cab = conn.execute(
         """SELECT reporte_id, pagador, fecha_proceso, periodo_desde, periodo_hasta, total_neto, estado,
-                  subido_en, datos_extraidos->>'prestador' AS prestador
+                  subido_en, datos_extraidos->>'prestador' AS prestador, tipo, numero,
+                  COALESCE(jsonb_array_length(datos_extraidos->'paginas'), 1) AS paginas
              FROM reporte_pago WHERE reporte_id = %s AND anestesiologo_id = %s""",
         (reporte_id, anestesiologo_id),
     ).fetchone()
@@ -749,6 +760,7 @@ def obtener_reporte(conn, anestesiologo_id: int, reporte_id: int) -> Optional[di
     filas = conn.execute(
         """SELECT d.detalle_id, d.empresa, d.documento_paciente, d.paciente, d.fecha_servicio, d.factura,
                   d.autorizacion, d.total, d.glosas, d.descuentos, d.neto, d.es_paciente, d.cirugia_id,
+                  d.numero_orden, d.procedimiento,
                   c.fecha_procedimiento, c.estado AS estado_cirugia,
                   p.nombres || ' ' || p.apellidos AS paciente_app,
                   CASE WHEN NOT d.es_paciente THEN 'OTRO_CONCEPTO'
@@ -794,7 +806,7 @@ def aplicar_reporte(conn, anestesiologo_id: int, reporte_id: int) -> int:
 def listar_reportes(conn, anestesiologo_id: int) -> list[dict]:
     return conn.execute(
         """SELECT r.reporte_id, r.pagador, r.fecha_proceso, r.periodo_desde, r.periodo_hasta, r.total_neto,
-                  r.estado, r.subido_en,
+                  r.estado, r.subido_en, r.tipo, r.numero,
                   COUNT(d.*) FILTER (WHERE d.es_paciente) AS lineas,
                   COUNT(d.*) FILTER (WHERE d.cirugia_id IS NOT NULL) AS encontradas
              FROM reporte_pago r LEFT JOIN pago_detalle d USING (reporte_id)

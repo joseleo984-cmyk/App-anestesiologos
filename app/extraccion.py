@@ -2,6 +2,7 @@
 import base64
 import io
 import json
+from datetime import date
 
 import anthropic
 from PIL import Image, ImageOps
@@ -268,6 +269,92 @@ def extraer_reporte_pago(datos: bytes, media_type: str, client: anthropic.Anthro
     return ReportePagoExtraido.model_validate(_llamar_claude(
         [(datos, media_type)], INSTRUCCIONES_PAGO, ESQUEMA_PAGO, "Extrae todas las líneas de este reporte de pagos.",
         "medium", client))
+
+
+# ------------------------------------------------- relación / liquidación de AP (pago global de una clínica)
+ESQUEMA_RELACION = {
+    "type": "object",
+    "properties": {
+        "numero": _nullable(_TEXTO),
+        "fecha": _nullable(_TEXTO),
+        "mes_facturar": _nullable(_TEXTO),
+        "clinica": _nullable(_TEXTO),
+        "anestesiologo": _nullable(_TEXTO),
+        "total": _nullable(_NUMERO),
+        "filas": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "entidad": _nullable(_TEXTO),
+                    "paciente": _nullable(_TEXTO),
+                    "documento_paciente": _nullable(_TEXTO),
+                    "procedimiento": _nullable(_TEXTO),
+                    "numero_orden": _nullable(_TEXTO),
+                    "fecha_servicio": _nullable(_TEXTO),
+                    "valor": _nullable(_NUMERO),
+                },
+                "required": ["entidad", "paciente", "documento_paciente", "procedimiento", "numero_orden",
+                             "fecha_servicio", "valor"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    "required": ["numero", "fecha", "mes_facturar", "clinica", "anestesiologo", "total", "filas"],
+    "additionalProperties": False,
+}
+
+INSTRUCCIONES_RELACION = """Lees la "RELACION DE ORDENES" (o liquidación) que la asociación de anestesiólogos \
+(AP) hace de las órdenes que entrega un anestesiólogo en Colombia; algunas clínicas pagan el total de esa \
+relación y no paciente por paciente. Puede venir en varias páginas o fotos: combínalas en una sola relación. \
+Extrae:
+
+- numero: el número de la relación o de radicado (a veces sellado o escrito a mano, ej. en rojo), sin espacios.
+- fecha: la FECHA del documento, en AAAA-MM-DD (el documento usa día/mes/año).
+- mes_facturar: MES A FACTURAR en formato AAAA-MM.
+- clinica: la clínica o pagador al que corresponde la relación si aparece en el encabezado; si no, null.
+- anestesiologo: el nombre del ANESTESIÓLOGO.
+- total: el TOTAL de la relación en pesos como número entero (508.360 -> 508360).
+- filas: UNA por cada línea con datos, en el orden del documento (no incluyas las líneas vacías ni el total):
+  - entidad: la ENTIDAD (aseguradora, EPS o IPS); paciente: tal como aparece.
+  - documento_paciente: la CEDULA o documento, sin puntos ni espacios.
+  - procedimiento; numero_orden: el No. ORDEN tal como aparece; fecha_servicio: si la línea tiene fecha \
+(AAAA-MM-DD), si no null.
+  - valor: el VALOR en pesos como número entero.
+
+Copia los datos tal como están; nunca inventes un valor que no se lee: usa null."""
+
+
+def _fin_de_mes(d: date) -> date:
+    siguiente = date(d.year + (d.month == 12), d.month % 12 + 1, 1)
+    return date.fromordinal(siguiente.toordinal() - 1)
+
+
+def relacion_a_reporte(datos: dict) -> ReportePagoExtraido:
+    """Convierte lo leído de la relación al formato de un reporte de pagos (una línea por paciente)."""
+    desde = hasta = None
+    mes = (datos.get("mes_facturar") or "").strip()
+    try:
+        desde = date(int(mes[:4]), int(mes[5:7]), 1)
+        hasta = _fin_de_mes(desde)
+    except (ValueError, IndexError):
+        pass
+    filas = [{"empresa": f.get("entidad"), "documento_paciente": f.get("documento_paciente"),
+              "paciente": f.get("paciente"), "fecha_servicio": f.get("fecha_servicio"),
+              "numero_orden": f.get("numero_orden"), "procedimiento": f.get("procedimiento"),
+              "total": f.get("valor"), "neto": f.get("valor"), "es_paciente": True}
+             for f in datos.get("filas") or [] if f.get("documento_paciente") or f.get("paciente")]
+    return ReportePagoExtraido.model_validate({
+        "pagador": datos.get("clinica"), "prestador": datos.get("anestesiologo"), "fecha_proceso": datos.get("fecha"),
+        "periodo_desde": desde, "periodo_hasta": hasta, "total_neto": datos.get("total"),
+        "numero": (datos.get("numero") or "").replace(" ", "") or None, "filas": filas})
+
+
+def extraer_relacion(archivos: list[Archivo], client: anthropic.Anthropic | None = None) -> ReportePagoExtraido:
+    pedido = "Extrae los datos de esta relación de órdenes." if len(archivos) == 1 else (
+        f"Estos {len(archivos)} archivos son las páginas de la MISMA relación de órdenes. Extrae sus datos.")
+    return relacion_a_reporte(_llamar_claude(archivos, INSTRUCCIONES_RELACION, ESQUEMA_RELACION, pedido,
+                                             "medium", client))
 
 
 _VALORES_VOLANTE = ["probienestar", "compensacion_ordinaria", "compensacion_extraordinaria", "auxilio_sindical",

@@ -249,3 +249,10 @@ CREATE OR REPLACE FUNCTION doc_norm(t TEXT) RETURNS TEXT LANGUAGE sql IMMUTABLE 
     FROM (SELECT regexp_replace(upper(regexp_replace(coalesce(t, ''), '[^A-Za-z0-9]', '', 'g')),
                                 '^(CC|TI|CE|RC|PA|PPT|CN|MS|AS|NUIP)(?=[0-9])', '') AS d) x
 $$;
+
+-- 20. Relación o liquidación de AP de clínicas que pagan el total de lo entregado (ej. Santa Ana)
+ALTER TABLE reporte_pago ADD COLUMN IF NOT EXISTS tipo VARCHAR(10) NOT NULL DEFAULT 'PAGOS'
+    CHECK (tipo IN ('PAGOS','RELACION'));
+ALTER TABLE reporte_pago ADD COLUMN IF NOT EXISTS numero VARCHAR(50);
+ALTER TABLE pago_detalle ADD COLUMN IF NOT EXISTS numero_orden VARCHAR(100);
+ALTER TABLE pago_detalle ADD COLUMN IF NOT EXISTS procedimiento VARCHAR(300);

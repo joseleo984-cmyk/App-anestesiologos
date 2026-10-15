@@ -199,6 +199,8 @@ class FilaPago(_Base):
     descuentos: Decimal = Decimal(0)
     neto: Optional[Decimal] = None
     es_paciente: bool = True
+    numero_orden: Optional[str] = None
+    procedimiento: Optional[str] = None
 
     _f = field_validator("fecha_servicio", mode="before")(_fecha_o_nulo)
     _p = field_validator("total", "neto", mode="before")(_pesos_o_nulo)
@@ -222,6 +224,7 @@ class ReportePagoExtraido(_Base):
     periodo_desde: Optional[date] = None
     periodo_hasta: Optional[date] = None
     total_neto: Optional[Decimal] = None
+    numero: Optional[str] = None          # nº de la relación / radicado (relaciones de AP)
     filas: list[FilaPago] = []
 
     _f = field_validator("fecha_proceso", "periodo_desde", "periodo_hasta", mode="before")(_fecha_o_nulo)

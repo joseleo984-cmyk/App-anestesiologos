@@ -155,6 +155,11 @@ CREATE TABLE IF NOT EXISTS reporte_pago (
                        CHECK (estado IN ('LEIDO','APLICADO')),
     datos_extraidos    JSONB,
     subido_en          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    -- PAGOS: reporte de pagos de la asociación. RELACION: relación o liquidación de AP de una clínica que
+    -- paga el total de lo entregado (no paciente por paciente); marca las cirugías pagadas pero no es ingreso
+    -- aparte (el pago global ya viene en el reporte de pagos)
+    tipo               VARCHAR(10) NOT NULL DEFAULT 'PAGOS' CHECK (tipo IN ('PAGOS','RELACION')),
+    numero             VARCHAR(50),                  -- nº de la relación / radicado
     UNIQUE (anestesiologo_id, hash_sha256)
 );
 
@@ -172,6 +177,8 @@ CREATE TABLE IF NOT EXISTS pago_detalle (
     descuentos         NUMERIC(14,2) NOT NULL DEFAULT 0,
     neto               NUMERIC(14,2),
     es_paciente        BOOLEAN NOT NULL DEFAULT TRUE,   -- FALSE = otro concepto (ej. honorarios globales)
+    numero_orden       VARCHAR(100),                 -- en las relaciones de AP
+    procedimiento      VARCHAR(300),
     cirugia_id         BIGINT REFERENCES cirugia(cirugia_id) ON DELETE SET NULL
 );
 CREATE INDEX IF NOT EXISTS idx_pago_detalle_reporte ON pago_detalle (reporte_id);
