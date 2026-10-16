@@ -941,6 +941,13 @@ def pagar_radicado(reporte_id: int, pago: PagoRadicado, conn=Depends(get_conn, s
     return {"marcadas": marcadas}
 
 
+@app.get("/api/pagos/buscar")
+def buscar_paciente_en_pagos(q: str = Query(min_length=2, max_length=80), conn=Depends(get_conn, scope="function"),
+                             anestesiologo_id=Depends(anestesiologo_actual)):
+    """Un paciente por nombre o cédula: sus cirugías (y si están pagadas) y las líneas de los reportes subidos."""
+    return repositorio.buscar_en_pagos(conn, anestesiologo_id, q)
+
+
 @app.get("/api/pagos")
 def listar_reportes_pago(conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
     return repositorio.listar_reportes(conn, anestesiologo_id)

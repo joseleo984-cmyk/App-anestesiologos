@@ -565,3 +565,32 @@ def test_cedula_mal_leida_en_el_radicado_se_corrige_en_la_linea(con_radicado, mo
     assert c.post(f"/api/pagos/lineas/{linea['detalle_id']}/vincular", json={"cirugia_id": uno, "cedula_correcta": "x"}).status_code == 422
     assert c.post(f"/api/pagos/lineas/{linea['detalle_id']}/vincular", json={"cirugia_id": 999, "cedula_correcta": "app"}).status_code == 404
     assert c.get("/api/pagos/lineas/999/candidatas").status_code == 404
+
+
+def test_buscar_paciente_en_los_pagos(con_reporte, conn):
+    c = con_reporte
+    uno = crear_paciente(c, "72000730", "2026-08-14", "Paciente", "Uno")
+    crear_paciente(c, "1.043.000.111", "2026-08-01", "Ana María", "Pérez Gómez")
+    rep = subir(c).json()
+    # por cédula, con o sin puntos y ceros: la cirugía y la línea del reporte que la pagó
+    for q in ("72000730", "72.000.730", "0072000730", "2000730"):
+        r = c.get("/api/pagos/buscar", params={"q": q}).json()
+        assert [x["cirugia_id"] for x in r["cirugias"]] == [uno], q
+        assert [(x["reporte_id"], x["cirugia_id"], x["neto"]) for x in r["lineas"]] == [(rep["reporte_id"], uno, 700405)], q
+    # por nombre: sin tildes, en cualquier orden, en minúsculas
+    r = c.get("/api/pagos/buscar", params={"q": "gomez ana"}).json()
+    assert [x["paciente"] for x in r["cirugias"]] == ["Ana María Pérez Gómez"] and r["lineas"] == []
+    r = c.get("/api/pagos/buscar", params={"q": "registrado"}).json()       # solo en el reporte
+    assert r["cirugias"] == [] and [x["documento_paciente"] for x in r["lineas"]] == ["555000"]
+    assert r["lineas"][0]["tipo"] == "PAGOS" and r["lineas"][0]["cirugia_id"] is None
+    # los honorarios globales no son pacientes; lo de otro anestesiólogo no se ve
+    assert c.get("/api/pagos/buscar", params={"q": "honorarios"}).json() == {"cirugias": [], "lineas": []}
+    conn.execute("INSERT INTO anestesiologo (nombre, email) VALUES ('Dr. Otro', 'otro@ejemplo.com')")
+    conn.commit()
+    from fastapi.testclient import TestClient
+    from app import auth, main
+    otro = TestClient(main.app)
+    otro.cookies.set(auth.COOKIE, auth.crear_sesion(2))
+    assert otro.get("/api/pagos/buscar", params={"q": "72000730"}).json() == {"cirugias": [], "lineas": []}
+    assert c.get("/api/pagos/buscar", params={"q": "a"}).status_code == 422
+    assert c.get("/api/pagos/buscar", params={"q": "--"}).json() == {"cirugias": [], "lineas": []}

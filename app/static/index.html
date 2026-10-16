@@ -599,6 +599,11 @@
 .segmentos button .sub { font-size: .78rem; font-weight: 400; }
 .segmentos button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-bg); color: var(--text); box-shadow: inset 0 0 0 1px var(--accent); }
 .pago-radicado { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
+#buscar-pago { margin-top: 4px; }
+.titulo-busqueda { margin: 14px 0 4px; font-size: .9rem; }
+.resultado-busqueda { display: grid; gap: 3px; width: 100%; text-align: left; padding: 10px 12px; margin-top: 6px; font-weight: 400; }
+.resultado-busqueda .item-cab { display: flex; justify-content: space-between; gap: 8px; }
+.linea-pago.resaltada { background: var(--accent-bg); box-shadow: 0 0 0 8px var(--accent-bg); border-radius: 4px; }
 .boton-linea { min-height: 34px; padding: 4px 12px; font-size: .85rem; margin-top: 6px; }
 .candidata { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 10px; margin-top: 6px;
   border: 1px solid var(--line); border-radius: 10px; }
@@ -692,6 +697,11 @@
   </div>
 
   <div id="pestana-pagos" class="pestana oculto">
+    <section class="card" id="buscar-pagos">
+      <h2>Buscar paciente</h2>
+      <input id="buscar-pago" type="search" placeholder="Nombre o cédula" autocomplete="off" enterkeyhint="search" aria-label="Buscar paciente por nombre o cédula">
+      <div id="resultado-busqueda-pago"></div>
+    </section>
     <section class="card" id="antiguedad-pagos"><h2>Por cobrar</h2><p class="sub">Cargando…</p></section>
     <section class="card">
       <h2>Sube la relación de pagos</h2>
@@ -1545,8 +1555,7 @@ function cerrarFormulario() {
   const volverA = volver ? "pagos" : modo.tipo === "editar" ? "cirugias" : pestanaActual;
   modo = { tipo: "manual" };
   mostrarPestana(volverA);
-  if (volver) mostrarReportePago(volver.reporte).then(() =>
-    document.querySelector(`[data-linea="${volver.linea}"]`)?.scrollIntoView({ block: "center" }));
+  if (volver?.reporte) mostrarReportePago(volver.reporte).then(() => resaltarLinea(volver.linea));
 }
 
 $("#cancelar").onclick = cerrarFormulario;
@@ -4315,7 +4324,7 @@ function pintarReportePago(rep) {
        ${plural(cuenta("SIN_CIRUGIA"), "sin cirugía en la app", "sin cirugía en la app")} ·
        ${plural(cuenta("OTRO_CONCEPTO"), "otro concepto", "otros conceptos")}${
        cuenta("PAGO_GLOBAL") ? ` · ${plural(cuenta("PAGO_GLOBAL"), "pago global de clínica", "pagos globales de clínica")}` : ""}</p>
-    <div>${rep.filas.map((f) => `<div class="linea-pago">
+    <div>${rep.filas.map((f) => `<div class="linea-pago" data-linea="${f.detalle_id}">
       <div class="item-cab"><strong>${escapar(f.paciente || "—")}</strong><span class="valor">${pesos(f.neto)}</span></div>
       <div class="sub">${[f.documento_paciente, f.fecha_servicio, f.empresa, f.procedimiento, f.numero_orden && `orden ${f.numero_orden}`]
           .filter(Boolean).map(escapar).join(" · ")}
@@ -4373,6 +4382,51 @@ function pintarReportePago(rep) {
     cargarReportesPago();
   };
 }
+
+// ---------------------------------------------------------------- buscador de pacientes en Pagos
+const TIPO_REPORTE = { PAGOS: "Reporte de pagos", RELACION: "Relación pagada", RADICADO: "Radicado" };
+const ESTADO_CIRUGIA = { PAGADA: "Pagada", FACTURADA: "Radicada", REALIZADA: "Realizada", PROGRAMADA: "Programada", CANCELADA: "Cancelada" };
+let esperaBusquedaPago, busquedaPagoActual = "";
+function resaltarLinea(id) {
+  const el = document.querySelector(`[data-linea="${id}"]`);
+  if (!el) return;
+  el.scrollIntoView({ block: "center" });
+  el.classList.add("resaltada");
+  setTimeout(() => el.classList.remove("resaltada"), 2500);
+}
+$("#buscar-pago").addEventListener("input", () => { clearTimeout(esperaBusquedaPago); esperaBusquedaPago = setTimeout(buscarPacientePago, 300); });
+async function buscarPacientePago() {
+  const q = $("#buscar-pago").value.trim(), cont = $("#resultado-busqueda-pago");
+  busquedaPagoActual = q;
+  if (q.replace(/[^\p{L}\d]/gu, "").length < 3) { cont.innerHTML = ""; return; }
+  const r = await fetch(`/api/pagos/buscar?q=${encodeURIComponent(q)}`);
+  if (q !== busquedaPagoActual) return;   // ya escribió otra cosa
+  if (!r.ok) { cont.innerHTML = `<div class="aviso err">No se pudo buscar.</div>`; return; }
+  const { cirugias, lineas } = await r.json();
+  if (!cirugias.length && !lineas.length) { cont.innerHTML = `<p class="sub" style="margin:8px 0 0">No encontré a «${escapar(q)}» en tus cirugías ni en los reportes.</p>`; return; }
+  cont.innerHTML = `
+    ${cirugias.length ? `<h3 class="titulo-busqueda">En tus cirugías (${cirugias.length})</h3>
+      ${cirugias.map((c) => `<button type="button" class="resultado-busqueda" data-cirugia="${c.cirugia_id}">
+        <span class="item-cab"><strong>${escapar(c.paciente)}</strong>${c.valor_honorarios != null ? `<span class="valor">${pesos(c.valor_honorarios)}</span>` : ""}</span>
+        <span class="sub">${escapar(c.tipo_documento)} ${escapar(c.numero_documento)} · ${escapar(fechaBreve(c.fecha_procedimiento, true))} · ${escapar(tipoTitulo(c.clinica))}${c.aseguradora ? ` · ${escapar(c.aseguradora)}` : ""}</span>
+        <span><span class="chip ${c.estado}">${ESTADO_CIRUGIA[c.estado] || c.estado}${c.estado === "PAGADA" && c.fecha_pago ? ` el ${escapar(fechaBreve(c.fecha_pago, true))}` : ""}</span></span>
+      </button>`).join("")}` : ""}
+    ${lineas.length ? `<h3 class="titulo-busqueda">En los reportes subidos (${lineas.length})</h3>
+      ${lineas.map((l) => `<button type="button" class="resultado-busqueda" data-reporte="${l.reporte_id}" data-linea-busqueda="${l.detalle_id}">
+        <span class="item-cab"><strong>${escapar(l.paciente || "—")}</strong>${l.neto != null ? `<span class="valor">${pesos(l.neto)}</span>` : ""}</span>
+        <span class="sub">${escapar(l.documento_paciente || "")} · ${TIPO_REPORTE[l.tipo] || "Reporte"} · ${escapar(l.pagador || "")}${l.fecha_proceso ? ` · ${escapar(fechaBreve(l.fecha_proceso, true))}` : ""}</span>
+        <span>${l.cirugia_id ? `<span class="chip ${l.estado_cirugia}">✓ ${{ PAGADA: "Pagada", FACTURADA: "Radicada" }[l.estado_cirugia] || "Encontrada"}</span>`
+          : `<span class="chip SIN_CIRUGIA">⚠ Sin cirugía en la app</span>`}</span>
+      </button>`).join("")}` : ""}
+    ${cirugias.length === 30 || lineas.length === 30 ? `<p class="sub" style="margin:8px 0 0">Se muestran los 30 más recientes. Escribe más para afinar.</p>` : ""}`;
+}
+$("#resultado-busqueda-pago").addEventListener("click", async (e) => {
+  const b = e.target.closest(".resultado-busqueda");
+  if (!b) return;
+  if (b.dataset.cirugia) return abrirCirugia(Number(b.dataset.cirugia), { reporte: null });
+  await mostrarReportePago(Number(b.dataset.reporte));
+  resaltarLinea(b.dataset.lineaBusqueda);
+});
 
 // Línea del radicado sin cirugía: el paciente puede estar guardado con la cédula mal escrita (o la hoja se leyó mal)
 const candidatasLinea = {};

@@ -1041,3 +1041,45 @@ def reporte_glosas(conn, anestesiologo_id: int, desde=None, hasta=None) -> dict:
                   d.total, d.glosas, d.descuentos, d.neto, r.fecha_proceso, r.pagador
              {desde_sql} ORDER BY d.fecha_servicio DESC NULLS LAST, d.detalle_id""", params).fetchall()
     return {"totales": totales, "por_empresa": por_empresa, "lineas": lineas}
+
+
+# ---------------------------------------------------------------- buscador de pacientes en los pagos
+def _sin_tildes(expr: str) -> str:
+    return f"translate(upper({expr}), 'ÁÉÍÓÚÜÑ', 'AEIOUUN')"
+
+
+def buscar_en_pagos(conn, anestesiologo_id: int, texto: str, maximo: int = 30) -> dict:
+    """Busca un paciente por cédula (sin puntos, prefijo ni ceros a la izquierda) o por nombre (todas las
+    palabras, sin importar tildes ni el orden) en las cirugías y en las líneas de los reportes subidos
+    (pagos, relaciones y radicados)."""
+    t = unicodedata.normalize("NFKD", texto or "").encode("ascii", "ignore").decode().upper()
+    digitos = re.sub(r"\D", "", t).lstrip("0")
+    params = {"anest": anestesiologo_id, "max": maximo}
+    if len(digitos) >= 4:
+        params["doc"] = f"%{digitos}%"
+        filtro_c, filtro_d = "doc_norm(p.numero_documento) LIKE %(doc)s", "doc_norm(d.documento_paciente) LIKE %(doc)s"
+    else:
+        palabras = [w for w in re.split(r"[^A-Z]+", t) if len(w) >= 2]
+        if not palabras:
+            return {"cirugias": [], "lineas": []}
+        params["palabras"] = [f"%{w}%" for w in palabras]
+        nombre = "p.nombres || ' ' || p.apellidos"
+        filtro_c = f"{_sin_tildes(nombre)} LIKE ALL(%(palabras)s)"
+        filtro_d = f"{_sin_tildes('d.paciente')} LIKE ALL(%(palabras)s)"
+    cirugias = conn.execute(
+        f"""SELECT c.cirugia_id, c.fecha_procedimiento, c.estado, c.valor_honorarios, c.fecha_pago,
+                   p.tipo_documento, p.numero_documento, p.nombres || ' ' || p.apellidos AS paciente,
+                   cl.nombre AS clinica, a.nombre AS aseguradora
+              FROM cirugia c JOIN paciente p ON p.paciente_id = c.paciente_id JOIN clinica cl ON cl.clinica_id = c.clinica_id
+              LEFT JOIN cobertura cb ON cb.cobertura_id = c.cobertura_id
+              LEFT JOIN aseguradora a ON a.aseguradora_id = cb.aseguradora_id
+             WHERE c.anestesiologo_id = %(anest)s AND {filtro_c}
+             ORDER BY c.fecha_procedimiento DESC, c.cirugia_id DESC LIMIT %(max)s""", params).fetchall()
+    lineas = conn.execute(
+        f"""SELECT d.detalle_id, d.reporte_id, d.paciente, d.documento_paciente, d.empresa, d.procedimiento,
+                   d.fecha_servicio, d.neto, d.cirugia_id, r.tipo, r.pagador, r.fecha_proceso,
+                   r.estado AS estado_reporte, c.estado AS estado_cirugia
+              FROM pago_detalle d JOIN reporte_pago r USING (reporte_id) LEFT JOIN cirugia c ON c.cirugia_id = d.cirugia_id
+             WHERE r.anestesiologo_id = %(anest)s AND d.es_paciente AND {filtro_d}
+             ORDER BY r.fecha_proceso DESC NULLS LAST, d.detalle_id LIMIT %(max)s""", params).fetchall()
+    return {"cirugias": cirugias, "lineas": lineas}
