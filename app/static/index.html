@@ -4077,7 +4077,7 @@ async function cargarInicio() {
     if (rad.estado === "LEIDO") tareas.push({ tono: "warn", titulo: `Radicado ${escapar(rad.pagador || "")} ${cuando} sin aplicar`,
       sub: `${plural(rad.cirugias, "cirugía encontrada", "cirugías encontradas")} de ${rad.lineas} órdenes: márcalas como radicadas`, accion: "Revisar", ir: abrir });
     else tareas.push({ tono: rad.dias > d.dias_atraso ? "err" : "info", titulo: `Radicado ${escapar(rad.pagador || "")} ${cuando}: ${rad.total_neto != null ? pesos(rad.total_neto) : "sin total"} por cobrar`,
-      sub: `${plural(rad.cirugias, "cirugía", "cirugías")}${rad.dias != null ? ` · hace ${rad.dias} días` : ""}`, accion: "Ver", ir: abrir });
+      sub: `${plural(rad.cirugias, "cirugía", "cirugías")}${rad.pagadas ? ` (${rad.pagadas} ya pagada${rad.pagadas === 1 ? "" : "s"})` : ""}${rad.dias != null ? ` · hace ${rad.dias} días` : ""}`, accion: "Ver", ir: abrir });
   }
   if (d.sin_valor) tareas.push({ tono: "warn", titulo: plural(d.sin_valor, "cirugía sin valor", "cirugías sin valor"),
     sub: "No cuentan en los reportes ni en lo que te deben", accion: "Completar", ir: () => verLista({ "#f-estado": "SIN_VALOR" }) });
@@ -4475,6 +4475,10 @@ function pintarRadicado(rep) {
   const porRadicar = rep.filas.filter((f) => f.resultado === "COINCIDE" && ["PROGRAMADA", "REALIZADA"].includes(f.estado_cirugia)).length;
   const encontradas = cuenta("COINCIDE");
   const pagado = rep.estado === "PAGADO";
+  // cirugías del radicado que ya se pagaron por otro lado (reporte de AP o a mano) y las que faltan por pagar
+  const yaPagadas = rep.filas.filter((f) => f.cirugia_id && f.estado_cirugia === "PAGADA").length;
+  const porPagar = rep.filas.filter((f) => f.cirugia_id && !["PAGADA", "CANCELADA"].includes(f.estado_cirugia)).length;
+  const todoPagado = !pagado && rep.filas.length > 0 && cuenta("SIN_CIRUGIA") === 0 && porPagar === 0;
   const plural = (n, uno, varios) => `<strong>${n}</strong> ${n === 1 ? uno : varios}`;
   const etiqueta = (f) => f.resultado !== "COINCIDE" ? RESULTADO[f.resultado]
     : f.estado_cirugia === "PAGADA" ? "✓ Pagada" : f.estado_cirugia === "FACTURADA" ? "✓ Radicada" : "✓ Encontrada";
@@ -4487,8 +4491,10 @@ function pintarRadicado(rep) {
     <div class="cifras" style="margin:8px 0">
       <div class="card"><span class="sub">Total del radicado</span><span class="grande-cifra">${rep.total_neto != null ? pesosCorto(rep.total_neto) : "—"}</span>
         <span class="sub">${rep.total_neto != null ? pesos(rep.total_neto) : "No se leyó el total"}</span></div>
-      <div class="card"><span class="sub">${pagado ? "Pagado" : "Estado"}</span><span class="grande-cifra">${pagado ? pesosCorto(rep.valor_pagado) : rep.estado === "APLICADO" ? "Por cobrar" : "Sin aplicar"}</span>
-        <span class="sub">${pagado ? `el ${escapar(rep.pagado_en)}` : `${rep.filas.length} órdenes en la hoja`}</span></div>
+      <div class="card"><span class="sub">${pagado ? "Pagado" : "Estado"}</span><span class="grande-cifra">${pagado ? pesosCorto(rep.valor_pagado)
+          : todoPagado ? "Pagado" : rep.estado === "APLICADO" ? "Por cobrar" : "Sin aplicar"}</span>
+        <span class="sub">${pagado ? `el ${escapar(rep.pagado_en)}` : todoPagado ? "sus cirugías ya están pagadas"
+          : yaPagadas ? `${yaPagadas} de ${rep.filas.length} órdenes ya pagadas` : `${rep.filas.length} órdenes en la hoja`}</span></div>
     </div>
     ${rep.cuadra === false ? `<div class="aviso err">⚠ Las líneas suman ${pesos(rep.suma_neto)} pero el total dice ${pesos(rep.total_neto)}. Revisa el original.</div>` : ""}
     <p>${plural(encontradas, "orden encontrada en tus cirugías", "órdenes encontradas en tus cirugías")} ·
@@ -4516,9 +4522,12 @@ function pintarRadicado(rep) {
       ${cuenta("SIN_CIRUGIA") ? `<button type="button" id="cruzar-pago">Volver a cruzar</button>` : ""}
       ${rep.estado === "LEIDO" ? `<button type="button" id="descartar-pago">Descartar radicado</button>` : ""}
     </div>
+    ${todoPagado ? `<div class="aviso ok">✓ Las ${yaPagadas} cirugías de este radicado ya están pagadas (por el reporte de pagos de AP o marcadas a mano), así que no queda nada por cobrar.
+      Si quieres, registra abajo el pago de la clínica para guardar su fecha y valor: las fechas de pago de las cirugías no cambian.</div>` : ""}
     ${!pagado && encontradas ? `<form class="pago-radicado" id="form-pagar" novalidate>
       <h3>¿Ya pagó la clínica?</h3>
-      <p class="sub">Registra el pago y las ${encontradas} cirugías encontradas quedan pagadas con esa fecha. El valor de cada cirugía no cambia.</p>
+      <p class="sub">${porPagar ? `Registra el pago y ${porPagar === 1 ? "la cirugía que falta queda pagada" : `las ${porPagar} cirugías que faltan quedan pagadas`} con esa fecha.` : "Registra el pago de la clínica."}
+        ${yaPagadas ? `${yaPagadas === 1 ? "La que ya estaba pagada conserva" : `Las ${yaPagadas} que ya estaban pagadas conservan`} su fecha.` : ""} El valor de cada cirugía no cambia.</p>
       <div class="fila">
         <div><label for="pagar-fecha">Fecha del pago</label><input id="pagar-fecha" type="date" value="${hoyIso}" required></div>
         <div><label for="pagar-valor">Valor pagado ($)</label><input id="pagar-valor" inputmode="numeric" value="${rep.total_neto != null ? formatoMiles(rep.total_neto) : ""}"></div>
@@ -4580,7 +4589,8 @@ function pintarRadicado(rep) {
     const fecha = $("#pagar-fecha").value;
     if (!fecha) return toast("Pon la fecha del pago");
     const valor = $("#pagar-valor").value.replace(/\D/g, "");
-    if (!confirm(`¿Marcar como pagadas las ${encontradas} cirugías de este radicado, con fecha ${fecha}?`)) return;
+    if (!confirm(porPagar ? `¿Marcar como pagadas las ${porPagar} cirugías que faltan de este radicado, con fecha ${fecha}?`
+      : `¿Registrar el pago de la clínica con fecha ${fecha}?`)) return;
     const boton = ev.submitter; boton.disabled = true;
     const r = await fetch(`/api/pagos/${rep.reporte_id}/pagar`, { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ fecha_pago: fecha, valor: valor ? Number(valor) : null }) });
@@ -4601,12 +4611,20 @@ async function cargarReportesPago() {
   cont.innerHTML = filas.map((p) => `<button type="button" class="item" data-reporte="${p.reporte_id}">
     <div class="item-cab"><strong>${escapar(p.fecha_proceso || p.subido_en.slice(0, 10))} · ${p.tipo === "RELACION" ? "Relación AP · " : p.tipo === "RADICADO" ? "Radicado · " : ""}${escapar(p.pagador || "Reporte")}</strong>
       <span class="valor">${pesos(p.total_neto)}</span></div>
-    <div class="sub">${p.encontradas} de ${p.lineas} ${p.tipo === "RADICADO" ? "órdenes encontradas" : "pagos encontrados"} · <span class="chip ${p.estado === "PAGADO" ? "PAGADA" : p.tipo === "RADICADO" && p.estado === "APLICADO" ? "FACTURADA" : ""}">${
-      p.estado === "PAGADO" ? `PAGADO ${escapar(p.pagado_en || "")}` : p.estado === "APLICADO" ? (p.tipo === "RADICADO" ? "POR COBRAR" : "APLICADO") : "SIN APLICAR"}</span></div>
+    <div class="sub">${p.encontradas} de ${p.lineas} ${p.tipo === "RADICADO" ? "órdenes encontradas" : "pagos encontrados"} · ${chipReporte(p)}</div>
   </button>`).join("");
   cont.querySelectorAll("[data-reporte]").forEach((b) => b.onclick = () => { mostrarReportePago(b.dataset.reporte); window.scrollTo({ top: 0, behavior: "smooth" }); });
 }
 
+// Un radicado cuyas cirugías ya se pagaron por otro lado (reporte de AP o a mano) no está por cobrar
+const radicadoYaPagado = (p) => p.tipo === "RADICADO" && p.estado !== "PAGADO" && p.lineas > 0 && p.pendientes === 0;
+function chipReporte(p) {
+  if (p.estado === "PAGADO") return `<span class="chip PAGADA">PAGADO ${escapar(p.pagado_en || "")}</span>`;
+  if (radicadoYaPagado(p)) return `<span class="chip PAGADA">SUS CIRUGÍAS YA ESTÁN PAGADAS</span>`;
+  if (p.estado !== "APLICADO") return `<span class="chip">SIN APLICAR</span>`;
+  if (p.tipo !== "RADICADO") return `<span class="chip">APLICADO</span>`;
+  return `<span class="chip FACTURADA">POR COBRAR${p.pagadas ? ` · ${p.pagadas} YA PAGADA${p.pagadas === 1 ? "" : "S"}` : ""}</span>`;
+}
 function verPendientes() {
   limpiarFiltros();
   $("#f-estado").value = "PENDIENTE";

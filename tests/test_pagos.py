@@ -594,3 +594,29 @@ def test_buscar_paciente_en_los_pagos(con_reporte, conn):
     assert otro.get("/api/pagos/buscar", params={"q": "72000730"}).json() == {"cirugias": [], "lineas": []}
     assert c.get("/api/pagos/buscar", params={"q": "a"}).status_code == 422
     assert c.get("/api/pagos/buscar", params={"q": "--"}).json() == {"cirugias": [], "lineas": []}
+
+
+def test_radicado_con_sus_cirugias_pagadas_por_otro_lado_no_queda_por_cobrar(con_radicado):
+    c = con_radicado
+    uno = crear(c, "72000730", "2026-01-05")
+    dos = crear(c, "32622878", "2026-01-10")
+    rep = subir_radicado(c, pagador="Clínica Santa Ana (ficticia)").json()
+    c.post(f"/api/pagos/{rep['reporte_id']}/aplicar")
+    # «Paciente Uno» (ficticio) se pagó por otro lado (reporte de AP o a mano): el radicado sigue por cobrar
+    d = c.get(f"/api/cirugias/{uno}").json()
+    c.put(f"/api/cirugias/{uno}", json={**d, "estado": "PAGADA", "fecha_pago": "2026-02-10", "valor_honorarios": 500000})
+    radicado = c.get("/api/inicio").json()["radicados"][0]
+    assert (radicado["cirugias"], radicado["pagadas"], radicado["pendientes"]) == (2, 1, 2)   # dos y la línea sin cirugía
+    lista = next(x for x in c.get("/api/pagos").json() if x["reporte_id"] == rep["reporte_id"])
+    assert (lista["pagadas"], lista["pendientes"]) == (1, 2)
+
+    # se paga la otra y se registra la tercera: ya no queda nada por cobrar en ese radicado
+    d = c.get(f"/api/cirugias/{dos}").json()
+    c.put(f"/api/cirugias/{dos}", json={**d, "estado": "PAGADA", "fecha_pago": "2026-02-11"})
+    crear(c, "55555555", "2026-01-12", estado="PAGADA")
+    assert c.get("/api/inicio").json()["radicados"] == []
+    lista = next(x for x in c.get("/api/pagos").json() if x["reporte_id"] == rep["reporte_id"])
+    assert (lista["estado"], lista["pagadas"], lista["pendientes"]) == ("APLICADO", 3, 0)
+    # registrar después el pago de la clínica no cambia las fechas que ya tenían
+    c.post(f"/api/pagos/{rep['reporte_id']}/pagar", json={"fecha_pago": "2026-03-20"})
+    assert c.get(f"/api/cirugias/{uno}").json()["fecha_pago"] == "2026-02-10"

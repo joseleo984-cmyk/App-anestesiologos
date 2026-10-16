@@ -994,25 +994,39 @@ def pagar_con_linea(conn, anestesiologo_id: int, detalle_id: int, radicado_id: i
     return marcadas
 
 
+# Cuántas órdenes de cada reporte ya están pagadas y cuántas no (una línea sin cirugía en la app cuenta como
+# pendiente). Una cirugía de un radicado se puede pagar por otro lado (el reporte de pagos de AP o a mano):
+# si ya no queda ninguna pendiente, el radicado no está por cobrar aunque no se haya registrado su pago.
+_CUENTAS_PAGO = """count(DISTINCT c.cirugia_id) FILTER (WHERE c.estado = 'PAGADA') AS pagadas,
+                   count(*) FILTER (WHERE d.es_paciente
+                                      AND (c.cirugia_id IS NULL OR c.estado NOT IN ('PAGADA', 'CANCELADA'))) AS pendientes"""
+
+
 def radicados_por_cobrar(conn, anestesiologo_id: int) -> list[dict]:
-    """Radicados que la clínica aún no ha pagado, con cuántas cirugías llevan y los días desde la radicación."""
+    """Radicados que la clínica aún no ha pagado y en los que queda algo pendiente, con cuántas cirugías
+    llevan, cuántas ya están pagadas y los días desde la radicación."""
     return conn.execute(
-        """SELECT r.reporte_id, r.pagador, r.fecha_proceso, r.total_neto, r.estado,
+        f"""SELECT r.reporte_id, r.pagador, r.fecha_proceso, r.total_neto, r.estado,
                   count(DISTINCT d.cirugia_id) AS cirugias, count(d.*) FILTER (WHERE d.es_paciente) AS lineas,
-                  CURRENT_DATE - r.fecha_proceso AS dias
+                  {_CUENTAS_PAGO}, CURRENT_DATE - r.fecha_proceso AS dias
              FROM reporte_pago r LEFT JOIN pago_detalle d USING (reporte_id)
+             LEFT JOIN cirugia c ON c.cirugia_id = d.cirugia_id
             WHERE r.anestesiologo_id = %s AND r.tipo = 'RADICADO' AND r.estado <> 'PAGADO'
-            GROUP BY r.reporte_id ORDER BY r.fecha_proceso NULLS LAST, r.reporte_id""",
+            GROUP BY r.reporte_id
+           HAVING count(*) FILTER (WHERE d.es_paciente) = 0
+               OR count(*) FILTER (WHERE d.es_paciente AND (c.cirugia_id IS NULL OR c.estado NOT IN ('PAGADA', 'CANCELADA'))) > 0
+            ORDER BY r.fecha_proceso NULLS LAST, r.reporte_id""",
         (anestesiologo_id,)).fetchall()
 
 
 def listar_reportes(conn, anestesiologo_id: int) -> list[dict]:
     return conn.execute(
-        """SELECT r.reporte_id, r.pagador, r.fecha_proceso, r.periodo_desde, r.periodo_hasta, r.total_neto,
+        f"""SELECT r.reporte_id, r.pagador, r.fecha_proceso, r.periodo_desde, r.periodo_hasta, r.total_neto,
                   r.estado, r.subido_en, r.tipo, r.numero, r.pagado_en,
                   COUNT(d.*) FILTER (WHERE d.es_paciente) AS lineas,
-                  COUNT(d.*) FILTER (WHERE d.cirugia_id IS NOT NULL) AS encontradas
+                  COUNT(d.*) FILTER (WHERE d.cirugia_id IS NOT NULL) AS encontradas, {_CUENTAS_PAGO}
              FROM reporte_pago r LEFT JOIN pago_detalle d USING (reporte_id)
+             LEFT JOIN cirugia c ON c.cirugia_id = d.cirugia_id
             WHERE r.anestesiologo_id = %s
             GROUP BY r.reporte_id ORDER BY r.subido_en DESC""",
         (anestesiologo_id,),
