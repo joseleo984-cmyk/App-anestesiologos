@@ -878,6 +878,38 @@ def crear_faltantes_del_radicado(reporte_id: int, conn=Depends(get_conn, scope="
     return {**resultado, "radicado": repositorio.obtener_reporte(conn, anestesiologo_id, reporte_id)}
 
 
+@app.get("/api/pagos/lineas/{detalle_id}/candidatas")
+def candidatas_de_linea(detalle_id: int, conn=Depends(get_conn, scope="function"),
+                        anestesiologo_id=Depends(anestesiologo_actual)):
+    """Cirugías que pueden ser las de una línea no encontrada (paciente guardado con la cédula mal escrita)."""
+    try:
+        return {"candidatas": radicado.candidatas(conn, anestesiologo_id, detalle_id)}
+    except repositorio.DocumentoNoEncontrado:
+        raise HTTPException(404, "Línea no encontrada.")
+
+
+class VincularLinea(BaseModel):
+    cirugia_id: int
+    cedula_correcta: Literal["radicado", "app"]
+
+
+@app.post("/api/pagos/lineas/{detalle_id}/vincular")
+def vincular_linea(detalle_id: int, datos: VincularLinea, conn=Depends(get_conn, scope="function"),
+                   anestesiologo_id=Depends(anestesiologo_actual)):
+    """La línea es de esa cirugía: se corrige la cédula que estaba mal (en la app o en la línea) y se cruza."""
+    try:
+        radicado.vincular(conn, anestesiologo_id, detalle_id, datos.cirugia_id, datos.cedula_correcta)
+    except repositorio.DocumentoNoEncontrado:
+        conn.rollback()
+        raise HTTPException(404, "Línea o cirugía no encontrada.")
+    except ValueError as e:
+        conn.rollback()
+        raise HTTPException(422, str(e))
+    reporte_id = conn.execute("SELECT reporte_id FROM pago_detalle WHERE detalle_id = %s", (detalle_id,)).fetchone()["reporte_id"]
+    conn.commit()
+    return repositorio.obtener_reporte(conn, anestesiologo_id, reporte_id)
+
+
 class LineaRadicado(BaseModel):
     radicado_id: int
 

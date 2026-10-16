@@ -509,3 +509,59 @@ def test_pago_global_de_santa_ana_en_el_reporte_de_ap_paga_el_radicado(con_repor
     # Una línea de paciente no se puede usar como pago de un radicado
     paciente = rep["filas"][0]["detalle_id"]
     assert c.post(f"/api/pagos/lineas/{paciente}/radicado", json={"radicado_id": radicado["reporte_id"]}).status_code == 404
+
+
+def crear_paciente(cliente, documento, fecha, nombres, apellidos):
+    datos = {**CONFIRMAR, "fecha_procedimiento": fecha,
+             "paciente": {"tipo_documento": "CC", "numero_documento": documento, "nombres": nombres, "apellidos": apellidos}}
+    r = cliente.post("/api/cirugias", json=datos)
+    assert r.status_code == 201, r.text
+    return r.json()["cirugia_id"]
+
+
+def test_paciente_guardado_con_la_cedula_mal_se_corrige_desde_el_radicado(con_radicado):
+    c = con_radicado
+    # «Paciente Tres» (ficticio) quedó guardado con un dígito mal en la cédula, en dos cirugías
+    tres = crear_paciente(c, "55555556", "2026-01-12", "Paciente", "Tres")
+    antes = crear_paciente(c, "55555556", "2025-11-02", "Paciente", "Tres")
+    crear_paciente(c, "99999999", "2026-01-11", "Otra", "Persona")      # ni nombre ni cédula parecidos
+    rep = subir_radicado(c, pagador="Clínica Santa Ana (ficticia)").json()
+    c.post(f"/api/pagos/{rep['reporte_id']}/aplicar")
+    linea = next(f for f in rep["filas"] if f["documento_paciente"] == "55555555")
+    assert linea["resultado"] == "SIN_CIRUGIA"
+
+    cand = c.get(f"/api/pagos/lineas/{linea['detalle_id']}/candidatas").json()["candidatas"]
+    assert [x["cirugia_id"] for x in cand] == [tres, antes]                # la de fecha más cercana primero
+    assert cand[0]["cedula_parecida"] is True and cand[0]["parecido"] == 100 and cand[0]["paciente"] == "Paciente Tres"
+
+    # la cédula del radicado es la buena: se corrige la ficha del paciente (sus dos cirugías)
+    r = c.post(f"/api/pagos/lineas/{linea['detalle_id']}/vincular", json={"cirugia_id": tres, "cedula_correcta": "radicado"})
+    assert r.status_code == 200, r.text
+    fila = next(f for f in r.json()["filas"] if f["detalle_id"] == linea["detalle_id"])
+    assert fila["resultado"] == "COINCIDE" and fila["cirugia_id"] == tres
+    d = c.get(f"/api/cirugias/{tres}").json()
+    assert d["paciente"]["numero_documento"] == "55555555" and d["estado"] == "FACTURADA"   # el radicado ya estaba aplicado
+    assert c.get(f"/api/cirugias/{antes}").json()["paciente"]["numero_documento"] == "55555555"
+    # volver a cruzar no la pierde
+    filas = c.post(f"/api/pagos/{rep['reporte_id']}/cruzar").json()["filas"]
+    assert next(f for f in filas if f["detalle_id"] == linea["detalle_id"])["cirugia_id"] == tres
+
+
+def test_cedula_mal_leida_en_el_radicado_se_corrige_en_la_linea(con_radicado, monkeypatch):
+    c = con_radicado
+    uno = crear_paciente(c, "72000730", "2026-01-05", "Paciente", "Uno")
+    filas = [{**RADICADO["filas"][0], "documento_paciente": "72000780"}]   # la hoja a mano se leyó con un dígito mal
+    monkeypatch.setattr(extraccion, "extraer_relacion",
+                        lambda archivos, tipo="relacion": extraccion.relacion_a_reporte({**RADICADO, "filas": filas}))
+    rep = subir_radicado(c, pagador="Clínica Santa Ana (ficticia)").json()
+    linea = rep["filas"][0]
+    assert linea["resultado"] == "SIN_CIRUGIA"
+    assert c.get(f"/api/pagos/lineas/{linea['detalle_id']}/candidatas").json()["candidatas"][0]["cirugia_id"] == uno
+    r = c.post(f"/api/pagos/lineas/{linea['detalle_id']}/vincular", json={"cirugia_id": uno, "cedula_correcta": "app"})
+    fila = r.json()["filas"][0]
+    assert fila["resultado"] == "COINCIDE" and fila["documento_paciente"] == "72000730"
+    assert c.get(f"/api/cirugias/{uno}").json()["paciente"]["numero_documento"] == "72000730"
+    # validaciones
+    assert c.post(f"/api/pagos/lineas/{linea['detalle_id']}/vincular", json={"cirugia_id": uno, "cedula_correcta": "x"}).status_code == 422
+    assert c.post(f"/api/pagos/lineas/{linea['detalle_id']}/vincular", json={"cirugia_id": 999, "cedula_correcta": "app"}).status_code == 404
+    assert c.get("/api/pagos/lineas/999/candidatas").status_code == 404

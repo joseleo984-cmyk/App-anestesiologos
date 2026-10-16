@@ -599,6 +599,10 @@
 .segmentos button .sub { font-size: .78rem; font-weight: 400; }
 .segmentos button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-bg); color: var(--text); box-shadow: inset 0 0 0 1px var(--accent); }
 .pago-radicado { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
+.boton-linea { min-height: 34px; padding: 4px 12px; font-size: .85rem; margin-top: 6px; }
+.candidata { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 10px; margin-top: 6px;
+  border: 1px solid var(--line); border-radius: 10px; }
+.candidata .boton-linea { margin-top: 0; white-space: nowrap; }
 .pago-radicado h3 { margin: 0 0 4px; }
 .faltantes strong { display: block; margin-bottom: 4px; }
 .faltantes button { display: block; width: 100%; }
@@ -1537,9 +1541,12 @@ function leerFormulario() {
 
 function cerrarFormulario() {
   $("#paso-revisar").classList.add("oculto");
-  const volverA = modo.tipo === "editar" ? "cirugias" : pestanaActual;
+  const volver = modo.volver;
+  const volverA = volver ? "pagos" : modo.tipo === "editar" ? "cirugias" : pestanaActual;
   modo = { tipo: "manual" };
   mostrarPestana(volverA);
+  if (volver) mostrarReportePago(volver.reporte).then(() =>
+    document.querySelector(`[data-linea="${volver.linea}"]`)?.scrollIntoView({ block: "center" }));
 }
 
 $("#cancelar").onclick = cerrarFormulario;
@@ -1550,10 +1557,11 @@ $("#manual").onclick = () => {
   llenarFormulario({});
 };
 
-async function abrirCirugia(id) {
+// volver: {reporte, linea} para regresar al radicado (o reporte) desde el que se abrió
+async function abrirCirugia(id, volver = null) {
   const r = await fetch(`/api/cirugias/${id}`);
   if (!r.ok) return alert("No se pudo abrir la cirugía.");
-  modo = { tipo: "editar", id };
+  modo = { tipo: "editar", id, volver };
   llenarFormulario(await r.json());
   $("#cobro-cirugia").innerHTML = "";
   const rc = await fetch(`/api/cirugias/${id}/cobro`);
@@ -4366,6 +4374,46 @@ function pintarReportePago(rep) {
   };
 }
 
+// Línea del radicado sin cirugía: el paciente puede estar guardado con la cédula mal escrita (o la hoja se leyó mal)
+const candidatasLinea = {};
+async function buscarCandidatas(rep, linea) {
+  const cont = $(`#candidatas-${linea}`);
+  cont.innerHTML = `<p class="sub">Buscando en tus cirugías…</p>`;
+  const r = await fetch(`/api/pagos/lineas/${linea}/candidatas`);
+  if (!r.ok) { cont.innerHTML = `<div class="aviso err">No se pudo buscar.</div>`; return; }
+  const { candidatas } = await r.json();
+  candidatasLinea[linea] = candidatas;
+  cont.innerHTML = candidatas.length ? `<p class="sub" style="margin:6px 0 4px">Cirugías parecidas (por nombre o por cédula):</p>
+    ${candidatas.map((c) => `<div class="candidata">
+      <div><strong>${escapar(c.paciente)}</strong>
+        <div class="sub">${escapar(c.tipo_documento)} ${escapar(c.numero_documento)} · ${escapar(fechaBreve(c.fecha_procedimiento, true))} · ${escapar(tipoTitulo(c.clinica))}</div>
+        <div class="sub">${c.cedula_parecida ? "Cédula casi igual" : ""}${c.cedula_parecida && c.parecido >= 75 ? " · " : ""}${c.parecido >= 75 ? `Nombre ${c.parecido === 100 ? "igual" : "parecido"}` : ""}</div></div>
+      <button type="button" class="boton-linea primario" data-es-esta="${c.cirugia_id}">Es esta</button></div>`).join("")}`
+    : `<p class="sub" style="margin:6px 0 0">No encontré cirugías con nombre o cédula parecidos. Si AP se quedó con la orden, créala con «Crear las cirugías que faltan».</p>`;
+}
+function elegirCedula(rep, linea, cirugiaId) {
+  const f = rep.filas.find((x) => x.detalle_id === linea), c = (candidatasLinea[linea] || []).find((x) => x.cirugia_id === cirugiaId);
+  if (!f || !c) return;
+  $(`#candidatas-${linea}`).innerHTML = `<div class="aviso warn" style="margin-top:8px">
+    <strong>¿Cuál cédula es la correcta?</strong> Compárala con el original del radicado o con la orden.
+    <div class="botones" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:8px">
+      <button type="button" class="boton-linea" data-cedula="radicado" data-cirugia="${cirugiaId}">La del radicado: ${escapar(f.documento_paciente)}</button>
+      <button type="button" class="boton-linea" data-cedula="app" data-cirugia="${cirugiaId}">La de la app: ${escapar(c.numero_documento)}</button></div>
+    <p class="sub" style="margin:6px 0 0">Si es la del radicado, se corrige el paciente en la app (todas sus cirugías). Si es la de la app, se corrige la línea del radicado.</p></div>`;
+}
+async function vincularLinea(rep, linea, cirugiaId, cedula) {
+  const r = await fetch(`/api/pagos/lineas/${linea}/vincular`, { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cirugia_id: cirugiaId, cedula_correcta: cedula }) });
+  const cuerpo = await r.json().catch(() => null);
+  if (!r.ok) return toast(mensajeError(cuerpo, "No se pudo vincular."));
+  inicioDatos = null;
+  pintarReportePago(cuerpo);
+  cargarReportesPago();
+  cargarCirugias();
+  toast(cedula === "radicado" ? "Cédula del paciente corregida y cruzada" : "Línea corregida y cruzada");
+  document.querySelector(`[data-linea="${linea}"]`)?.scrollIntoView({ block: "center" });
+}
+
 function pintarRadicado(rep) {
   $("#liquidacion-pago").innerHTML = "";
   const paginas = rep.paginas || 1;
@@ -4391,11 +4439,14 @@ function pintarRadicado(rep) {
     ${rep.cuadra === false ? `<div class="aviso err">⚠ Las líneas suman ${pesos(rep.suma_neto)} pero el total dice ${pesos(rep.total_neto)}. Revisa el original.</div>` : ""}
     <p>${plural(encontradas, "orden encontrada en tus cirugías", "órdenes encontradas en tus cirugías")} ·
        ${plural(cuenta("SIN_CIRUGIA"), "sin cirugía en la app", "sin cirugía en la app")}</p>
-    <div>${rep.filas.map((f) => `<div class="linea-pago">
+    <div id="lineas-radicado">${rep.filas.map((f) => `<div class="linea-pago" data-linea="${f.detalle_id}">
       <div class="item-cab"><strong>${escapar(f.paciente || "—")}</strong>${f.neto != null ? `<span class="valor">${pesos(f.neto)}</span>` : ""}</div>
       <div class="sub">${[f.documento_paciente, f.empresa, f.procedimiento, f.numero_orden && `orden ${f.numero_orden}`].filter(Boolean).map(escapar).join(" · ")}</div>
       <div style="margin-top:4px"><span class="chip ${f.resultado === "COINCIDE" ? f.estado_cirugia : f.resultado}">${etiqueta(f)}</span>
         ${f.cirugia_id ? `<span class="sub"> · cirugía del ${escapar(f.fecha_procedimiento)} (${escapar(f.paciente_app)})</span>` : ""}</div>
+      ${f.cirugia_id ? `<button type="button" class="boton-linea" data-corregir="${f.cirugia_id}">✏️ Corregir cirugía</button>`
+        : f.resultado === "SIN_CIRUGIA" ? `<button type="button" class="boton-linea" data-buscar="${f.detalle_id}">🔎 ¿Está guardada con otra cédula?</button>
+          <div class="candidatas" id="candidatas-${f.detalle_id}"></div>` : ""}
     </div>`).join("")}</div>
     ${cuenta("SIN_CIRUGIA") ? `<div class="aviso warn faltantes">
       <strong>${cuenta("SIN_CIRUGIA")} paciente${cuenta("SIN_CIRUGIA") === 1 ? "" : "s"} del radicado no está${cuenta("SIN_CIRUGIA") === 1 ? "" : "n"} en la app.</strong>
@@ -4445,6 +4496,15 @@ function pintarRadicado(rep) {
     $("#detalle-pago").innerHTML = "";
     inicioDatos = null;
     cargarReportesPago();
+  };
+  $("#lineas-radicado").onclick = (e) => {
+    const b = e.target.closest("[data-corregir],[data-buscar],[data-es-esta],[data-cedula]");
+    if (!b) return;
+    const linea = Number(b.closest("[data-linea]").dataset.linea);
+    if (b.dataset.corregir) return abrirCirugia(Number(b.dataset.corregir), { reporte: rep.reporte_id, linea });
+    if (b.dataset.buscar) return buscarCandidatas(rep, linea);
+    if (b.dataset.esEsta) return elegirCedula(rep, linea, Number(b.dataset.esEsta));
+    if (b.dataset.cedula) return vincularLinea(rep, linea, Number(b.dataset.cirugia), b.dataset.cedula);
   };
   const faltantes = $("#crear-faltantes");
   if (faltantes) faltantes.onclick = async () => {
