@@ -620,3 +620,34 @@ def test_radicado_con_sus_cirugias_pagadas_por_otro_lado_no_queda_por_cobrar(con
     # registrar después el pago de la clínica no cambia las fechas que ya tenían
     c.post(f"/api/pagos/{rep['reporte_id']}/pagar", json={"fecha_pago": "2026-03-20"})
     assert c.get(f"/api/cirugias/{uno}").json()["fecha_pago"] == "2026-02-10"
+
+
+def test_radicado_pagado_por_paciente(con_radicado, conn):
+    c = con_radicado
+    uno = crear(c, "72000730", "2026-01-05")
+    dos = crear(c, "32622878", "2026-01-10")
+    rep = subir_radicado(c, pagador="Clínica Ficticia del Norte").json()
+    assert rep["pagador"] == "Clínica Ficticia del Norte"            # no solo Santa Ana
+    c.post(f"/api/pagos/{rep['reporte_id']}/aplicar")
+    lineas = {f["documento_paciente"]: f["detalle_id"] for f in rep["filas"]}
+    url = f"/api/pagos/{rep['reporte_id']}/pagar-pacientes"
+    # la clínica pagó solo a «Paciente Uno» (ficticio), con su valor
+    r = c.post(url, json={"fecha_pago": "2026-02-20", "lineas": [{"detalle_id": lineas["72000730"], "valor": 650000}]})
+    assert r.status_code == 200, r.text
+    assert r.json()["marcadas"] == 1 and r.json()["radicado"]["estado"] == "APLICADO"
+    d = c.get(f"/api/cirugias/{uno}").json()
+    assert d["estado"] == "PAGADA" and d["fecha_pago"] == "2026-02-20" and d["valor_honorarios"] == 650000
+    assert c.get(f"/api/cirugias/{dos}").json()["estado"] == "FACTURADA"
+    fila = next(f for f in r.json()["radicado"]["filas"] if f["detalle_id"] == lineas["72000730"])
+    assert fila["valor_cirugia"] == 650000
+    radicado = c.get("/api/inicio").json()["radicados"][0]
+    assert radicado["pagadas"] == 1 and radicado["pendientes"] == 2
+    # pagarla otra vez no cambia su fecha; sin valor se conserva el que tenía
+    assert c.post(url, json={"fecha_pago": "2026-03-01", "lineas": [{"detalle_id": lineas["72000730"]}]}).json()["marcadas"] == 0
+    assert c.get(f"/api/cirugias/{uno}").json()["fecha_pago"] == "2026-02-20"
+    # una línea sin cirugía en la app no se puede pagar; otra de otro reporte tampoco
+    assert c.post(url, json={"fecha_pago": "2026-03-01", "lineas": [{"detalle_id": lineas["55555555"]}]}).status_code == 422
+    assert c.post(url, json={"fecha_pago": "2026-03-01", "lineas": [{"detalle_id": 99999}]}).status_code == 422
+    assert c.post(url, json={"fecha_pago": "2026-03-01", "lineas": []}).status_code == 422
+    assert c.post("/api/pagos/99999/pagar-pacientes", json={"fecha_pago": "2026-03-01",
+                                                          "lineas": [{"detalle_id": 1}]}).status_code == 404

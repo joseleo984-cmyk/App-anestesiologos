@@ -600,6 +600,11 @@
 .segmentos button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-bg); color: var(--text); box-shadow: inset 0 0 0 1px var(--accent); }
 .pago-radicado { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
 #buscar-pago { margin-top: 4px; }
+.pago-paciente { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); }
+.pago-paciente label { flex: 1; display: flex; gap: 10px; align-items: flex-start; margin: 0; font-weight: 400; }
+.pago-paciente label > span { display: grid; gap: 2px; }
+.pago-paciente input[type="checkbox"] { width: 22px; height: 22px; margin-top: 2px; flex: 0 0 auto; }
+.pago-paciente input[inputmode] { width: 120px; flex: 0 0 auto; text-align: right; }
 .titulo-busqueda { margin: 14px 0 4px; font-size: .9rem; }
 .resultado-busqueda { display: grid; gap: 3px; width: 100%; text-align: left; padding: 10px 12px; margin-top: 6px; font-weight: 400; }
 .resultado-busqueda .item-cab { display: flex; justify-content: space-between; gap: 8px; }
@@ -713,15 +718,15 @@
       <div id="estado-pago"></div>
     </section>
     <section class="card">
-      <h2>Clínicas que pagan el total (ej. Santa Ana)</h2>
-      <p class="sub">Estas clínicas no pagan paciente por paciente sino el total de la relación de órdenes entregada.
+      <h2>Radicados de clínicas</h2>
+      <p class="sub">Para cualquier clínica a la que entregas (radicas) la relación de órdenes y que paga después, todo junto o por paciente.
         Sube la hoja (foto o PDF, todas sus páginas; puede estar escrita a mano): la app cruza cada paciente con su cirugía.</p>
       <div class="segmentos" id="relacion-tipo" role="radiogroup" aria-label="Qué vas a subir">
         <button type="button" data-tipo="RADICADO" aria-pressed="true">Radicado<span class="sub">Órdenes entregadas, aún sin pagar</span></button>
         <button type="button" data-tipo="RELACION" aria-pressed="false">Relación pagada<span class="sub">La clínica ya pagó el total</span></button>
       </div>
       <div class="fila">
-        <div><label for="relacion-pagador">Clínica</label><input id="relacion-pagador" value="Clínica Santa Ana de Dios" autocomplete="off"></div>
+        <div><label for="relacion-pagador">Clínica</label><input id="relacion-pagador" list="clinicas-radicado" placeholder="Si la dejas vacía, la que diga la hoja" autocomplete="off"><datalist id="clinicas-radicado"></datalist></div>
         <div><label for="relacion-fecha" id="relacion-fecha-etiqueta">Fecha del radicado</label><input id="relacion-fecha" type="date"></div>
       </div>
       <p class="sub" id="relacion-ayuda">Si no pones la fecha se usa la del sello de recibido o la de la hoja. Al aplicarlo, las
@@ -3866,6 +3871,7 @@ async function cargarOpciones() {
   };
   llenar("#f-cirujano", o.cirujanos, "Todos");
   llenar("#f-clinica", o.clinicas, "Todas");
+  $("#clinicas-radicado").innerHTML = o.clinicas.map((c) => `<option value="${escapar(c.nombre)}">`).join("");
   llenar("#f-aseguradora", o.aseguradoras, "Todas", `<option value="PARTICULAR">Particular</option>`);
   cargarClinicas();
   cargarSugerencias();
@@ -4479,6 +4485,11 @@ function pintarRadicado(rep) {
   const yaPagadas = rep.filas.filter((f) => f.cirugia_id && f.estado_cirugia === "PAGADA").length;
   const porPagar = rep.filas.filter((f) => f.cirugia_id && !["PAGADA", "CANCELADA"].includes(f.estado_cirugia)).length;
   const todoPagado = !pagado && rep.filas.length > 0 && cuenta("SIN_CIRUGIA") === 0 && porPagar === 0;
+  // si ya se pagaron algunos pacientes, el valor sugerido es lo que falta (si todas las que faltan tienen valor)
+  const faltan = rep.filas.filter((f) => f.cirugia_id && !["PAGADA", "CANCELADA"].includes(f.estado_cirugia))
+    .filter((f, i, a) => a.findIndex((x) => x.cirugia_id === f.cirugia_id) === i);
+  const valorSugerido = !yaPagadas ? rep.total_neto
+    : faltan.length && faltan.every((f) => f.valor_cirugia != null) ? faltan.reduce((t, f) => t + Number(f.valor_cirugia), 0) : null;
   const plural = (n, uno, varios) => `<strong>${n}</strong> ${n === 1 ? uno : varios}`;
   const etiqueta = (f) => f.resultado !== "COINCIDE" ? RESULTADO[f.resultado]
     : f.estado_cirugia === "PAGADA" ? "✓ Pagada" : f.estado_cirugia === "FACTURADA" ? "✓ Radicada" : "✓ Encontrada";
@@ -4516,7 +4527,7 @@ function pintarRadicado(rep) {
       <button type="button" class="primario" id="crear-faltantes" style="margin-top:8px">➕ Crear ${cuenta("SIN_CIRUGIA") === 1 ? "la cirugía que falta" : `las ${cuenta("SIN_CIRUGIA")} cirugías que faltan`}</button>
       <p class="sub" style="margin:8px 0 0">Si la cédula quedó mal leída, compárala con el original: corrígela en la cirugía que ya tienes y toca «Volver a cruzar».</p>
     </div>` : ""}
-    ${pagado ? `<div class="aviso ok">✓ Santa Ana pagó este radicado: ${pesos(rep.valor_pagado)} el ${escapar(rep.pagado_en)}. Sus cirugías quedaron pagadas.</div>` : ""}
+    ${pagado ? `<div class="aviso ok">✓ ${escapar(rep.pagador || "La clínica")} pagó este radicado: ${pesos(rep.valor_pagado)} el ${escapar(rep.pagado_en)}. Sus cirugías quedaron pagadas.</div>` : ""}
     <div class="acciones-pago">
       ${porRadicar ? `<button type="button" class="primario" id="aplicar-pago">Marcar ${porRadicar} cirugía${porRadicar === 1 ? "" : "s"} como radicada${porRadicar === 1 ? "" : "s"}</button>` : ""}
       ${cuenta("SIN_CIRUGIA") ? `<button type="button" id="cruzar-pago">Volver a cruzar</button>` : ""}
@@ -4526,11 +4537,27 @@ function pintarRadicado(rep) {
       Si quieres, registra abajo el pago de la clínica para guardar su fecha y valor: las fechas de pago de las cirugías no cambian.</div>` : ""}
     ${!pagado && encontradas ? `<form class="pago-radicado" id="form-pagar" novalidate>
       <h3>¿Ya pagó la clínica?</h3>
-      <p class="sub">${porPagar ? `Registra el pago y ${porPagar === 1 ? "la cirugía que falta queda pagada" : `las ${porPagar} cirugías que faltan quedan pagadas`} con esa fecha.` : "Registra el pago de la clínica."}
-        ${yaPagadas ? `${yaPagadas === 1 ? "La que ya estaba pagada conserva" : `Las ${yaPagadas} que ya estaban pagadas conservan`} su fecha.` : ""} El valor de cada cirugía no cambia.</p>
+      ${porPagar ? `<div class="segmentado seg-ancho" id="pagar-modo" style="margin:4px 0 8px">
+        <button type="button" data-modo-pago="todo" aria-pressed="true">${yaPagadas ? "Pagó el resto" : "Pagó todo"}</button>
+        <button type="button" data-modo-pago="pacientes" aria-pressed="false">Por paciente</button></div>` : ""}
+      <div id="pagar-todo">
+        <p class="sub">${porPagar ? `Registra el pago y ${porPagar === 1 ? "la cirugía que falta queda pagada" : `las ${porPagar} cirugías que faltan quedan pagadas`} con esa fecha.` : "Registra el pago de la clínica."}
+          ${yaPagadas ? `${yaPagadas === 1 ? "La que ya estaba pagada conserva" : `Las ${yaPagadas} que ya estaban pagadas conservan`} su fecha.` : ""} El valor de cada cirugía no cambia.</p>
+      </div>
+      <div id="pagar-por-paciente" class="oculto">
+        <p class="sub">Marca los pacientes que pagó la clínica y revisa el valor de cada uno. Los demás siguen por cobrar.</p>
+        <button type="button" class="enlace" id="pagar-marcar-todos" style="border:0;background:none;min-height:0;padding:2px 0">Marcar todos</button>
+        ${rep.filas.filter((f) => f.cirugia_id && !["PAGADA", "CANCELADA"].includes(f.estado_cirugia))
+          .filter((f, i, a) => a.findIndex((x) => x.cirugia_id === f.cirugia_id) === i).map((f) => `<div class="pago-paciente">
+          <label><input type="checkbox" data-pagar-linea="${f.detalle_id}">
+            <span><strong>${escapar(f.paciente_app || f.paciente || "—")}</strong><span class="sub">${escapar(f.documento_paciente || "")} · ${escapar(f.procedimiento || "")}</span></span></label>
+          <input inputmode="numeric" data-valor-linea="${f.detalle_id}" aria-label="Valor pagado de ${escapar(f.paciente_app || f.paciente || "")}"
+            placeholder="Valor" value="${f.valor_cirugia != null ? formatoMiles(f.valor_cirugia) : ""}"></div>`).join("")}
+        <p class="sub" id="pagar-seleccion" style="margin:8px 0 0">Ningún paciente marcado.</p>
+      </div>
       <div class="fila">
         <div><label for="pagar-fecha">Fecha del pago</label><input id="pagar-fecha" type="date" value="${hoyIso}" required></div>
-        <div><label for="pagar-valor">Valor pagado ($)</label><input id="pagar-valor" inputmode="numeric" value="${rep.total_neto != null ? formatoMiles(rep.total_neto) : ""}"></div>
+        <div id="pagar-valor-total"><label for="pagar-valor">Valor pagado ($)</label><input id="pagar-valor" inputmode="numeric" value="${valorSugerido != null ? formatoMiles(valorSugerido) : ""}"></div>
       </div>
       <button type="submit" class="primario" style="margin-top:8px">✓ Registrar pago</button>
     </form>` : ""}
@@ -4584,10 +4611,52 @@ function pintarRadicado(rep) {
     cargarCirugias();
   };
   const formPagar = $("#form-pagar");
+  let modoPago = "todo";
+  const marcados = () => [...document.querySelectorAll("#pagar-por-paciente [data-pagar-linea]:checked")];
+  const valorDe = (id) => $(`[data-valor-linea="${id}"]`).value.replace(/\D/g, "");
+  const resumirSeleccion = () => {
+    const m = marcados(), total = m.reduce((s, c) => s + Number(valorDe(c.dataset.pagarLinea) || 0), 0);
+    $("#pagar-seleccion").textContent = m.length ? `${m.length} paciente${m.length === 1 ? "" : "s"} marcado${m.length === 1 ? "" : "s"} · ${pesos(total)}` : "Ningún paciente marcado.";
+  };
+  if (formPagar) {
+    formPagar.querySelectorAll("[data-modo-pago]").forEach((b) => b.onclick = () => {
+      modoPago = b.dataset.modoPago;
+      formPagar.querySelectorAll("[data-modo-pago]").forEach((x) => x.setAttribute("aria-pressed", x === b));
+      $("#pagar-todo").classList.toggle("oculto", modoPago !== "todo");
+      $("#pagar-valor-total").classList.toggle("oculto", modoPago !== "todo");
+      $("#pagar-por-paciente").classList.toggle("oculto", modoPago !== "pacientes");
+    });
+    $("#pagar-por-paciente").addEventListener("input", resumirSeleccion);
+    $("#pagar-por-paciente").addEventListener("change", resumirSeleccion);
+    formPagar.querySelectorAll("[data-valor-linea]").forEach((i) => i.addEventListener("blur", () => {
+      const d = i.value.replace(/\D/g, ""); i.value = d ? formatoMiles(d) : ""; }));
+    $("#pagar-marcar-todos").onclick = () => {
+      const cajas = [...document.querySelectorAll("#pagar-por-paciente [data-pagar-linea]")], todas = cajas.every((c) => c.checked);
+      cajas.forEach((c) => c.checked = !todas);
+      $("#pagar-marcar-todos").textContent = todas ? "Marcar todos" : "Desmarcar todos";
+      resumirSeleccion();
+    };
+  }
   if (formPagar) formPagar.onsubmit = async (ev) => {
     ev.preventDefault();
     const fecha = $("#pagar-fecha").value;
     if (!fecha) return toast("Pon la fecha del pago");
+    if (modoPago === "pacientes") {
+      const m = marcados();
+      if (!m.length) return toast("Marca los pacientes que pagó la clínica");
+      if (!confirm(`¿Marcar como pagad${m.length === 1 ? "o el paciente marcado" : `os los ${m.length} pacientes marcados`}, con fecha ${fecha}?`)) return;
+      const boton = ev.submitter; boton.disabled = true;
+      const r = await fetch(`/api/pagos/${rep.reporte_id}/pagar-pacientes`, { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fecha_pago: fecha, lineas: m.map((c) => ({ detalle_id: Number(c.dataset.pagarLinea),
+          valor: valorDe(c.dataset.pagarLinea) ? Number(valorDe(c.dataset.pagarLinea)) : null })) }) });
+      const cuerpo = await r.json().catch(() => null);
+      if (!r.ok) { boton.disabled = false; return toast(mensajeError(cuerpo, "No se pudo registrar el pago.")); }
+      toast(`${cuerpo.marcadas} paciente${cuerpo.marcadas === 1 ? "" : "s"} pagado${cuerpo.marcadas === 1 ? "" : "s"}`);
+      inicioDatos = null;
+      pintarReportePago(cuerpo.radicado);
+      cargarReportesPago();
+      return;
+    }
     const valor = $("#pagar-valor").value.replace(/\D/g, "");
     if (!confirm(porPagar ? `¿Marcar como pagadas las ${porPagar} cirugías que faltan de este radicado, con fecha ${fecha}?`
       : `¿Registrar el pago de la clínica con fecha ${fecha}?`)) return;

@@ -7,6 +7,7 @@ ciudad) para no duplicar información cuando llega una nueva orden.
 import re
 import unicodedata
 from datetime import date
+from decimal import Decimal
 from typing import Optional
 
 import psycopg
@@ -903,7 +904,7 @@ def obtener_reporte(conn, anestesiologo_id: int, reporte_id: int) -> Optional[di
                   d.autorizacion, d.total, d.glosas, d.descuentos, d.neto, d.es_paciente, d.cirugia_id,
                   d.numero_orden, d.procedimiento, d.radicado_id, rr.fecha_proceso AS radicado_fecha,
                   rr.pagador AS radicado_pagador,
-                  c.fecha_procedimiento, c.estado AS estado_cirugia,
+                  c.fecha_procedimiento, c.estado AS estado_cirugia, c.valor_honorarios AS valor_cirugia,
                   p.nombres || ' ' || p.apellidos AS paciente_app,
                   CASE WHEN d.pago_global THEN 'PAGO_GLOBAL'
                        WHEN NOT d.es_paciente THEN 'OTRO_CONCEPTO'
@@ -978,6 +979,27 @@ def pagar_radicado(conn, anestesiologo_id: int, reporte_id: int, fecha_pago, val
             (fecha_pago, valor, reporte_id, anestesiologo_id)).rowcount:
         raise DocumentoNoEncontrado()
     return _marcar_pagadas(conn, anestesiologo_id, reporte_id, fecha_pago)
+
+
+def pagar_pacientes(conn, anestesiologo_id: int, reporte_id: int, fecha_pago, lineas: list[tuple[int, Optional[Decimal]]]) -> int:
+    """La clínica pagó solo algunos pacientes del radicado: esas cirugías quedan pagadas con la fecha y, si se
+    da, el valor de cada una. El radicado sigue por cobrar mientras le queden pacientes sin pagar.
+    Devuelve cuántas cirugías se marcaron."""
+    rep = conn.execute("SELECT tipo FROM reporte_pago WHERE reporte_id = %s AND anestesiologo_id = %s",
+                       (reporte_id, anestesiologo_id)).fetchone()
+    if rep is None or rep["tipo"] != "RADICADO":
+        raise DocumentoNoEncontrado()
+    marcadas = 0
+    for detalle_id, valor in lineas:
+        fila = conn.execute("SELECT cirugia_id FROM pago_detalle WHERE detalle_id = %s AND reporte_id = %s",
+                            (detalle_id, reporte_id)).fetchone()
+        if fila is None or fila["cirugia_id"] is None:
+            raise ValueError("Uno de los pacientes no tiene cirugía en la app: búscala o créala primero.")
+        marcadas += conn.execute(
+            """UPDATE cirugia SET estado = 'PAGADA', fecha_pago = %s, valor_honorarios = COALESCE(%s, valor_honorarios)
+                WHERE cirugia_id = %s AND anestesiologo_id = %s AND estado NOT IN ('PAGADA', 'CANCELADA')""",
+            (fecha_pago, valor, fila["cirugia_id"], anestesiologo_id)).rowcount
+    return marcadas
 
 
 def pagar_con_linea(conn, anestesiologo_id: int, detalle_id: int, radicado_id: int) -> int:

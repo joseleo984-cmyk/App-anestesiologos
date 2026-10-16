@@ -941,6 +941,33 @@ def pagar_radicado(reporte_id: int, pago: PagoRadicado, conn=Depends(get_conn, s
     return {"marcadas": marcadas}
 
 
+class LineaPagada(BaseModel):
+    detalle_id: int
+    valor: Optional[Decimal] = Field(default=None, ge=0, le=Decimal("10000000000"))
+
+
+class PagoPacientes(BaseModel):
+    fecha_pago: date
+    lineas: list[LineaPagada] = Field(min_length=1, max_length=500)
+
+
+@app.post("/api/pagos/{reporte_id}/pagar-pacientes")
+def pagar_pacientes_del_radicado(reporte_id: int, pago: PagoPacientes, conn=Depends(get_conn, scope="function"),
+                                 anestesiologo_id=Depends(anestesiologo_actual)):
+    """La clínica pagó solo algunos pacientes del radicado: quedan pagados con la fecha y su valor."""
+    try:
+        marcadas = repositorio.pagar_pacientes(conn, anestesiologo_id, reporte_id, pago.fecha_pago,
+                                               [(x.detalle_id, x.valor) for x in pago.lineas])
+    except repositorio.DocumentoNoEncontrado:
+        conn.rollback()
+        raise HTTPException(404, "Radicado no encontrado.")
+    except ValueError as e:
+        conn.rollback()
+        raise HTTPException(422, str(e))
+    conn.commit()
+    return {"marcadas": marcadas, "radicado": repositorio.obtener_reporte(conn, anestesiologo_id, reporte_id)}
+
+
 @app.get("/api/pagos/buscar")
 def buscar_paciente_en_pagos(q: str = Query(min_length=2, max_length=80), conn=Depends(get_conn, scope="function"),
                              anestesiologo_id=Depends(anestesiologo_actual)):
