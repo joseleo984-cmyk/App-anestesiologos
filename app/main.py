@@ -738,6 +738,32 @@ def reporte_de_glosas(desde: Optional[date] = None, hasta: Optional[date] = None
     return repositorio.reporte_glosas(conn, anestesiologo_id, desde, hasta)
 
 
+@app.get("/api/cirugias/repetidas")
+def cirugias_repetidas(conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
+    """Cirugías del mismo paciente, el mismo día y en la misma clínica (casi siempre registradas dos veces)."""
+    return {"grupos": repositorio.cirugias_repetidas(conn, anestesiologo_id)}
+
+
+class UnirCirugias(BaseModel):
+    conservar: int
+    eliminar: int
+
+
+@app.post("/api/cirugias/unir")
+def unir_cirugias(datos: UnirCirugias, conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
+    """Une una cirugía repetida en la otra y borra la repetida."""
+    try:
+        repositorio.unir_cirugias(conn, anestesiologo_id, datos.conservar, datos.eliminar)
+    except repositorio.DocumentoNoEncontrado:
+        conn.rollback()
+        raise HTTPException(404, "Cirugía no encontrada.")
+    except ValueError as e:
+        conn.rollback()
+        raise HTTPException(422, str(e))
+    conn.commit()
+    return {"cirugia_id": datos.conservar, "grupos": repositorio.cirugias_repetidas(conn, anestesiologo_id)}
+
+
 @app.get("/api/cirugias/{cirugia_id}")
 def ver_cirugia(cirugia_id: int, conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
     cirugia = repositorio.obtener_cirugia(conn, anestesiologo_id, cirugia_id)

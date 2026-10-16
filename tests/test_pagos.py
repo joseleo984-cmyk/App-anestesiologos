@@ -492,9 +492,10 @@ def test_pago_global_de_santa_ana_en_el_reporte_de_ap_paga_el_radicado(con_repor
     otra = {**santa_ana, "paciente": "ANA F", "neto": 1000, "total": 1000, "descuentos": 0}
     c.poner_reporte({**REPORTE, "total_neto": None, "filas": [REPORTE["filas"][0], santa_ana, otra]})
     rep = subir(c).json()
-    assert [f["resultado"] for f in rep["filas"]] == ["SIN_CIRUGIA", "PAGO_GLOBAL", "PAGO_GLOBAL"]
+    # el paciente del radicado también viene en el reporte de AP: se encuentra (un radicado no es un pago)
+    assert [f["resultado"] for f in rep["filas"]] == ["COINCIDE", "PAGO_GLOBAL", "PAGO_GLOBAL"]
+    assert rep["filas"][0]["cirugia_id"] == uno
     assert [r["reporte_id"] for r in rep["radicados_por_cobrar"]] == [radicado["reporte_id"]]
-    assert c.get("/api/inicio").json()["por_aplicar"] == 0
 
     linea = rep["filas"][1]["detalle_id"]
     r = c.post(f"/api/pagos/lineas/{linea}/radicado", json={"radicado_id": radicado["reporte_id"]})
@@ -651,3 +652,78 @@ def test_radicado_pagado_por_paciente(con_radicado, conn):
     assert c.post(url, json={"fecha_pago": "2026-03-01", "lineas": []}).status_code == 422
     assert c.post("/api/pagos/99999/pagar-pacientes", json={"fecha_pago": "2026-03-01",
                                                           "lineas": [{"detalle_id": 1}]}).status_code == 404
+
+
+def test_cirugia_pagada_por_el_reporte_de_ap_se_encuentra_en_el_radicado_sin_duplicarla(con_reporte, con_radicado, monkeypatch):
+    c = con_radicado
+    # «Paciente Uno» (ficticio) se pagó por el reporte de AP y además viene en un radicado de la clínica
+    uno = crear(c, "72000730", "2026-08-14")
+    rep_pagos = subir(c).json()
+    c.post(f"/api/pagos/{rep_pagos['reporte_id']}/aplicar")
+    assert c.get(f"/api/cirugias/{uno}").json()["estado"] == "PAGADA"
+    monkeypatch.setattr(extraccion, "extraer_relacion", lambda archivos, tipo="relacion": extraccion.relacion_a_reporte(
+        {**RADICADO, "fecha": "2026-09-01", "filas": [RADICADO["filas"][0]]}))
+    rad = subir_radicado(c, pagador="Clínica Ficticia").json()
+    assert rad["filas"][0]["cirugia_id"] == uno                      # antes salía «sin cirugía en la app»
+    assert c.post(f"/api/pagos/{rad['reporte_id']}/crear-faltantes").json()["creadas"] == 0
+    assert len(c.get("/api/cirugias").json()) == 1                   # sin duplicado
+    c.post(f"/api/pagos/{rad['reporte_id']}/aplicar")
+    assert c.get(f"/api/cirugias/{uno}").json()["estado"] == "PAGADA"  # radicarla no le quita el pago
+
+
+def test_cirugia_radicada_se_encuentra_y_se_paga_en_el_reporte_de_ap(con_reporte, con_radicado, monkeypatch):
+    c = con_radicado
+    uno = crear(c, "72000730", "2026-08-14")
+    monkeypatch.setattr(extraccion, "extraer_relacion", lambda archivos, tipo="relacion": extraccion.relacion_a_reporte(
+        {**RADICADO, "fecha": "2026-09-01", "filas": [RADICADO["filas"][0]]}))
+    rad = subir_radicado(c, pagador="Clínica Ficticia").json()
+    c.post(f"/api/pagos/{rad['reporte_id']}/aplicar")
+    assert c.get(f"/api/cirugias/{uno}").json()["estado"] == "FACTURADA"
+    rep = subir(c).json()
+    assert rep["filas"][0]["cirugia_id"] == uno                      # antes no la encontraba por estar en el radicado
+    assert c.post(f"/api/pagos/{rep['reporte_id']}/aplicar").json()["marcadas"] == 1
+    assert c.get(f"/api/cirugias/{uno}").json()["estado"] == "PAGADA"
+    # el radicado ya no queda por cobrar (su única cirugía está pagada)
+    assert c.get("/api/inicio").json()["radicados"] == []
+
+
+def test_unir_cirugias_repetidas(con_radicado, conn):
+    c = con_radicado
+    # La misma cirugía ficticia quedó dos veces: la original (pagada, con su orden) y una creada desde un radicado
+    original = crear(c, "72000730", "2026-01-15", estado="PAGADA")
+    conn.execute("UPDATE cirugia SET fecha_pago = '2026-04-07', valor_honorarios = 343917 WHERE cirugia_id = %s", (original,))
+    conn.commit()
+    datos = {**CONFIRMAR, "fecha_procedimiento": "2026-01-15", "estado": "FACTURADA", "numero_orden": "OR-9",
+             "observaciones": "Creada desde el radicado de prueba: revisa la fecha.",
+             "paciente": {**CONFIRMAR["paciente"], "numero_documento": "72.000.730"},
+             "procedimientos": [{"codigo": "PENDIENTE1", "nombre": "Por confirmar", "es_principal": True}]}
+    r = c.post("/api/cirugias", json=datos)
+    assert r.status_code == 201, r.text
+    copia = r.json()["cirugia_id"]
+    crear(c, "72000730", "2026-02-20")                                 # otro día: no es repetida
+    rad = subir_radicado(c, pagador="Clínica Ficticia").json()
+    linea = next(f for f in rad["filas"] if f["documento_paciente"] == "72000730")["detalle_id"]
+    conn.execute("UPDATE pago_detalle SET cirugia_id = %s WHERE detalle_id = %s", (copia, linea))
+    conn.commit()
+
+    assert c.get("/api/inicio").json()["repetidas"] == 1
+    grupos = c.get("/api/cirugias/repetidas").json()["grupos"]
+    assert len(grupos) == 1
+    assert [x["cirugia_id"] for x in grupos[0]["cirugias"]] == [original, copia]   # se sugiere conservar la original
+    assert grupos[0]["cirugias"][1]["desde_radicado"] is True
+
+    r = c.post("/api/cirugias/unir", json={"conservar": original, "eliminar": copia})
+    assert r.status_code == 200, r.text
+    assert r.json()["grupos"] == []
+    d = c.get(f"/api/cirugias/{original}").json()
+    assert d["estado"] == "PAGADA" and d["fecha_pago"] == "2026-04-07" and d["valor_honorarios"] == 343917
+    assert d["numero_orden"] == "OR-9" and [p["codigo"] for p in d["procedimientos"]] == ["471100"]
+    assert c.get(f"/api/cirugias/{copia}").status_code == 404
+    fila = next(f for f in c.get(f"/api/pagos/{rad['reporte_id']}").json()["filas"] if f["detalle_id"] == linea)
+    assert fila["cirugia_id"] == original
+    assert c.get("/api/inicio").json()["repetidas"] == 0
+    # validaciones
+    otra = crear(c, "99999999", "2026-01-15")
+    assert c.post("/api/cirugias/unir", json={"conservar": original, "eliminar": otra}).status_code == 422
+    assert c.post("/api/cirugias/unir", json={"conservar": original, "eliminar": original}).status_code == 422
+    assert c.post("/api/cirugias/unir", json={"conservar": original, "eliminar": 99999}).status_code == 404

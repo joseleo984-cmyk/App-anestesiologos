@@ -817,14 +817,16 @@ def conciliar(conn, anestesiologo_id: int, reporte_id: int) -> None:
                   AND (%(fecha)s::date IS NULL
                        OR c.fecha_procedimiento BETWEEN %(fecha)s::date - %(antes)s AND %(fecha)s::date + %(despues)s)
                   AND (%(pago)s::date IS NULL OR c.fecha_procedimiento <= %(pago)s::date)
-                  -- no tomar cirugías ya pagadas por otro reporte aplicado
+                  -- no tomar cirugías que ya tiene otro reporte aplicado del mismo tipo: dos reportes de pago no
+                  -- pagan dos veces la misma cirugía, ni dos radicados la radican dos veces. Pero un radicado no es
+                  -- un pago: la misma cirugía está en el radicado de la clínica y en el reporte de pagos de AP
                   AND NOT EXISTS (SELECT 1 FROM pago_detalle d JOIN reporte_pago r USING (reporte_id)
-                                   WHERE d.cirugia_id = c.cirugia_id AND r.estado = 'APLICADO'
-                                     AND r.reporte_id <> %(rep)s)
+                                   WHERE d.cirugia_id = c.cirugia_id AND r.estado IN ('APLICADO', 'PAGADO')
+                                     AND r.reporte_id <> %(rep)s AND (r.tipo = 'RADICADO') = %(radicado)s)
                 ORDER BY orden, distancia, c.fecha_procedimiento DESC""",
             {"fecha": fecha, "anest": anestesiologo_id, "doc": f["documento_paciente"], "orden": f["orden"] or "",
              "antes": DIAS_ANTES, "despues": despues, "pago": pago["fecha_proceso"] if pago else None,
-             "rep": reporte_id},
+             "rep": reporte_id, "radicado": bool(pago) and pago["tipo"] == "RADICADO"},
         ).fetchall()
         elegida = next((c["cirugia_id"] for c in candidatas if c["cirugia_id"] not in usadas), None)
         if elegida:
@@ -1119,3 +1121,67 @@ def buscar_en_pagos(conn, anestesiologo_id: int, texto: str, maximo: int = 30) -
              WHERE r.anestesiologo_id = %(anest)s AND d.es_paciente AND {filtro_d}
              ORDER BY r.fecha_proceso DESC NULLS LAST, d.detalle_id LIMIT %(max)s""", params).fetchall()
     return {"cirugias": cirugias, "lineas": lineas}
+
+
+# ---------------------------------------------------------------- cirugías repetidas
+_AVANCE = {"PAGADA": 4, "FACTURADA": 3, "REALIZADA": 2, "PROGRAMADA": 1, "CANCELADA": 0}
+
+
+def cirugias_repetidas(conn, anestesiologo_id: int) -> list[dict]:
+    """Grupos de cirugías del mismo paciente (por cédula), el mismo día y en la misma clínica: casi siempre la
+    misma cirugía registrada dos veces (por ejemplo, creada desde un radicado cuando ya existía). En cada grupo
+    la primera es la que se sugiere conservar: la original (no creada desde un radicado) y la más avanzada."""
+    filas = conn.execute(
+        """SELECT * FROM (
+             SELECT c.cirugia_id, c.fecha_procedimiento, c.estado, c.valor_honorarios, c.fecha_pago, c.documento_id,
+                    COALESCE(c.observaciones LIKE 'Creada desde el radicado%%', FALSE) AS desde_radicado,
+                    p.nombres || ' ' || p.apellidos AS paciente, p.tipo_documento, p.numero_documento,
+                    doc_norm(p.numero_documento) AS doc, cl.clinica_id, cl.nombre AS clinica,
+                    count(*) OVER (PARTITION BY doc_norm(p.numero_documento), c.fecha_procedimiento, c.clinica_id) AS veces
+               FROM cirugia c JOIN paciente p ON p.paciente_id = c.paciente_id JOIN clinica cl ON cl.clinica_id = c.clinica_id
+              WHERE c.anestesiologo_id = %s AND c.estado <> 'CANCELADA') x
+            WHERE veces > 1 ORDER BY fecha_procedimiento DESC, doc, cirugia_id""", (anestesiologo_id,)).fetchall()
+    grupos: dict[tuple, list[dict]] = {}
+    for f in filas:
+        grupos.setdefault((f["doc"], f["fecha_procedimiento"], f["clinica_id"]), []).append(f)
+    salida = []
+    for (_, fecha, _), cirugias in grupos.items():
+        cirugias.sort(key=lambda c: (c["desde_radicado"], -_AVANCE[c["estado"]], c["documento_id"] is None, c["cirugia_id"]))
+        salida.append({"paciente": cirugias[0]["paciente"], "fecha_procedimiento": fecha, "clinica": cirugias[0]["clinica"],
+                       "cirugias": [{k: v for k, v in c.items() if k not in ("veces", "doc", "clinica_id")} for c in cirugias]})
+    return salida
+
+
+def unir_cirugias(conn, anestesiologo_id: int, conservar: int, eliminar: int) -> None:
+    """Une una cirugía repetida en la otra: la que se conserva toma lo que le falte de la otra (valor, orden
+    original, cirujano, cobertura, procedimientos si los suyos están por confirmar), el estado más avanzado
+    de las dos (con su fecha de pago) y sus líneas de los reportes. Luego se borra la repetida."""
+    if conservar == eliminar:
+        raise ValueError("Elige dos cirugías distintas.")
+    filas = {f["cirugia_id"]: f for f in conn.execute(
+        """SELECT c.*, doc_norm(p.numero_documento) AS doc FROM cirugia c JOIN paciente p ON p.paciente_id = c.paciente_id
+            WHERE c.cirugia_id IN (%s, %s) AND c.anestesiologo_id = %s FOR UPDATE OF c""",
+        (conservar, eliminar, anestesiologo_id)).fetchall()}
+    if len(filas) != 2:
+        raise DocumentoNoEncontrado()
+    a, b = filas[conservar], filas[eliminar]
+    if a["doc"] != b["doc"]:
+        raise ValueError("Solo se pueden unir cirugías del mismo paciente.")
+    pagada = a if a["estado"] == "PAGADA" else b if b["estado"] == "PAGADA" else None
+    estado = max((a["estado"], b["estado"]), key=lambda e: _AVANCE[e])
+    conn.execute(
+        """UPDATE cirugia SET estado = %s, fecha_pago = %s, valor_honorarios = COALESCE(valor_honorarios, %s),
+                  documento_id = COALESCE(documento_id, %s), numero_orden = COALESCE(numero_orden, %s),
+                  cirujano_id = COALESCE(cirujano_id, %s), cobertura_id = COALESCE(cobertura_id, %s)
+            WHERE cirugia_id = %s""",
+        (estado, pagada["fecha_pago"] if pagada else a["fecha_pago"], b["valor_honorarios"], b["documento_id"],
+         b["numero_orden"], b["cirujano_id"], b["cobertura_id"], conservar))
+    codigos = [r["codigo"] for r in conn.execute("SELECT codigo FROM cirugia_procedimiento WHERE cirugia_id = %s",
+                                                 (conservar,)).fetchall()]
+    if all(c.startswith("PEND") for c in codigos):   # los suyos estaban por confirmar: se toman los de la otra
+        if conn.execute("SELECT 1 FROM cirugia_procedimiento WHERE cirugia_id = %s AND codigo NOT LIKE 'PEND%%'",
+                        (eliminar,)).fetchone():
+            conn.execute("DELETE FROM cirugia_procedimiento WHERE cirugia_id = %s", (conservar,))
+            conn.execute("UPDATE cirugia_procedimiento SET cirugia_id = %s WHERE cirugia_id = %s", (conservar, eliminar))
+    conn.execute("UPDATE pago_detalle SET cirugia_id = %s WHERE cirugia_id = %s", (conservar, eliminar))
+    conn.execute("DELETE FROM cirugia WHERE cirugia_id = %s", (eliminar,))

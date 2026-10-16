@@ -53,6 +53,7 @@ def resumen(conn, anestesiologo_id: int, hoy: Optional[date] = None) -> dict:
         "sin_valor": sin_valor,
         "por_aplicar": repositorio.por_aplicar(conn, anestesiologo_id),
         "radicados": repositorio.radicados_por_cobrar(conn, anestesiologo_id),
+        "repetidas": len(repositorio.cirugias_repetidas(conn, anestesiologo_id)),
         "proximo_pago": proximo,
         "dias_atraso": finanzas.DIAS_PENDIENTE_MAX,
     }

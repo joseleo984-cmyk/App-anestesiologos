@@ -606,6 +606,7 @@
 .pago-paciente input[type="checkbox"] { width: 22px; height: 22px; margin-top: 2px; flex: 0 0 auto; }
 .pago-paciente input[inputmode] { width: 120px; flex: 0 0 auto; text-align: right; }
 .titulo-busqueda { margin: 14px 0 4px; font-size: .9rem; }
+.grupo-repetidas { border-top: 1px solid var(--line); padding-top: 12px; }
 .resultado-busqueda { display: grid; gap: 3px; width: 100%; text-align: left; padding: 10px 12px; margin-top: 6px; font-weight: 400; }
 .resultado-busqueda .item-cab { display: flex; justify-content: space-between; gap: 8px; }
 .linea-pago.resaltada { background: var(--accent-bg); box-shadow: 0 0 0 8px var(--accent-bg); border-radius: 4px; }
@@ -1326,6 +1327,7 @@
   <div class="botones"><button type="button" id="terminos-salir">Salir</button>
     <button type="button" class="primario" id="terminos-aceptar" disabled>Aceptar y continuar</button></div>
 </div></div>
+<div id="capa-repetidas" class="capa oculto"><div class="ficha" id="ficha-repetidas" role="dialog" aria-modal="true" aria-label="Cirugías repetidas"></div></div>
 <div id="capa-validacion" class="capa oculto"><div class="ficha" id="ficha-validacion" role="dialog" aria-modal="true" aria-label="Registrar prueba de validación"></div></div>
 <div id="capa-bloque" class="capa oculto"><div class="ficha" id="ficha-bloque" role="dialog" aria-modal="true" aria-label="Bloqueo"></div></div>
 <div id="mazo" class="oculto" role="dialog" aria-modal="true" aria-label="Revisar noticias nuevas"></div>
@@ -4085,6 +4087,8 @@ async function cargarInicio() {
     else tareas.push({ tono: rad.dias > d.dias_atraso ? "err" : "info", titulo: `Radicado ${escapar(rad.pagador || "")} ${cuando}: ${rad.total_neto != null ? pesos(rad.total_neto) : "sin total"} por cobrar`,
       sub: `${plural(rad.cirugias, "cirugía", "cirugías")}${rad.pagadas ? ` (${rad.pagadas} ya pagada${rad.pagadas === 1 ? "" : "s"})` : ""}${rad.dias != null ? ` · hace ${rad.dias} días` : ""}`, accion: "Ver", ir: abrir });
   }
+  if (d.repetidas) tareas.push({ tono: "err", titulo: d.repetidas === 1 ? "Una cirugía está registrada dos veces" : `${d.repetidas} cirugías están registradas dos veces`,
+    sub: "Mismo paciente, mismo día y misma clínica: únelas para no contarlas doble", accion: "Revisar", ir: abrirRepetidas });
   if (d.sin_valor) tareas.push({ tono: "warn", titulo: plural(d.sin_valor, "cirugía sin valor", "cirugías sin valor"),
     sub: "No cuentan en los reportes ni en lo que te deben", accion: "Completar", ir: () => verLista({ "#f-estado": "SIN_VALOR" }) });
   const p = d.proximo_pago;
@@ -4388,6 +4392,63 @@ function pintarReportePago(rep) {
     cargarReportesPago();
   };
 }
+
+// ---------------------------------------------------------------- cirugías repetidas
+async function abrirRepetidas() {
+  const r = await fetch("/api/cirugias/repetidas");
+  if (!r.ok) return toast("No se pudieron cargar las cirugías repetidas.");
+  pintarRepetidas((await r.json()).grupos);
+  $("#capa-repetidas").classList.remove("oculto");
+  document.body.style.overflow = "hidden";
+}
+function cerrarRepetidas() { $("#capa-repetidas").classList.add("oculto"); document.body.style.overflow = ""; }
+let gruposRepetidas = [];
+function pintarRepetidas(grupos) {
+  gruposRepetidas = grupos;
+  $("#ficha-repetidas").innerHTML = `<div class="agarre"></div>
+    <div class="arriba"><h3 style="margin:0">Cirugías registradas dos veces</h3><span style="flex:1"></span>
+      <button type="button" data-rp="cerrar" aria-label="Cerrar" style="min-height:36px;padding:4px 12px">✕</button></div>
+    ${grupos.length ? `<p class="sub" style="margin:0">Elige cuál conservar. La que conservas toma de la otra lo que le falte (valor, orden,
+      procedimientos si los suyos están por confirmar), queda con el estado más avanzado y con sus líneas de los reportes. La otra se borra.</p>
+    ${grupos.map((g, gi) => `<div class="grupo-repetidas">
+      <strong>${escapar(g.paciente)}</strong>
+      <div class="sub">${escapar(fechaBreve(g.fecha_procedimiento, true))} · ${escapar(tipoTitulo(g.clinica))}</div>
+      ${g.cirugias.map((c, ci) => `<div class="candidata">
+        <div><span class="chip ${c.estado}">${ESTADO_CIRUGIA[c.estado] || c.estado}${c.estado === "PAGADA" && c.fecha_pago ? ` el ${escapar(fechaBreve(c.fecha_pago, true))}` : ""}</span>
+          ${ci === 0 ? `<span class="chip" style="margin-left:4px">Sugerida</span>` : ""}
+          <div class="sub" style="margin-top:4px">${c.valor_honorarios != null ? pesos(c.valor_honorarios) : "Sin valor"}${c.desde_radicado ? " · creada desde un radicado" : ""}${c.documento_id ? " · con la orden original" : ""}</div>
+          <button type="button" class="enlace" data-rp="abrir" data-id="${c.cirugia_id}" style="border:0;background:none;min-height:0;padding:2px 0">Ver cirugía</button></div>
+        <button type="button" class="boton-linea${ci === 0 ? " primario" : ""}" data-rp="conservar" data-g="${gi}" data-id="${c.cirugia_id}">Conservar esta</button>
+      </div>`).join("")}
+    </div>`).join("")}`
+    : `<div class="aviso ok" style="margin:0">✓ No hay cirugías repetidas.</div>`}`;
+}
+$("#capa-repetidas").addEventListener("click", async (e) => {
+  if (e.target.id === "capa-repetidas") return cerrarRepetidas();
+  const b = e.target.closest("[data-rp]");
+  if (!b) return;
+  if (b.dataset.rp === "cerrar") return cerrarRepetidas();
+  if (b.dataset.rp === "abrir") { cerrarRepetidas(); return abrirCirugia(Number(b.dataset.id)); }
+  if (b.dataset.rp === "conservar") {
+    const g = gruposRepetidas[Number(b.dataset.g)], conservar = Number(b.dataset.id);
+    const otras = g.cirugias.filter((c) => c.cirugia_id !== conservar);
+    if (!confirm(`¿Conservar esta cirugía y borrar ${otras.length === 1 ? "la otra" : `las otras ${otras.length}`}? No se puede deshacer.`)) return;
+    b.disabled = true;
+    let grupos = null;
+    for (const o of otras) {
+      const r = await fetch("/api/cirugias/unir", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conservar, eliminar: o.cirugia_id }) });
+      const cuerpo = await r.json().catch(() => null);
+      if (!r.ok) { b.disabled = false; return toast(mensajeError(cuerpo, "No se pudieron unir.")); }
+      grupos = cuerpo.grupos;
+    }
+    toast("Cirugías unidas");
+    inicioDatos = null;
+    pintarRepetidas(grupos);
+    cargarCirugias();
+    if (pestanaActual === "inicio") cargarInicio();
+  }
+});
 
 // ---------------------------------------------------------------- buscador de pacientes en Pagos
 const TIPO_REPORTE = { PAGOS: "Reporte de pagos", RELACION: "Relación pagada", RADICADO: "Radicado" };

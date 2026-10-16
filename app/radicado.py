@@ -73,6 +73,8 @@ def crear_faltantes(conn, anestesiologo_id: int, reporte_id: int) -> dict:
         raise repositorio.DocumentoNoEncontrado()
     if rep["fecha_proceso"] is None:
         raise ValueError("El radicado no tiene fecha: no se puede saber de cuándo son las cirugías.")
+    # antes de crear, se vuelve a cruzar: una cirugía que ya existe (aunque esté pagada) no se crea otra vez
+    repositorio.conciliar(conn, anestesiologo_id, reporte_id)
     lineas = conn.execute(
         """SELECT documento_paciente, doc_norm(documento_paciente) AS doc, paciente, empresa, procedimiento
              FROM pago_detalle WHERE reporte_id = %s AND es_paciente AND cirugia_id IS NULL
