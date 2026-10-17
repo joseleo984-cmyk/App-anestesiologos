@@ -52,3 +52,5 @@ VERSION = (os.environ.get("RENDER_GIT_COMMIT") or "local")[:7]
 MAX_LECTURAS_IA_DIA = int(os.environ.get("MAX_LECTURAS_IA_DIA", "80"))
 # La documentación interactiva de la API (/docs) solo se abre si se pide (desarrollo)
 DOCS_ABIERTAS = os.environ.get("DOCS_ABIERTAS", "no").strip().lower() in ("si", "sí", "true", "1")
+# Si es "si", el administrador no puede usar la app hasta activar la verificación en dos pasos
+EXIGIR_2FA_ADMIN = os.environ.get("EXIGIR_2FA_ADMIN", "no").strip().lower() in ("si", "sí", "true", "1")

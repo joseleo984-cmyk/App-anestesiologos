@@ -480,3 +480,9 @@ CREATE TABLE IF NOT EXISTS auditoria (
     ip               VARCHAR(45)
 );
 CREATE INDEX IF NOT EXISTS idx_auditoria_fecha ON auditoria (creado_en DESC);
+
+-- Verificación en dos pasos (TOTP) y códigos de recuperación (guardados como hash)
+ALTER TABLE anestesiologo ADD COLUMN IF NOT EXISTS totp_secreto VARCHAR(64);
+ALTER TABLE anestesiologo ADD COLUMN IF NOT EXISTS totp_activo BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE anestesiologo ADD COLUMN IF NOT EXISTS totp_ultimo_paso BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE anestesiologo ADD COLUMN IF NOT EXISTS totp_recuperacion TEXT[] NOT NULL DEFAULT '{}';

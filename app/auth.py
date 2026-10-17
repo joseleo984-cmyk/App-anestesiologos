@@ -63,3 +63,24 @@ def clave_temporal() -> str:
     """Clave fácil de dictar: sin letras ni números que se confundan (0/O, 1/l)."""
     alfabeto = "abcdefghjkmnpqrstuvwxyz23456789"
     return "-".join("".join(secrets.choice(alfabeto) for _ in range(4)) for _ in range(3))
+
+
+PRUEBA_2FA_SEGUNDOS = 300
+
+
+def crear_token_2fa(anestesiologo_id: int, version: int) -> str:
+    """Comprobante de que la contraseña ya fue correcta; solo sirve 5 minutos y solo para pedir el código."""
+    datos = f"2fa.{anestesiologo_id}.{version}.{int(time.time())}"
+    return f"{datos}.{_firma(datos)}"
+
+
+def leer_token_2fa(valor: Optional[str]) -> Optional[tuple[int, int]]:
+    try:
+        marca, anestesiologo_id, version, emitido, firma = (valor or "").split(".")
+        if marca != "2fa" or not hmac.compare_digest(firma, _firma(f"2fa.{anestesiologo_id}.{version}.{emitido}")):
+            return None
+        if time.time() - int(emitido) > PRUEBA_2FA_SEGUNDOS:
+            return None
+        return int(anestesiologo_id), int(version)
+    except ValueError:
+        return None

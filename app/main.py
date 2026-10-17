@@ -25,7 +25,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from rapidfuzz import fuzz
 
-from app import (almacenamiento, auth, calidad, cartera, catalogo, config, copia, correo, exportar, extraccion, extractos,
+from app import (almacenamiento, auth, calidad, cartera, catalogo, config, copia, correo, dospasos, exportar, extraccion, extractos,
                  finanzas, inicio, liquidacion, noticias, radicado, repositorio, seguridad, uso_ia, validacion)
 from app.modelos import (ClaveCopia, CompromisoEntrada, CuentaEntrada, Favorita, FuenteNoticias, ImportacionConfirmada, MetaEntrada,
                          MovimientoEntrada, OrdenConfirmada, PartidaEntrada, PruebaValidacion, Sugerencia, TemasNoticias)
@@ -80,6 +80,8 @@ def cuenta_sesion(sesion: str | None = Cookie(default=None), conn=Depends(get_co
 def anestesiologo_actual(cuenta: dict = Depends(cuenta_sesion)) -> int:
     if cuenta["debe_cambiar_clave"]:
         raise HTTPException(403, {"mensaje": "Cambia tu contraseña temporal para continuar.", "cambiar_clave": True})
+    if config.EXIGIR_2FA_ADMIN and cuenta["es_admin"] and not cuenta["totp_activo"]:
+        raise HTTPException(403, {"mensaje": "Activa la verificación en dos pasos para continuar.", "activar_2fa": True})
     return cuenta["anestesiologo_id"]
 
 
@@ -190,7 +192,7 @@ def iniciar_sesion(datos: Credenciales, request: Request, response: Response, co
             raise HTTPException(429, _mensaje_bloqueo(hasta))
         time.sleep(1)  # frena los intentos de adivinar contraseñas
         raise HTTPException(401, "Correo o contraseña incorrectos.")
-    if usuario["intentos_fallidos"]:
+    if usuario["intentos_fallidos"] and not usuario["totp_activo"]:   # con 2FA, el contador se limpia al terminar
         repositorio.limpiar_intentos(conn, usuario["anestesiologo_id"])
         conn.commit()
     if usuario["estado_registro"] == "PENDIENTE":
@@ -198,10 +200,53 @@ def iniciar_sesion(datos: Credenciales, request: Request, response: Response, co
     if not usuario["activo"]:
         time.sleep(1)
         raise HTTPException(401, "Correo o contraseña incorrectos.")
+    if usuario["totp_activo"]:   # la contraseña estuvo bien: falta el código de la app de verificación
+        return {"requiere_2fa": True, "token_2fa": auth.crear_token_2fa(usuario["anestesiologo_id"], usuario["version_sesion"])}
     repositorio.auditar(conn, "LOGIN_OK", usuario["anestesiologo_id"], None, ip)
     conn.commit()
     poner_cookie(response, usuario["anestesiologo_id"], usuario["version_sesion"])
     return {"nombre": usuario["nombre"], "debe_cambiar_clave": usuario["debe_cambiar_clave"]}
+
+
+class SegundoPaso(BaseModel):
+    token_2fa: str = Field(max_length=200)
+    codigo: str = Field(min_length=6, max_length=20)
+
+
+@app.post("/api/login-2fa")
+def iniciar_sesion_segundo_paso(datos: SegundoPaso, request: Request, response: Response, conn=Depends(get_conn, scope="function")):
+    """Segundo paso: el código de 6 dígitos de la app de verificación (o un código de recuperación de un solo uso)."""
+    ip, ahora = (request.client.host if request.client else "?"), time.time()
+    fallos = [t for t in _fallos_por_ip.get(ip, []) if ahora - t < VENTANA_FALLOS_IP]
+    _fallos_por_ip[ip] = fallos
+    if len(fallos) >= MAX_FALLOS_IP:
+        raise HTTPException(429, "Demasiados intentos fallidos desde esta conexión. Espera 15 minutos.")
+    leido = auth.leer_token_2fa(datos.token_2fa)
+    cuenta = repositorio.obtener_cuenta(conn, leido[0]) if leido else None
+    if not cuenta or cuenta["version_sesion"] != leido[1] or not cuenta["activo"] or not cuenta["totp_activo"]:
+        raise HTTPException(401, "La verificación venció. Vuelve a iniciar sesión.")
+    if cuenta["bloqueado_hasta"] and cuenta["bloqueado_hasta"] > datetime.now(timezone.utc):
+        raise HTTPException(429, _mensaje_bloqueo(cuenta["bloqueado_hasta"]))
+    uso = None
+    paso = dospasos.verificar(cuenta["totp_secreto"], datos.codigo, cuenta["totp_ultimo_paso"])
+    if paso is not None and repositorio.usar_paso_totp(conn, cuenta["anestesiologo_id"], paso):
+        uso = "código de la app"
+    elif paso is None and repositorio.usar_codigo_recuperacion(conn, cuenta["anestesiologo_id"], dospasos.hash_recuperacion(datos.codigo)):
+        uso = "código de recuperación"
+    if uso is None:
+        fallos.append(ahora)
+        hasta = repositorio.registrar_intento_fallido(conn, cuenta["anestesiologo_id"])
+        repositorio.auditar(conn, "LOGIN_2FA_FALLO", cuenta["anestesiologo_id"], None, ip)
+        conn.commit()
+        if hasta and hasta > datetime.now(timezone.utc):
+            raise HTTPException(429, _mensaje_bloqueo(hasta))
+        time.sleep(1)
+        raise HTTPException(401, "Código incorrecto. Revisa que la hora de tu teléfono sea automática.")
+    repositorio.limpiar_intentos(conn, cuenta["anestesiologo_id"])
+    repositorio.auditar(conn, "LOGIN_OK", cuenta["anestesiologo_id"], f"con {uso}", ip)
+    conn.commit()
+    poner_cookie(response, cuenta["anestesiologo_id"], cuenta["version_sesion"])
+    return {"nombre": cuenta["nombre"], "debe_cambiar_clave": cuenta["debe_cambiar_clave"]}
 
 
 @app.post("/api/logout")
@@ -215,6 +260,8 @@ def usuario_actual(cuenta: dict = Depends(cuenta_sesion)):
     return {"anestesiologo_id": cuenta["anestesiologo_id"], "nombre": cuenta["nombre"], "email": cuenta["email"],
             "es_admin": cuenta["es_admin"], "debe_cambiar_clave": cuenta["debe_cambiar_clave"],
             "debe_aceptar_terminos": cuenta["terminos_version"] != config.TERMINOS_VERSION,
+            "dos_pasos": cuenta["totp_activo"], "codigos_recuperacion": len(cuenta["totp_recuperacion"] or []),
+            "exigir_dos_pasos": bool(config.EXIGIR_2FA_ADMIN and cuenta["es_admin"] and not cuenta["totp_activo"]),
             "ciudad_por_defecto": config.CIUDAD_POR_DEFECTO, "version": config.VERSION}
 
 
@@ -235,6 +282,107 @@ def cambiar_mi_clave(datos: CambioClave, response: Response, conn=Depends(get_co
     repositorio.auditar(conn, "CLAVE_CAMBIADA", cuenta["anestesiologo_id"])
     conn.commit()
     poner_cookie(response, cuenta["anestesiologo_id"], version)  # esta sesión sigue; las demás se cierran
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------- verificación en dos pasos
+class ClaveActual(BaseModel):
+    password: str = Field(max_length=200)
+
+
+class ClaveYCodigo(BaseModel):
+    password: str = Field(max_length=200)
+    codigo: str = Field(min_length=6, max_length=20)
+
+
+class SoloCodigo(BaseModel):
+    codigo: str = Field(min_length=6, max_length=20)
+
+
+def _cuenta_con_clave(cuenta: dict, password: str) -> None:
+    if not auth.verificar_password(password, cuenta["password_hash"]):
+        time.sleep(1)
+        raise HTTPException(400, "La contraseña no es correcta.")
+
+
+def _confirmar_2fa(conn, cuenta: dict, password: str, codigo: str) -> None:
+    """Para desactivar o renovar códigos: contraseña + un código vigente (de la app o de recuperación)."""
+    _cuenta_con_clave(cuenta, password)
+    paso = dospasos.verificar(cuenta["totp_secreto"], codigo, cuenta["totp_ultimo_paso"])
+    ok = (paso is not None and repositorio.usar_paso_totp(conn, cuenta["anestesiologo_id"], paso)) or (
+        paso is None and repositorio.usar_codigo_recuperacion(conn, cuenta["anestesiologo_id"], dospasos.hash_recuperacion(codigo)))
+    if not ok:
+        time.sleep(1)
+        raise HTTPException(400, "El código no es correcto.")
+
+
+@app.post("/api/2fa/iniciar")
+def iniciar_dos_pasos(datos: ClaveActual, conn=Depends(get_conn, scope="function"), cuenta: dict = Depends(cuenta_sesion)):
+    """Empieza la activación: devuelve el QR y la clave para la app de verificación. Pide la contraseña para que
+    quien tenga la sesión abierta en un teléfono ajeno no pueda activarla con su propio dispositivo."""
+    if cuenta["debe_cambiar_clave"]:
+        raise HTTPException(403, {"mensaje": "Cambia tu contraseña temporal primero.", "cambiar_clave": True})
+    _cuenta_con_clave(cuenta, datos.password)
+    if cuenta["totp_activo"]:
+        raise HTTPException(409, "La verificación en dos pasos ya está activa.")
+    secreto = dospasos.nuevo_secreto()
+    repositorio.guardar_secreto_totp(conn, cuenta["anestesiologo_id"], secreto)
+    conn.commit()
+    enlace = dospasos.uri(secreto, cuenta["email"])
+    return {"secreto": secreto, "enlace": enlace, "qr": dospasos.qr_svg(enlace)}
+
+
+@app.post("/api/2fa/activar")
+def activar_dos_pasos(datos: SoloCodigo, conn=Depends(get_conn, scope="function"), cuenta: dict = Depends(cuenta_sesion)):
+    if cuenta["totp_activo"] or not cuenta["totp_secreto"]:
+        raise HTTPException(409, "Primero inicia la activación.")
+    paso = dospasos.verificar(cuenta["totp_secreto"], datos.codigo, 0)
+    if paso is None:
+        time.sleep(1)
+        raise HTTPException(400, "El código no coincide. Revisa que la hora de tu teléfono sea automática e intenta con el código nuevo.")
+    codigos = dospasos.codigos_de_recuperacion()
+    repositorio.activar_totp(conn, cuenta["anestesiologo_id"], paso, [dospasos.hash_recuperacion(c) for c in codigos])
+    repositorio.auditar(conn, "DOS_PASOS_ACTIVADO", cuenta["anestesiologo_id"])
+    conn.commit()
+    return {"codigos": codigos}
+
+
+@app.post("/api/2fa/desactivar")
+def desactivar_dos_pasos(datos: ClaveYCodigo, conn=Depends(get_conn, scope="function"), cuenta: dict = Depends(cuenta_sesion)):
+    if not cuenta["totp_activo"]:
+        raise HTTPException(409, "La verificación en dos pasos no está activa.")
+    if config.EXIGIR_2FA_ADMIN and cuenta["es_admin"]:
+        raise HTTPException(403, "El administrador no puede desactivarla: está exigida.")
+    _confirmar_2fa(conn, cuenta, datos.password, datos.codigo)
+    repositorio.desactivar_totp(conn, cuenta["anestesiologo_id"])
+    repositorio.auditar(conn, "DOS_PASOS_DESACTIVADO", cuenta["anestesiologo_id"])
+    conn.commit()
+    return {"ok": True}
+
+
+@app.post("/api/2fa/codigos")
+def renovar_codigos_de_recuperacion(datos: ClaveYCodigo, conn=Depends(get_conn, scope="function"), cuenta: dict = Depends(cuenta_sesion)):
+    """Códigos de recuperación nuevos (los anteriores dejan de servir)."""
+    if not cuenta["totp_activo"]:
+        raise HTTPException(409, "La verificación en dos pasos no está activa.")
+    _confirmar_2fa(conn, cuenta, datos.password, datos.codigo)
+    codigos = dospasos.codigos_de_recuperacion()
+    repositorio.nuevos_codigos_recuperacion(conn, cuenta["anestesiologo_id"], [dospasos.hash_recuperacion(c) for c in codigos])
+    repositorio.auditar(conn, "CODIGOS_RECUPERACION_NUEVOS", cuenta["anestesiologo_id"])
+    conn.commit()
+    return {"codigos": codigos}
+
+
+@app.post("/api/usuarios/{usuario_id}/restablecer-2fa")
+def restablecer_dos_pasos(usuario_id: int, conn=Depends(get_conn, scope="function"), admin=Depends(admin_actual)):
+    """Quien perdió el teléfono y los códigos: se apaga su verificación en dos pasos y se cierran sus sesiones."""
+    if usuario_id == admin["anestesiologo_id"]:
+        raise HTTPException(400, "Para tu propia cuenta usa «Desactivar» o, si perdiste todo, cambia ADMIN_PASSWORD en Render.")
+    if repositorio.obtener_cuenta(conn, usuario_id) is None:
+        raise HTTPException(404, "Cuenta no encontrada.")
+    repositorio.desactivar_totp(conn, usuario_id, cerrar_sesiones=True)
+    repositorio.auditar(conn, "DOS_PASOS_RESTABLECIDO_ADMIN", admin["anestesiologo_id"], f"cuenta {usuario_id}")
+    conn.commit()
     return {"ok": True}
 
 
@@ -824,6 +972,7 @@ def pantalla_de_inicio(conn=Depends(get_conn, scope="function"), anestesiologo_i
     """Resumen de la cartera para la pantalla de Inicio: cobrado, por cobrar, antigüedad y tareas pendientes."""
     datos = cartera.resumen(conn, anestesiologo_id)
     datos["solicitudes"] = repositorio.solicitudes_pendientes(conn) if cuenta["es_admin"] else 0
+    datos["dos_pasos_pendiente"] = bool(cuenta["es_admin"] and not cuenta["totp_activo"])
     return datos
 
 

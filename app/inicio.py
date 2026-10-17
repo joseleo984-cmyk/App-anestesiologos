@@ -85,6 +85,11 @@ def preparar_base_de_datos() -> None:
                        version_sesion = CASE WHEN anestesiologo.clave_env_aplicada IS DISTINCT FROM %(huella)s
                                              THEN anestesiologo.version_sesion + 1
                                              ELSE anestesiologo.version_sesion END,
+                       -- salida de emergencia: cambiar ADMIN_PASSWORD en Render también apaga la verificación en dos pasos
+                       totp_activo = CASE WHEN anestesiologo.clave_env_aplicada IS DISTINCT FROM %(huella)s
+                                          THEN FALSE ELSE anestesiologo.totp_activo END,
+                       totp_secreto = CASE WHEN anestesiologo.clave_env_aplicada IS DISTINCT FROM %(huella)s
+                                           THEN NULL ELSE anestesiologo.totp_secreto END,
                        clave_env_aplicada = %(huella)s""",
                 {"nombre": config.ADMIN_NOMBRE, "email": config.ADMIN_EMAIL.strip().lower(),
                  "hash": auth.hash_password(config.ADMIN_PASSWORD), "huella": huella},

@@ -10,6 +10,7 @@ sensibles de salud (Ley 1581 de 2012, habeas data): la app los trata con ese niv
 | Contraseñas | scrypt con sal; mínimo 10 caracteres; claves temporales de un solo uso; el hash nunca sale del servidor |
 | Sesión | Cookie firmada (HMAC), `HttpOnly`, `SameSite=Lax`, `Secure` en Render; 30 días; se cierran todas al cambiar o restablecer la clave |
 | Fuerza bruta | Bloqueo por cuenta (5 fallos → 15 min, se duplica hasta 24 h), límite por conexión, pausa de 1 s, tiempo de respuesta igual con correo inexistente |
+| Dos pasos | Verificación TOTP (Google/Microsoft Authenticator) opcional para todos y exigible al administrador (`EXIGIR_2FA_ADMIN=si`); 10 códigos de recuperación de un solo uso (guardados como hash); un código no se reutiliza; los fallos del código cuentan para el bloqueo; el administrador puede quitarla a quien perdió el teléfono |
 | Recuperación | Enlace de un solo uso, vence en 60 min, se guarda solo su hash, respuesta igual exista o no el correo |
 | Autorización | Todas las rutas con datos exigen sesión; las de administración exigen administrador; **cada consulta filtra por el anestesiólogo** (prueba automática recorre todas las rutas con identificadores ajenos) |
 | Aislamiento | Pacientes y coberturas por anestesiólogo; Supabase con RLS activado en todas las tablas y bucket privado |
@@ -25,7 +26,7 @@ sensibles de salud (Ley 1581 de 2012, habeas data): la app los trata con ese niv
 
 ## Pendiente (en orden de importancia)
 
-1. **Autenticación en dos pasos** (correo o app) para el administrador: su cuenta ve todo y puede descargar la copia.
+1. ~~Autenticación en dos pasos~~ **hecha**. Falta que la administradora la active y, cuando esté lista, poner `EXIGIR_2FA_ADMIN=si` en Render. Salida de emergencia si pierde el teléfono y los códigos: cambiar `ADMIN_PASSWORD` en Render (también apaga los dos pasos).
 2. **Supabase**: revisar que el proyecto tenga copias automáticas (plan Pro) y que `SUPABASE_SERVICE_KEY` solo esté en Render. Si alguna vez se pegó en un chat o captura, rotarla.
 3. **Datos enviados a la IA**: las fotos y textos de órdenes salen hacia Anthropic. Confirmar en las condiciones de la API la retención y el no uso para entrenamiento, y reflejarlo en la política de privacidad (transferencia internacional de datos).
 4. **Textos legales**: completar razón social, NIT y correo en `terminos.html` y `privacidad.html`, con revisión de un abogado; registrar el tratamiento ante la SIC si aplica.

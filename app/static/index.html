@@ -631,6 +631,11 @@
 .esc-trabajando { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,.55); color: #fff; font-weight: 600; }
 .esc-botones { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .esc-botones .ancho { grid-column: 1 / -1; }
+.qr-dos-pasos { display: grid; place-items: center; margin: 8px 0; }
+.qr-dos-pasos svg { width: min(240px, 70vw); height: auto; background: #fff; padding: 6px; border-radius: 8px; }
+.clave-qr { font-family: ui-monospace, monospace; letter-spacing: .06em; user-select: all; }
+.codigos-recuperacion { background: var(--bg); border: 1px dashed var(--line); border-radius: 10px; padding: 12px; font-size: 1.05rem;
+  columns: 2; user-select: all; margin: 8px 0; }
 </style>
 </head>
 <body>
@@ -1129,6 +1134,12 @@
       <button type="submit" class="primario grande" style="margin-top:12px">Guardar contraseña</button>
       <p class="sub">Al cambiarla se cierra tu sesión en los demás dispositivos.</p>
     </form>
+    <section class="card" id="dos-pasos">
+      <h2>Verificación en dos pasos</h2>
+      <p class="sub">Además de la contraseña, pide un código de 6 dígitos de una app en tu teléfono (Google Authenticator, Microsoft Authenticator…).
+        Así, aunque alguien conozca tu contraseña, no puede entrar a los datos de tus pacientes.</p>
+      <div id="dos-pasos-contenido"><p class="sub">Cargando…</p></div>
+    </section>
   </div>
 
   <div id="pestana-usuarios" class="pestana oculto">
@@ -1406,6 +1417,7 @@ window.fetch = async (...args) => {
   if (r.status === 403) {
     const cuerpo = await r.clone().json().catch(() => null);
     if (cuerpo?.detail?.cambiar_clave) exigirCambioClave();
+    if (cuerpo?.detail?.activar_2fa && typeof exigirDosPasos === "function") exigirDosPasos();
   }
   return r;
 };
@@ -4239,6 +4251,8 @@ async function cargarInicio() {
   }
   if (d.repetidas) tareas.push({ tono: "err", titulo: d.repetidas === 1 ? "Una cirugía está registrada dos veces" : `${d.repetidas} cirugías están registradas dos veces`,
     sub: "Mismo paciente, mismo día y misma clínica: únelas para no contarlas doble", accion: "Revisar", ir: abrirRepetidas });
+  if (d.dos_pasos_pendiente) tareas.push({ tono: "err", titulo: "Activa la verificación en dos pasos",
+    sub: "Tu cuenta ve los datos de todos: protégela con un código además de la contraseña", accion: "Activar", ir: () => { mostrarPestana("clave"); pintarDosPasos(); } });
   if (d.sin_valor) tareas.push({ tono: "warn", titulo: plural(d.sin_valor, "cirugía sin valor", "cirugías sin valor"),
     sub: "No cuentan en los reportes ni en lo que te deben", accion: "Completar", ir: () => verLista({ "#f-estado": "SIN_VALOR" }) });
   const p = d.proximo_pago;
@@ -5094,13 +5108,20 @@ function pedirTerminos() {
     if (r.ok) { $("#capa-terminos").classList.add("oculto"); toast("Gracias. Quedó registrada tu aceptación."); }
   };
 }
+function exigirDosPasos() {
+  if (document.body.dataset.dosPasos) return;
+  document.body.dataset.dosPasos = "1";
+  $(".barra-inferior").classList.add("oculto");
+  mostrarPestana("clave");
+  pintarDosPasos();
+}
 function exigirCambioClave() {
   claveObligatoria = true;
   $(".barra-inferior").classList.add("oculto");
   $("#aviso-clave-obligatoria").classList.remove("oculto");
   mostrarPestana("clave");
 }
-$("#ir-clave").onclick = () => { $("#menu-cuenta").open = false; mostrarPestana("clave"); };
+$("#ir-clave").onclick = () => { $("#menu-cuenta").open = false; mostrarPestana("clave"); pintarDosPasos(); };
 $("#ir-usuarios").onclick = () => { $("#menu-cuenta").open = false; mostrarPestana("usuarios"); };
 // ---------------------------------------------------------------- visor de archivos
 // En el iPhone la app instalada no tiene botón de "atrás": abrir una foto, un PDF o un Excel como página
@@ -5262,6 +5283,75 @@ $("#form-clave").onsubmit = async (ev) => {
   aviso(estado, "ok", "Contraseña actualizada.");
 };
 
+// ---------------------------------------------------------------- verificación en dos pasos
+const JSON_POST = { method: "POST", headers: { "Content-Type": "application/json" } };
+function cajaCodigos(codigos) {
+  return `<div class="aviso warn"><strong>Guarda estos códigos de recuperación.</strong> Cada uno sirve <strong>una sola vez</strong> si pierdes el teléfono.
+    No se vuelven a mostrar. Anótalos en papel o en un lugar seguro, no en la misma app.</div>
+    <pre class="codigos-recuperacion" id="codigos-recuperacion">${codigos.map(escapar).join("\n")}</pre>
+    <button type="button" id="copiar-codigos">Copiar los códigos</button>`;
+}
+async function pintarDosPasos(u) {
+  const cont = $("#dos-pasos-contenido");
+  if (!u) { const r = await fetch("/api/yo"); if (!r.ok) return; u = await r.json(); }
+  const enlazarCopiar = () => { const b = $("#copiar-codigos"); if (b) b.onclick = async () => {
+    try { await navigator.clipboard.writeText($("#codigos-recuperacion").textContent); toast("Códigos copiados"); } catch { toast("Selecciónalos y cópialos a mano"); } }; };
+  if (u.dos_pasos) {
+    cont.innerHTML = `<div class="aviso ok">✓ Activada. Te quedan <strong>${u.codigos_recuperacion}</strong> códigos de recuperación.</div>
+      <div class="fila"><button type="button" id="dp-nuevos">Códigos de recuperación nuevos</button>
+      ${u.exigir_obligatoria ? "" : `<button type="button" id="dp-quitar">Desactivar</button>`}</div>
+      <div id="dp-form"></div><div id="dp-estado"></div>`;
+    const pedir = (titulo, boton, alEnviar) => {
+      $("#dp-form").innerHTML = `<p class="sub" style="margin-top:12px">${titulo}</p>
+        <label for="dp-clave">Tu contraseña</label><input id="dp-clave" type="password" autocomplete="current-password">
+        <label for="dp-codigo">Código de la app (o de recuperación)</label><input id="dp-codigo" inputmode="numeric" autocomplete="one-time-code">
+        <button type="button" class="primario" id="dp-ok" style="margin-top:8px">${boton}</button>`;
+      $("#dp-ok").onclick = async () => {
+        $("#dp-ok").disabled = true;
+        await alEnviar($("#dp-clave").value, $("#dp-codigo").value);
+        if ($("#dp-ok")) $("#dp-ok").disabled = false;
+      };
+    };
+    $("#dp-nuevos").onclick = () => pedir("Los códigos anteriores dejarán de servir.", "Generar códigos nuevos", async (password, codigo) => {
+      const r = await fetch("/api/2fa/codigos", { ...JSON_POST, body: JSON.stringify({ password, codigo }) });
+      const c = await r.json().catch(() => null);
+      if (!r.ok) return aviso($("#dp-estado"), "err", mensajeError(c, "No se pudo."));
+      $("#dp-form").innerHTML = ""; $("#dp-estado").innerHTML = cajaCodigos(c.codigos); enlazarCopiar();
+    });
+    const quitar = $("#dp-quitar");
+    if (quitar) quitar.onclick = () => pedir("Para desactivarla escribe tu contraseña y un código.", "Desactivar", async (password, codigo) => {
+      if (!confirm("¿Desactivar la verificación en dos pasos? Tu cuenta quedará protegida solo por la contraseña.")) return;
+      const r = await fetch("/api/2fa/desactivar", { ...JSON_POST, body: JSON.stringify({ password, codigo }) });
+      const c = await r.json().catch(() => null);
+      if (!r.ok) return aviso($("#dp-estado"), "err", mensajeError(c, "No se pudo desactivar."));
+      toast("Verificación en dos pasos desactivada"); pintarDosPasos();
+    });
+    return;
+  }
+  cont.innerHTML = `${u.exigir_dos_pasos ? `<div class="aviso warn">Como administrador, debes activarla para seguir usando la app.</div>` : ""}
+    <div class="aviso warn">No está activada. Tu cuenta solo se protege con la contraseña.</div>
+    <div id="dp-form"><label for="dp-clave">Tu contraseña</label><input id="dp-clave" type="password" autocomplete="current-password">
+    <button type="button" class="primario" id="dp-iniciar" style="margin-top:8px">Activar</button></div><div id="dp-estado"></div>`;
+  $("#dp-iniciar").onclick = async () => {
+    const r = await fetch("/api/2fa/iniciar", { ...JSON_POST, body: JSON.stringify({ password: $("#dp-clave").value }) });
+    const c = await r.json().catch(() => null);
+    if (!r.ok) return aviso($("#dp-estado"), "err", mensajeError(c, "No se pudo iniciar."));
+    $("#dp-form").innerHTML = `<ol class="sub" style="padding-left:20px"><li>Abre tu app de verificación y agrega una cuenta nueva.</li>
+      <li>Escanea este código QR (o escribe la clave a mano).</li><li>Escribe aquí el código de 6 dígitos que muestra.</li></ol>
+      <div class="qr-dos-pasos">${c.qr}</div>
+      <p class="sub" style="text-align:center">Clave a mano: <strong class="clave-qr">${escapar(c.secreto.match(/.{1,4}/g).join(" "))}</strong></p>
+      <label for="dp-codigo">Código de 6 dígitos</label><input id="dp-codigo" inputmode="numeric" autocomplete="one-time-code" maxlength="8">
+      <button type="button" class="primario" id="dp-activar" style="margin-top:8px">Confirmar y activar</button>`;
+    $("#dp-activar").onclick = async () => {
+      const r2 = await fetch("/api/2fa/activar", { ...JSON_POST, body: JSON.stringify({ codigo: $("#dp-codigo").value }) });
+      const c2 = await r2.json().catch(() => null);
+      if (!r2.ok) return aviso($("#dp-estado"), "err", mensajeError(c2, "El código no coincide."));
+      $("#dp-form").innerHTML = ""; $("#dp-estado").innerHTML = `<div class="aviso ok">✓ Verificación en dos pasos activada.</div>${cajaCodigos(c2.codigos)}`;
+      enlazarCopiar(); aviso($("#estado-clave"), "", "");
+    };
+  };
+}
+
 const NOMBRE_USO = { orden: "Órdenes", reporte_pago: "Reportes de pago", relacion: "Relaciones de AP", volante: "Volantes",
   extracto: "Extractos", extracto_categorias: "Categorías de extractos", noticias: "Noticias", noticias_traduccion: "Traducción de noticias",
   noticias_infografia: "Infografía de noticias" };
@@ -5354,6 +5444,7 @@ async function cargarUsuarios() {
     ${u.es_admin ? "" : `<div class="acciones-pago">
       <button type="button" data-restablecer="${u.anestesiologo_id}" data-nombre="${escapar(u.nombre)}">Nueva clave temporal</button>
       <button type="button" data-activar="${u.anestesiologo_id}" data-activo="${!u.activo}">${u.activo ? "Desactivar" : "Activar"}</button>
+      ${u.dos_pasos ? `<button type="button" data-quitar2fa="${u.anestesiologo_id}" data-nombre="${escapar(u.nombre)}">Quitar dos pasos</button>` : ""}
     </div>`}
     <div class="resultado-usuario"></div>
   </div>`).join("");
@@ -5363,6 +5454,11 @@ async function cargarUsuarios() {
     const cuerpo = await r.json().catch(() => null);
     const destino = b.closest(".linea-pago").querySelector(".resultado-usuario");
     destino.innerHTML = r.ok ? tarjetaClave(cuerpo.clave_temporal) : `<p class="aviso err">${escapar(mensajeError(cuerpo, "Error"))}</p>`;
+  });
+  cont.querySelectorAll("[data-quitar2fa]").forEach((b) => b.onclick = async () => {
+    if (!confirm(`¿Quitar la verificación en dos pasos de ${b.dataset.nombre}? Úsalo solo si perdió el teléfono y los códigos. Se cierran sus sesiones.`)) return;
+    const r = await fetch(`/api/usuarios/${b.dataset.quitar2fa}/restablecer-2fa`, { method: "POST" });
+    if (r.ok) { toast("Dos pasos quitados"); cargarUsuarios(); }
   });
   cont.querySelectorAll("[data-activar]").forEach((b) => b.onclick = async () => {
     const activar = b.dataset.activo === "true";
@@ -5401,7 +5497,9 @@ fetch("/api/yo").then((r) => r.ok ? r.json() : null).then((u) => {
   esAdmin = !!u.es_admin;
   actualizarGlobo();
   $("#ini-hola").textContent = `Hola, ${u.nombre.split(" ").slice(0, 2).join(" ")}`;
-  if (u.debe_cambiar_clave) exigirCambioClave(); else { cargarOpciones(); cargarInicio(); }
+  if (u.debe_cambiar_clave) exigirCambioClave();
+  else if (u.exigir_dos_pasos) exigirDosPasos();
+  else { cargarOpciones(); cargarInicio(); }
   if (u.debe_aceptar_terminos) pedirTerminos();
 });
 </script>

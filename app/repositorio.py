@@ -547,7 +547,8 @@ def ciudad_conocida(conn, anestesiologo_id: int, clinica: str) -> Optional[str]:
 
 
 _CUENTA = """anestesiologo_id, nombre, email, password_hash, es_admin, activo, debe_cambiar_clave,
-             version_sesion, estado_registro, intentos_fallidos, bloqueado_hasta, terminos_version"""
+             version_sesion, estado_registro, intentos_fallidos, bloqueado_hasta, terminos_version,
+             totp_secreto, totp_activo, totp_ultimo_paso, totp_recuperacion"""
 
 
 def obtener_cuenta(conn, anestesiologo_id: int) -> Optional[dict]:
@@ -606,7 +607,7 @@ def usar_enlace_clave(conn, token_hash: str) -> Optional[int]:
 def listar_usuarios(conn) -> list[dict]:
     return conn.execute(
         """SELECT a.anestesiologo_id, a.nombre, a.email, a.registro_medico, a.es_admin, a.activo,
-                  a.debe_cambiar_clave, a.creado_en, a.estado_registro, a.telefono,
+                  a.debe_cambiar_clave, a.creado_en, a.estado_registro, a.telefono, a.totp_activo AS dos_pasos,
                   (SELECT COUNT(*) FROM cirugia c WHERE c.anestesiologo_id = a.anestesiologo_id) AS cirugias
              FROM anestesiologo a ORDER BY a.estado_registro = 'PENDIENTE' DESC, a.activo DESC, a.nombre"""
     ).fetchall()
@@ -1200,3 +1201,36 @@ def ver_auditoria(conn, limite: int = 200) -> list[dict]:
         """SELECT a.auditoria_id, a.creado_en, a.evento, a.detalle, a.ip, u.nombre
              FROM auditoria a LEFT JOIN anestesiologo u USING (anestesiologo_id)
             ORDER BY a.creado_en DESC, a.auditoria_id DESC LIMIT %s""", (limite,)).fetchall()
+
+
+# ---------------------------------------------------------------- verificación en dos pasos
+def guardar_secreto_totp(conn, anestesiologo_id: int, secreto: str) -> None:
+    conn.execute("UPDATE anestesiologo SET totp_secreto = %s, totp_activo = FALSE WHERE anestesiologo_id = %s",
+                 (secreto, anestesiologo_id))
+
+
+def activar_totp(conn, anestesiologo_id: int, paso: int, hashes_recuperacion: list[str]) -> None:
+    conn.execute("""UPDATE anestesiologo SET totp_activo = TRUE, totp_ultimo_paso = %s, totp_recuperacion = %s
+                     WHERE anestesiologo_id = %s""", (paso, hashes_recuperacion, anestesiologo_id))
+
+
+def desactivar_totp(conn, anestesiologo_id: int, cerrar_sesiones: bool = False) -> None:
+    conn.execute("""UPDATE anestesiologo SET totp_activo = FALSE, totp_secreto = NULL, totp_ultimo_paso = 0,
+                           totp_recuperacion = '{}', version_sesion = version_sesion + %s
+                     WHERE anestesiologo_id = %s""", (1 if cerrar_sesiones else 0, anestesiologo_id))
+
+
+def usar_paso_totp(conn, anestesiologo_id: int, paso: int) -> bool:
+    """Marca el paso como usado; False si ya estaba usado (otro intento simultáneo con el mismo código)."""
+    return conn.execute("UPDATE anestesiologo SET totp_ultimo_paso = %s WHERE anestesiologo_id = %s AND totp_ultimo_paso < %s RETURNING 1",
+                        (paso, anestesiologo_id, paso)).fetchone() is not None
+
+
+def usar_codigo_recuperacion(conn, anestesiologo_id: int, hash_codigo: str) -> bool:
+    return conn.execute("""UPDATE anestesiologo SET totp_recuperacion = array_remove(totp_recuperacion, %s)
+                            WHERE anestesiologo_id = %s AND %s = ANY(totp_recuperacion) RETURNING 1""",
+                        (hash_codigo, anestesiologo_id, hash_codigo)).fetchone() is not None
+
+
+def nuevos_codigos_recuperacion(conn, anestesiologo_id: int, hashes: list[str]) -> None:
+    conn.execute("UPDATE anestesiologo SET totp_recuperacion = %s WHERE anestesiologo_id = %s", (hashes, anestesiologo_id))

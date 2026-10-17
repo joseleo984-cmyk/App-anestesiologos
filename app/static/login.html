@@ -69,6 +69,16 @@
     <button type="submit">Entrar</button>
     <p class="cambiar" style="margin:12px 0 0"><a href="#olvide" id="ir-olvide">Olvidé mi contraseña</a></p>
   </form>
+  <form id="paso2" class="oculto" novalidate>
+    <h2 style="margin-top:0">Verificación en dos pasos</h2>
+    <p>Escribe el código de 6 dígitos de tu app de verificación (Google Authenticator, Microsoft Authenticator…).</p>
+    <label for="codigo2">Código</label>
+    <input id="codigo2" inputmode="numeric" autocomplete="one-time-code" maxlength="20" required>
+    <div id="error-paso2"></div>
+    <button type="submit">Confirmar</button>
+    <p class="cambiar" style="margin:12px 0 0">¿Perdiste el teléfono? Escribe uno de tus <strong>códigos de recuperación</strong> en el mismo campo.
+      <a href="/login" id="volver-paso2">Volver</a></p>
+  </form>
   <form id="olvide" class="oculto" novalidate>
     <h1 style="font-size:1.15rem;margin:0 0 4px">Olvidé mi contraseña</h1>
     <p class="nota" style="margin:0 0 6px">Escribe tu correo y te enviamos un enlace para crear una contraseña nueva.</p>
@@ -163,6 +173,24 @@ $("#registro").onsubmit = async (ev) => {
     boton.disabled = false;
   }
 };
+let tokenDosPasos = null;
+document.getElementById("paso2").onsubmit = async (ev) => {
+  ev.preventDefault();
+  const boton = ev.submitter, caja = document.getElementById("error-paso2");
+  boton.disabled = true; caja.innerHTML = "";
+  try {
+    const r = await fetch("/api/login-2fa", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token_2fa: tokenDosPasos, codigo: document.getElementById("codigo2").value }) });
+    if (r.ok) { location.href = "/"; return; }
+    const cuerpo = await r.json().catch(() => null);
+    error(caja, (cuerpo && typeof cuerpo.detail === "string") ? cuerpo.detail : "No se pudo verificar el código.");
+    if (r.status === 401 && cuerpo && /venci/.test(cuerpo.detail || "")) setTimeout(() => location.reload(), 2500);
+  } catch {
+    error(caja, "Sin conexión. Intenta de nuevo.");
+  } finally {
+    boton.disabled = false;
+  }
+};
 document.getElementById("login").onsubmit = async (ev) => {
   ev.preventDefault();
   const boton = ev.submitter, error = document.getElementById("error");
@@ -172,7 +200,17 @@ document.getElementById("login").onsubmit = async (ev) => {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: document.getElementById("email").value, password: document.getElementById("password").value }),
     });
-    if (r.ok) { location.href = "/"; return; }
+    if (r.ok) {
+      const ok = await r.json().catch(() => null);
+      if (ok && ok.requiere_2fa) {            // contraseña correcta: falta el código
+        tokenDosPasos = ok.token_2fa;
+        document.getElementById("login").classList.add("oculto"); document.getElementById("texto-login").classList.add("oculto");
+        document.getElementById("ir-registro").classList.add("oculto");
+        document.getElementById("paso2").classList.remove("oculto"); document.getElementById("codigo2").focus();
+        return;
+      }
+      location.href = "/"; return;
+    }
     const cuerpo = await r.json().catch(() => null);
     error.innerHTML = `<div class="error"></div>`;
     error.firstChild.textContent = (cuerpo && typeof cuerpo.detail === "string") ? cuerpo.detail : "No se pudo iniciar sesión.";
