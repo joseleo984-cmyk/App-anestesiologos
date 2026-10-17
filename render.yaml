@@ -1,10 +1,10 @@
-# Blueprint de Render: la app en el plan gratis. La base de datos y las órdenes
+# Blueprint de Render: la app en el plan Starter (no se duerme). La base de datos y las órdenes
 # (fotos/PDF) están en Supabase. En Render: New > Blueprint > este repositorio.
 services:
   - type: web
     name: app-anestesiologos
     runtime: python
-    plan: free               # se duerme tras ~15 min sin uso; el primer acceso tarda ~1 min
+    plan: starter            # siempre encendida (el plan free se duerme tras ~15 min sin uso)
     region: virginia         # junto a Supabase "East US (North Virginia)"
     buildCommand: pip install -r requirements.txt
     # --proxy-headers: Render atiende el HTTPS y le pasa la solicitud a la app
