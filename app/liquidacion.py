@@ -13,6 +13,7 @@ peso contra el volante de octubre de 2026:
     Recaudo bajo (el 60 % no alcanza a 1 SMLMV): todo es compensación, sin auxilio; salud y pensión sobre
     1 SMLMV y una deducción de "ajuste sindical" para completar la seguridad social.
     La retención en la fuente (meses altos) no se calcula: se toma del volante al comparar.
+    Si AP descuenta la suscripción de la app (variable SUSCRIPCION_APP), va como una deducción más.
 """
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Optional
@@ -57,7 +58,11 @@ def _peso(v: Decimal) -> Decimal:
     return v.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
 
 
-def liquidar(recaudo: Decimal, anio: Optional[int] = None) -> dict:
+def suscripcion_app() -> Decimal:
+    return Decimal(config.SUSCRIPCION_APP) if config.SUSCRIPCION_APP else Decimal(0)
+
+
+def liquidar(recaudo: Decimal, anio: Optional[int] = None, suscripcion: Optional[Decimal] = None) -> dict:
     """Volante calculado: líneas de apropiación, devengados, deducciones, neto y alertas."""
     p, minimo = PORCENTAJES, smlmv(anio)
     recaudo = Decimal(recaudo)
@@ -91,6 +96,7 @@ def liquidar(recaudo: Decimal, anio: Optional[int] = None) -> dict:
         "cuatro_por_mil": _peso(distribuir * p["cuatro_por_mil"]),
         "cuota_sostenimiento": _peso(minimo * p["cuota_sostenimiento"]),
         "ajuste_sindical": ajuste,
+        "suscripcion_app": _peso(Decimal(suscripcion_app() if suscripcion is None else suscripcion)),
     }
     neto = distribuir - sum(deducciones.values())
 
@@ -120,6 +126,7 @@ CONCEPTOS = [  # (clave, nombre en pantalla, dónde está en la liquidación)
     ("salud", "Salud", ("deducciones", "salud")),
     ("pension", "Pensión", ("deducciones", "pension")),
     ("ajuste_sindical", "Ajuste sindical", ("deducciones", "ajuste_sindical")),
+    ("suscripcion_app", "Descuento suscripción app", ("deducciones", "suscripcion_app")),
     ("neto", "Neto a pagar (sin probienestar)", ("neto",)),
 ]
 TOLERANCIA = Decimal("5")  # diferencias de redondeo
@@ -129,13 +136,28 @@ def comparar(calculada: dict, volante: dict) -> list[dict]:
     """Compara la liquidación calculada con los valores leídos del volante, concepto por concepto.
     Los conceptos del volante que la fórmula no calcula (ej. retención en la fuente) se muestran aparte
     y se tienen en cuenta en el neto."""
-    otros = volante.get("otros") or []
+    otros = list(volante.get("otros") or [])
+    leido_suscripcion = volante.get("suscripcion_app")
+    if leido_suscripcion is None:  # por si la IA lo dejó entre los otros conceptos
+        for o in otros:
+            if "suscrip" in (o.get("concepto") or "").lower() and o.get("deducido"):
+                leido_suscripcion = o["deducido"]
+                otros.remove(o)
+                break
+    volante = {**volante, "suscripcion_app": leido_suscripcion}
+    desde_volante = bool(leido_suscripcion) and not calculada["deducciones"]["suscripcion_app"]
+    if desde_volante:
+        # AP ya descuenta la suscripción pero aquí no está configurada: se toma del volante para que el neto cuadre
+        calculada = {**calculada, "deducciones": {**calculada["deducciones"], "suscripcion_app": Decimal(leido_suscripcion)},
+                     "neto": calculada["neto"] - Decimal(leido_suscripcion)}
     efecto_otros = sum((Decimal(o.get("devengado") or 0) - Decimal(o.get("deducido") or 0) for o in otros), Decimal(0))
     filas = []
     for clave, nombre, ruta in CONCEPTOS:
         esperado = calculada
         for parte in ruta:
             esperado = esperado[parte]
+        if clave == "suscripcion_app" and desde_volante:
+            nombre += " (según el volante)"
         if clave == "neto":
             esperado = esperado + efecto_otros
             if efecto_otros:

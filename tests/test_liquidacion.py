@@ -99,3 +99,25 @@ def test_lectura_del_volante_con_claude():
     assert v.neto == 4506281 and v.periodo_hasta.month == 10
     esquema = cliente.llamadas[0]["output_config"]["format"]["schema"]
     assert "auxilio_sindical" in esquema["required"]
+
+
+def test_descuento_de_suscripcion_configurado(monkeypatch):
+    monkeypatch.setattr(liquidacion.config, "SUSCRIPCION_APP", "99000")
+    l = liquidacion.liquidar(Decimal("8071542"), 2026)
+    assert l["deducciones"]["suscripcion_app"] == 99000 and l["neto"] == 4506281 - 99000
+    filas = liquidacion.comparar(l, {**VOLANTE_OCTUBRE, "suscripcion_app": 99000, "neto": 4506281 - 99000})
+    assert {f["estado"] for f in filas} == {"COINCIDE"}
+
+
+@pytest.mark.parametrize("como", ["campo", "otro concepto"])
+def test_descuento_de_suscripcion_tomado_del_volante(como):
+    """AP ya descuenta la suscripción pero la app no lo tiene configurado: el cálculo sigue cuadrando."""
+    volante = {**VOLANTE_OCTUBRE, "neto": 4506281 - 99000}
+    if como == "campo":
+        volante["suscripcion_app"] = 99000
+    else:
+        volante["otros"] = [{"concepto": "DESCUENTO SUSCRIPCION APP", "devengado": None, "deducido": 99000}]
+    filas = liquidacion.comparar(liquidacion.liquidar(Decimal("8071542"), 2026), volante)
+    assert {f["estado"] for f in filas} == {"COINCIDE"}
+    fila = next(f for f in filas if f["concepto"].startswith("Descuento suscripción app"))
+    assert fila["volante"] == 99000 and "según el volante" in fila["concepto"]

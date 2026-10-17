@@ -467,7 +467,7 @@
   table.liq tr.sub-total td { font-weight: 700; }
   table.liq tr.grupo td { padding-top: 14px; color: var(--muted); font-size: .8rem; text-transform: uppercase; border-bottom: 0; }
   table.liq.comparacion { font-size: .8rem; }
-  table.liq tr.DIFERENTE td { background: var(--err-bg); color: var(--err-text); }
+  table.liq tr.DIFERENTE td { background: var(--warn-bg); color: var(--warn-text); }
   table.liq tr.NO_APARECE td { background: var(--warn-bg); }
   @media print {
     @page { size: landscape; margin: 10mm; }
@@ -4427,16 +4427,19 @@ async function mostrarLiquidacion(reporteId) {
       ${fila(Number(d.auxilio_sindical) ? "Salud (4 %)" : "Salud (4 % de 1 SMLMV)", x.salud)}${fila(Number(d.auxilio_sindical) ? "Pensión (4 %)" : "Pensión (4 % de 1 SMLMV)", x.pension)}
       ${fila("4 x mil", x.cuatro_por_mil)}${fila("Cuota de sostenimiento (5 % del SMLMV)", x.cuota_sostenimiento)}
       ${Number(x.ajuste_sindical) ? fila("Ajuste sindical (completa la seguridad social)", x.ajuste_sindical) : ""}
+      ${Number(x.suscripcion_app) ? fila("Descuento suscripción app", x.suscripcion_app) : ""}
       ${fila("Neto a pagar", l.neto, "sub-total")}
       ${fila("Tarjeta probienestar", d.probienestar)}
     </table>
-    <div class="acciones-pago"><button type="button" id="comparar-volante">📄 Comparar con el volante de AP</button></div>
+    <h3 style="margin-top:16px">Revisar mi volante</h3>
+    <p class="sub">Sube el volante que te entregó AP y ve, concepto por concepto, cómo se compone tu pago.</p>
+    <div class="acciones-pago"><button type="button" id="revisar-volante">📄 Revisar mi volante</button></div>
     <div id="resultado-volante"></div>
   </section>`;
-  $("#comparar-volante").onclick = () => elegirArchivo((archivo) => compararVolante(reporteId, archivo));
+  $("#revisar-volante").onclick = () => elegirArchivo((archivo) => revisarVolante(reporteId, archivo));
 }
 
-async function compararVolante(reporteId, archivo) {
+async function revisarVolante(reporteId, archivo) {
   const cont = $("#resultado-volante");
   cont.innerHTML = `<div class="cargando">Leyendo el volante con la IA…<br><span class="sub">${escapar(archivo.name || "")}</span></div>`;
   const form = new FormData();
@@ -4445,11 +4448,11 @@ async function compararVolante(reporteId, archivo) {
     const r = await fetch(`/api/pagos/${reporteId}/volante`, { method: "POST", body: form });
     const cuerpo = await r.json().catch(() => null);
     if (!r.ok) return aviso(cont, "err", mensajeError(cuerpo, `No se pudo leer el volante (error ${r.status}).`));
-    const filas = cuerpo.comparacion, malas = filas.filter((f) => !["COINCIDE", "OTRO"].includes(f.estado));
-    const icono = { COINCIDE: "✓", DIFERENTE: "✗", NO_APARECE: "?", OTRO: "•" };
-    cont.innerHTML = `${malas.length
-        ? `<div class="aviso err">⚠ ${malas.length} concepto${malas.length === 1 ? "" : "s"} no coincide${malas.length === 1 ? "" : "n"} con el cálculo.</div>`
-        : `<div class="aviso ok">✓ El volante coincide con el cálculo en todos los conceptos.</div>`}
+    const filas = cuerpo.comparacion, distintas = filas.filter((f) => !["COINCIDE", "OTRO"].includes(f.estado));
+    const icono = { COINCIDE: "✓", DIFERENTE: "≠", NO_APARECE: "?", OTRO: "•" };
+    cont.innerHTML = `${distintas.length
+        ? `<div class="aviso warn">Hay diferencias en ${distintas.length === 1 ? "este concepto" : `estos ${distintas.length} conceptos`}: revísalas con facturación.</div>`
+        : `<div class="aviso ok">✓ Tu volante cuadra con lo calculado.</div>`}
       ${cuerpo.avisos.map((t) => `<div class="aviso warn">${escapar(t)}</div>`).join("")}
       <div class="tabla-scroll"><table class="liq comparacion"><tr><th></th><th>Concepto</th><th class="v">Calculado</th><th class="v">Volante</th></tr>
       ${filas.filter((f) => !(Number(f.calculado) === 0 && f.calculado != null && f.volante == null)).map((f) => `<tr class="${f.estado}"><td>${icono[f.estado]}</td><td>${escapar(f.concepto)}</td>

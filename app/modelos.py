@@ -265,6 +265,7 @@ class VolanteExtraido(_Base):
     salud: Optional[Decimal] = None
     pension: Optional[Decimal] = None
     ajuste_sindical: Optional[Decimal] = None
+    suscripcion_app: Optional[Decimal] = None
     neto: Optional[Decimal] = None
     otros: list[OtroConcepto] = []
     # "ACUMULADO DE APORTES" del pie del volante
@@ -276,7 +277,7 @@ class VolanteExtraido(_Base):
     _f = field_validator("fecha_proceso", "periodo_desde", "periodo_hasta", mode="before")(_fecha_o_nulo)
     _p = field_validator("probienestar", "compensacion_ordinaria", "compensacion_extraordinaria", "auxilio_sindical",
                          "cuatro_por_mil", "cuota_sostenimiento", "salud", "pension", "ajuste_sindical",
-                         "neto", "acumulado_aporte_sindical", "acumulado_semestral", "acumulado_anual",
+                         "suscripcion_app", "neto", "acumulado_aporte_sindical", "acumulado_semestral", "acumulado_anual",
                          "acumulado_vacaciones", mode="before")(_pesos_o_nulo)
 
 

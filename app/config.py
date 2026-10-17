@@ -29,6 +29,8 @@ REGISTRO_ABIERTO = os.environ.get("REGISTRO_ABIERTO", "si").strip().lower() not 
 # Ciudad que se usa cuando la orden no la trae y la clínica no tiene una conocida (vacío = ninguna)
 CIUDAD_POR_DEFECTO = os.environ.get("CIUDAD_POR_DEFECTO", "Barranquilla").strip() or None
 SMLMV = os.environ.get("SMLMV", "").replace(".", "").strip() or None  # salario mínimo para la liquidación
+# Si AP descuenta la suscripción de la app del volante: valor mensual del descuento (vacío = no se descuenta)
+SUSCRIPCION_APP = os.environ.get("SUSCRIPCION_APP", "").replace(".", "").strip() or None
 
 # Firma de las cookies de sesión. En producción debe venir del entorno;
 # sin ella se genera una al azar y las sesiones se pierden al reiniciar.

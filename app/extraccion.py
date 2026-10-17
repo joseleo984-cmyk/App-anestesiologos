@@ -371,7 +371,7 @@ def extraer_relacion(archivos: list[Archivo], client: anthropic.Anthropic | None
 
 
 _VALORES_VOLANTE = ["probienestar", "compensacion_ordinaria", "compensacion_extraordinaria", "auxilio_sindical",
-                    "cuatro_por_mil", "cuota_sostenimiento", "salud", "pension", "ajuste_sindical", "neto",
+                    "cuatro_por_mil", "cuota_sostenimiento", "salud", "pension", "ajuste_sindical", "suscripcion_app", "neto",
                     "acumulado_aporte_sindical", "acumulado_semestral", "acumulado_anual", "acumulado_vacaciones"]
 ESQUEMA_VOLANTE = {
     "type": "object",
@@ -402,6 +402,7 @@ de Colombia entrega a cada afiliado. Extrae los valores en pesos como números e
 - compensacion_ordinaria, compensacion_extraordinaria, auxilio_sindical: devengados con esos nombres.
 - cuatro_por_mil (4 X MIL), cuota_sostenimiento (CUOTA DE SOSTENIMIENTO), salud, pension, \
 ajuste_sindical (AJUSTE SINDICAL): deducidos.
+- suscripcion_app: deducido por la suscripción de la app de cirugías y pagos (si aparece).
 - neto: el NETO del volante de compensaciones y auxilios (el de los asociados, sin el fondo probienestar).
 - otros: cualquier otro concepto devengado o deducido que no sea de los anteriores (por ejemplo \
 RETENCION EN LA FUENTE). No incluyas totales.
