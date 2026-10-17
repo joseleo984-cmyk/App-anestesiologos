@@ -45,3 +45,10 @@ ADMIN_NOMBRE = os.environ.get("ADMIN_NOMBRE", "Anestesiólogo")
 
 # Versión publicada: Render define RENDER_GIT_COMMIT con el commit desplegado
 VERSION = (os.environ.get("RENDER_GIT_COMMIT") or "local")[:7]
+
+
+# Seguridad
+# Tope de lecturas con IA por anestesiólogo en 24 horas: frena el abuso y el gasto descontrolado de la API
+MAX_LECTURAS_IA_DIA = int(os.environ.get("MAX_LECTURAS_IA_DIA", "80"))
+# La documentación interactiva de la API (/docs) solo se abre si se pide (desarrollo)
+DOCS_ABIERTAS = os.environ.get("DOCS_ABIERTAS", "no").strip().lower() in ("si", "sí", "true", "1")

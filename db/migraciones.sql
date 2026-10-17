@@ -417,3 +417,15 @@ CREATE TABLE IF NOT EXISTS validacion_prueba (
     creado_en          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_validacion_modulo ON validacion_prueba (modulo, creado_en DESC);
+
+-- 32.
+-- Bitácora de seguridad: quién entró, quién exportó, quién aprobó o restableció cuentas (sin datos de pacientes)
+CREATE TABLE IF NOT EXISTS auditoria (
+    auditoria_id     BIGSERIAL PRIMARY KEY,
+    creado_en        TIMESTAMPTZ NOT NULL DEFAULT now(),
+    anestesiologo_id BIGINT REFERENCES anestesiologo(anestesiologo_id) ON DELETE SET NULL,
+    evento           VARCHAR(40) NOT NULL,
+    detalle          VARCHAR(200),
+    ip               VARCHAR(45)
+);
+CREATE INDEX IF NOT EXISTS idx_auditoria_fecha ON auditoria (creado_en DESC);

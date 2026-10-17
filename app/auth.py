@@ -30,6 +30,10 @@ def verificar_password(password: str, guardado: Optional[str]) -> bool:
     return hmac.compare_digest(calculado, base64.b64decode(h))
 
 
+# Se verifica contra este hash cuando el correo no existe: así tardar lo mismo no revela qué correos tienen cuenta
+HASH_FALSO = hash_password(secrets.token_urlsafe(16))
+
+
 def _firma(datos: str) -> str:
     return hmac.new(config.SESSION_SECRET.encode(), datos.encode(), hashlib.sha256).hexdigest()
 

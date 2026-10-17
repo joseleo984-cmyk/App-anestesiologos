@@ -5,6 +5,8 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
 from openpyxl.utils import get_column_letter
 
+from app import seguridad
+
 PESOS = '"$"#,##0'
 ENCABEZADO = Font(bold=True, color="FFFFFF")
 FONDO = PatternFill("solid", fgColor="0B6BCB")
@@ -15,7 +17,7 @@ def _hoja(ws, titulos: list[str], filas: list[list], columnas_pesos: set[int], a
     for celda in ws[1]:
         celda.font, celda.fill = ENCABEZADO, FONDO
     for fila in filas:
-        ws.append(fila)
+        ws.append(seguridad.fila_segura(fila))
     for i, ancho in enumerate(anchos, start=1):
         ws.column_dimensions[get_column_letter(i)].width = ancho
         if i in columnas_pesos:
@@ -79,7 +81,7 @@ def libro_relacion(filas: list[dict], anestesiologo: str, mes: str, fecha) -> by
     borde = Border(left=linea, right=linea, top=linea, bottom=linea)
     ws.append(["RELACIÓN DE ÓRDENES"])
     ws["A1"].font = Font(bold=True, size=14)
-    ws.append([f"ANESTESIÓLOGO: {anestesiologo}", None, None, f"FECHA: {fecha:%d/%m/%Y}", None,
+    ws.append([f"ANESTESIÓLOGO: {seguridad.texto_seguro(anestesiologo)}", None, None, f"FECHA: {fecha:%d/%m/%Y}", None,
                f"MES A FACTURAR: {mes}"])
     ws.append(["VERIFICADO POR:"])
     ws.append([])
@@ -88,8 +90,8 @@ def libro_relacion(filas: list[dict], anestesiologo: str, mes: str, fecha) -> by
     for celda in ws[5]:
         celda.font, celda.fill, celda.border = ENCABEZADO, FONDO, borde
     for i, f in enumerate(filas, start=1):
-        ws.append([i, f["entidad"], f["paciente"], f["cedula"], f["procedimiento"], f["numero_orden"],
-                   float(f["valor"]) if f["valor"] is not None else None])
+        ws.append(seguridad.fila_segura([i, f["entidad"], f["paciente"], f["cedula"], f["procedimiento"], f["numero_orden"],
+                                         float(f["valor"]) if f["valor"] is not None else None]))
     total = len(filas) + 6
     ws.append([None] * 5 + ["TOTAL", f"=SUM(G6:G{total - 1})" if filas else 0])
     for fila in ws.iter_rows(min_row=6, max_row=total):

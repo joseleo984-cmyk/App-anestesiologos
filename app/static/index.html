@@ -1161,6 +1161,11 @@
       <div id="uso-ia"><p class="sub">Cargando…</p></div>
     </section>
     <section class="card">
+      <h2>Bitácora de seguridad</h2>
+      <p class="sub">Entradas, intentos fallidos, bloqueos, copias, exportaciones y cambios de cuentas (últimos 200). No guarda contraseñas ni datos de pacientes.</p>
+      <div id="bitacora"><p class="sub">Cargando…</p></div>
+    </section>
+    <section class="card">
       <h2>Calidad de la lectura</h2>
       <p class="sub">Campos que los anestesiólogos corrigen después de leer una orden (últimos 90 días) y sus comentarios de
         «¿Qué te faltó?». Solo se guarda qué campo cambió, nunca el dato.</p>
@@ -5297,8 +5302,25 @@ async function cargarCalidad() {
   cont.innerHTML = `<p class="sub">Órdenes leídas y guardadas: <strong>${formatoMiles(d.ordenes_leidas)}</strong></p>${campos}
     <p class="sub" style="margin:12px 0 4px">Comentarios recientes:</p>${comentarios}`;
 }
+const EVENTO_SEGURIDAD = { LOGIN_OK: "Entró", LOGIN_FALLO: "Intento fallido", CUENTA_BLOQUEADA: "Cuenta bloqueada", CLAVE_CAMBIADA: "Cambió su clave",
+  CLAVE_RESTABLECIDA_ENLACE: "Restableció su clave (correo)", CLAVE_RESTABLECIDA_ADMIN: "Clave restablecida por el administrador",
+  REGISTRO_APROBADO: "Registro aprobado", REGISTRO_RECHAZADO: "Registro rechazado", CUENTA_CREADA: "Cuenta creada", CUENTA_ACTIVADA: "Cuenta activada",
+  CUENTA_DESACTIVADA: "Cuenta desactivada", COPIA_SEGURIDAD: "Copia de seguridad", EXPORTAR_EXCEL: "Excel de cirugías", EXPORTAR_RELACION: "Excel de relación" };
+async function cargarBitacora() {
+  const cont = $("#bitacora");
+  const r = await fetch("/api/auditoria").catch(() => null);
+  if (!r || !r.ok) { cont.innerHTML = `<p class="sub">No se pudo cargar la bitácora.</p>`; return; }
+  const filas = await r.json();
+  if (!filas.length) { cont.innerHTML = `<p class="sub">Aún no hay registros.</p>`; return; }
+  cont.innerHTML = `<div class="tabla-scroll"><table class="inf-tabla"><thead><tr><th>Cuándo</th><th>Quién</th><th>Qué</th></tr></thead><tbody>${filas.map((f) => {
+    const alerta = ["LOGIN_FALLO", "CUENTA_BLOQUEADA"].includes(f.evento);
+    return `<tr${alerta ? ` style="color:var(--err-text)"` : ""}><td>${escapar(new Date(f.creado_en).toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" }))}</td>
+      <td>${escapar(f.nombre || "—")}</td><td>${escapar(EVENTO_SEGURIDAD[f.evento] || f.evento)}${f.detalle ? ` · ${escapar(f.detalle)}` : ""}${f.ip ? `<br><small class="sub">${escapar(f.ip)}</small>` : ""}</td></tr>`;
+  }).join("")}</tbody></table></div>`;
+}
 async function cargarUsuarios() {
   cargarUsoIA();
+  cargarBitacora();
   cargarCalidad();
   const cont = $("#lista-usuarios");
   const r = await fetch("/api/usuarios");

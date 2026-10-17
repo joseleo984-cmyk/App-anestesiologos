@@ -26,7 +26,7 @@ from pydantic import BaseModel, Field
 from rapidfuzz import fuzz
 
 from app import (almacenamiento, auth, calidad, cartera, catalogo, config, copia, correo, exportar, extraccion, extractos,
-                 finanzas, inicio, liquidacion, noticias, radicado, repositorio, uso_ia, validacion)
+                 finanzas, inicio, liquidacion, noticias, radicado, repositorio, seguridad, uso_ia, validacion)
 from app.modelos import (ClaveCopia, CompromisoEntrada, CuentaEntrada, Favorita, FuenteNoticias, ImportacionConfirmada, MetaEntrada,
                          MovimientoEntrada, OrdenConfirmada, PartidaEntrada, PruebaValidacion, Sugerencia, TemasNoticias)
 
@@ -41,12 +41,22 @@ async def ciclo_de_vida(_app):
     yield
 
 
-app = FastAPI(title="App Anestesiólogos", lifespan=ciclo_de_vida)
+app = FastAPI(title="App Anestesiólogos", lifespan=ciclo_de_vida,
+              docs_url="/docs" if config.DOCS_ABIERTAS else None, redoc_url=None,
+              openapi_url="/openapi.json" if config.DOCS_ABIERTAS else None)
+app.middleware("http")(seguridad.cabeceras_de_seguridad)
 STATIC = Path(__file__).parent / "static"
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 EXTENSIONES = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp",
                "image/gif": ".gif", "image/heic": ".heic", "application/pdf": ".pdf"}
+
+
+def cupo_ia(conn, anestesiologo_id: int) -> None:
+    """Máximo de lecturas con IA por anestesiólogo en 24 horas (frena el abuso y el gasto de la API)."""
+    if uso_ia.lecturas_ultimas_24h(conn, anestesiologo_id) >= config.MAX_LECTURAS_IA_DIA:
+        raise HTTPException(429, f"Llegaste al límite de {config.MAX_LECTURAS_IA_DIA} lecturas con IA en 24 horas. "
+                                 "Intenta más tarde o escribe los datos a mano.")
 
 
 def get_conn():
@@ -166,13 +176,18 @@ def iniciar_sesion(datos: Credenciales, request: Request, response: Response, co
     usuario = repositorio.buscar_anestesiologo_por_email(conn, datos.email)
     if usuario and usuario["bloqueado_hasta"] and usuario["bloqueado_hasta"] > datetime.now(timezone.utc):
         raise HTTPException(429, _mensaje_bloqueo(usuario["bloqueado_hasta"]))  # ni siquiera se prueba la clave
-    if not usuario or not auth.verificar_password(datos.password, usuario["password_hash"]):
-        fallos.append(ahora)
+    if not auth.verificar_password(datos.password, usuario["password_hash"] if usuario else auth.HASH_FALSO) or not usuario:
+        fallos.append(ahora)       # (con correo inexistente también se calcula el hash: tarda lo mismo)
+        hasta = None
         if usuario:
             hasta = repositorio.registrar_intento_fallido(conn, usuario["anestesiologo_id"])
+        repositorio.auditar(conn, "LOGIN_FALLO", usuario["anestesiologo_id"] if usuario else None,
+                            None if usuario else "correo sin cuenta", ip)
+        conn.commit()
+        if hasta and hasta > datetime.now(timezone.utc):
+            repositorio.auditar(conn, "CUENTA_BLOQUEADA", usuario["anestesiologo_id"], None, ip)
             conn.commit()
-            if hasta and hasta > datetime.now(timezone.utc):
-                raise HTTPException(429, _mensaje_bloqueo(hasta))
+            raise HTTPException(429, _mensaje_bloqueo(hasta))
         time.sleep(1)  # frena los intentos de adivinar contraseñas
         raise HTTPException(401, "Correo o contraseña incorrectos.")
     if usuario["intentos_fallidos"]:
@@ -183,6 +198,8 @@ def iniciar_sesion(datos: Credenciales, request: Request, response: Response, co
     if not usuario["activo"]:
         time.sleep(1)
         raise HTTPException(401, "Correo o contraseña incorrectos.")
+    repositorio.auditar(conn, "LOGIN_OK", usuario["anestesiologo_id"], None, ip)
+    conn.commit()
     poner_cookie(response, usuario["anestesiologo_id"], usuario["version_sesion"])
     return {"nombre": usuario["nombre"], "debe_cambiar_clave": usuario["debe_cambiar_clave"]}
 
@@ -215,6 +232,7 @@ def cambiar_mi_clave(datos: CambioClave, response: Response, conn=Depends(get_co
     if datos.nueva == datos.actual:
         raise HTTPException(400, "La contraseña nueva debe ser distinta de la actual.")
     version = repositorio.cambiar_clave(conn, cuenta["anestesiologo_id"], auth.hash_password(datos.nueva), False)
+    repositorio.auditar(conn, "CLAVE_CAMBIADA", cuenta["anestesiologo_id"])
     conn.commit()
     poner_cookie(response, cuenta["anestesiologo_id"], version)  # esta sesión sigue; las demás se cierran
     return {"ok": True}
@@ -291,6 +309,7 @@ def restablecer_con_enlace(datos: NuevaClave, conn=Depends(get_conn, scope="func
         conn.rollback()
         raise HTTPException(400, "El enlace no sirve: ya se usó o venció. Pide uno nuevo en «Olvidé mi contraseña».")
     repositorio.cambiar_clave(conn, cuenta, auth.hash_password(datos.nueva), False)  # cierra las sesiones abiertas
+    repositorio.auditar(conn, "CLAVE_RESTABLECIDA_ENLACE", cuenta)
     conn.commit()
     return {"ok": True}
 
@@ -373,17 +392,19 @@ def consumo_de_ia(desde: Optional[date] = None, conn=Depends(get_conn, scope="fu
 
 
 @app.post("/api/usuarios/{usuario_id}/aprobar")
-def aprobar_registro(usuario_id: int, conn=Depends(get_conn, scope="function"), _=Depends(admin_actual)):
+def aprobar_registro(usuario_id: int, conn=Depends(get_conn, scope="function"), admin=Depends(admin_actual)):
     if not repositorio.aprobar_solicitud(conn, usuario_id):
         raise HTTPException(404, "Solicitud no encontrada.")
+    repositorio.auditar(conn, "REGISTRO_APROBADO", admin["anestesiologo_id"], f"cuenta {usuario_id}")
     conn.commit()
     return {"ok": True}
 
 
 @app.post("/api/usuarios/{usuario_id}/rechazar")
-def rechazar_registro(usuario_id: int, conn=Depends(get_conn, scope="function"), _=Depends(admin_actual)):
+def rechazar_registro(usuario_id: int, conn=Depends(get_conn, scope="function"), admin=Depends(admin_actual)):
     if not repositorio.rechazar_solicitud(conn, usuario_id):
         raise HTTPException(404, "Solicitud no encontrada.")
+    repositorio.auditar(conn, "REGISTRO_RECHAZADO", admin["anestesiologo_id"], f"cuenta {usuario_id}")
     conn.commit()
     return {"ok": True}
 
@@ -405,7 +426,7 @@ def listar_usuarios(conn=Depends(get_conn, scope="function"), _=Depends(admin_ac
 
 
 @app.post("/api/usuarios", status_code=201)
-def crear_usuario(datos: NuevoUsuario, conn=Depends(get_conn, scope="function"), _=Depends(admin_actual)):
+def crear_usuario(datos: NuevoUsuario, conn=Depends(get_conn, scope="function"), admin=Depends(admin_actual)):
     """Crea la cuenta con una clave temporal que se muestra una sola vez."""
     clave = auth.clave_temporal()
     try:
@@ -414,6 +435,7 @@ def crear_usuario(datos: NuevoUsuario, conn=Depends(get_conn, scope="function"),
     except repositorio.EmailYaRegistrado:
         conn.rollback()
         raise HTTPException(409, "Ya existe una cuenta con ese correo o registro médico.")
+    repositorio.auditar(conn, "CUENTA_CREADA", admin["anestesiologo_id"], f"cuenta {nuevo}")
     conn.commit()
     return {"anestesiologo_id": nuevo, "clave_temporal": clave}
 
@@ -424,6 +446,7 @@ def activar_usuario(usuario_id: int, datos: EstadoUsuario, conn=Depends(get_conn
         raise HTTPException(400, "No puedes desactivar tu propia cuenta.")
     if not repositorio.cambiar_activo(conn, usuario_id, datos.activo):
         raise HTTPException(404, "Cuenta no encontrada.")
+    repositorio.auditar(conn, "CUENTA_ACTIVADA" if datos.activo else "CUENTA_DESACTIVADA", admin["anestesiologo_id"], f"cuenta {usuario_id}")
     conn.commit()
     return {"ok": True}
 
@@ -437,6 +460,7 @@ def restablecer_clave(usuario_id: int, conn=Depends(get_conn, scope="function"),
         raise HTTPException(404, "Cuenta no encontrada.")
     clave = auth.clave_temporal()
     repositorio.cambiar_clave(conn, usuario_id, auth.hash_password(clave), True)
+    repositorio.auditar(conn, "CLAVE_RESTABLECIDA_ADMIN", admin["anestesiologo_id"], f"cuenta {usuario_id}")
     conn.commit()
     return {"clave_temporal": clave}
 
@@ -531,6 +555,7 @@ def subir_documento(archivos: list[UploadFile] = File(default=[]), archivo: Opti
         documento_id = repositorio.crear_documento(conn, anestesiologo_id, ubicaciones, hash_sha256)
     conn.commit()
 
+    cupo_ia(conn, anestesiologo_id)
     uso_ia.en_nombre_de(anestesiologo_id, documento_id)
     try:
         orden = extraccion.extraer_orden(paginas)
@@ -605,6 +630,12 @@ def que_te_falto(datos: Comentario, conn=Depends(get_conn, scope="function"), an
     return {"comentario_id": cid}
 
 
+@app.get("/api/auditoria")
+def bitacora_de_seguridad(conn=Depends(get_conn, scope="function"), _=Depends(admin_actual)):
+    """Para el administrador: últimos hechos de seguridad (entradas, intentos fallidos, copias, cambios de cuentas)."""
+    return repositorio.ver_auditoria(conn)
+
+
 @app.get("/api/calidad-lectura")
 def calidad_de_la_lectura(conn=Depends(get_conn, scope="function"), _=Depends(admin_actual)):
     """Para el administrador: campos más corregidos en los últimos 90 días y comentarios de «¿Qué te faltó?»."""
@@ -660,6 +691,8 @@ def exportar_excel(filtros: Filtros = Depends(), conn=Depends(get_conn, scope="f
     cirugias = repositorio.listar_cirugias(conn, anestesiologo_id, 100_000, filtros.valores)
     glosas = repositorio.reporte_glosas(conn, anestesiologo_id, filtros.valores["desde"], filtros.valores["hasta"])
     libro = exportar.libro_cirugias(cirugias, repositorio.reporte(conn, anestesiologo_id, filtros.valores), glosas)
+    repositorio.auditar(conn, "EXPORTAR_EXCEL", anestesiologo_id, f"{len(cirugias)} cirugías")
+    conn.commit()
     return Response(libro, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     headers={"Content-Disposition": f'attachment; filename="cirugias-{date.today()}.xlsx"'})
 
@@ -690,6 +723,8 @@ def relacion_en_excel(filtros: FiltrosRelacion = Depends(), ids: list[int] = Que
     filas = repositorio.relacion_ordenes(conn, anestesiologo_id, **filtros.valores, ids=ids or None)
     cuenta = repositorio.obtener_cuenta(conn, anestesiologo_id)
     libro = exportar.libro_relacion(filas, cuenta["nombre"], mes.strip(), date.today())
+    repositorio.auditar(conn, "EXPORTAR_RELACION", anestesiologo_id, f"{len(filas)} filas")
+    conn.commit()
     return Response(libro, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     headers={"Content-Disposition": f'attachment; filename="relacion-ordenes-{date.today()}.xlsx"'})
 
@@ -704,6 +739,8 @@ def copia_de_seguridad(c: ClaveCopia, conn=Depends(get_conn, scope="function"), 
     """Toda la base de datos en un .zip cifrado con la clave que escoge el administrador (POST: la clave no
     queda en la dirección). Se restaura con db/mantenimiento/restaurar_copia.py."""
     datos, resumen = copia.crear_copia(conn, c.clave)
+    repositorio.auditar(conn, "COPIA_SEGURIDAD", admin["anestesiologo_id"])
+    conn.commit()
     log.info("Copia de seguridad descargada por %s: %s filas", admin["email"], sum(resumen["tablas"].values()))
     return Response(datos, media_type="application/zip", headers={
         "Content-Disposition": f'attachment; filename="copia-auditorias-ap-{date.today()}.zip"',
@@ -809,6 +846,7 @@ def subir_reporte_pago(archivo: UploadFile, conn=Depends(get_conn, scope="functi
     existente = repositorio.buscar_reporte_por_hash(conn, anestesiologo_id, hash_sha256)
     if existente:
         raise HTTPException(409, {"mensaje": "Este reporte ya se había subido.", "reporte_id": existente["reporte_id"]})
+    cupo_ia(conn, anestesiologo_id)
     uso_ia.en_nombre_de(anestesiologo_id)
     try:
         reporte = extraccion.extraer_reporte_pago(datos, tipo)
@@ -858,6 +896,7 @@ def _subir_relacion(conn, anestesiologo_id: int, archivos: list[UploadFile], pag
     if existente:
         raise HTTPException(409, {"mensaje": f"Este{'a' if tipo == 'RELACION' else ''} {nombre} ya se había subido.",
                                   "reporte_id": existente["reporte_id"]})
+    cupo_ia(conn, anestesiologo_id)
     uso_ia.en_nombre_de(anestesiologo_id)
     try:
         relacion = (extraccion.extraer_relacion(paginas) if tipo == "RELACION"
@@ -1037,6 +1076,7 @@ def comparar_volante(reporte_id: int, archivo: UploadFile, conn=Depends(get_conn
     if reporte is None:
         raise HTTPException(404, "Reporte no encontrado.")
     datos, tipo = _leer_subida(archivo)
+    cupo_ia(conn, anestesiologo_id)
     uso_ia.en_nombre_de(anestesiologo_id)
     try:
         volante = extraccion.extraer_volante(datos, tipo)
@@ -1105,6 +1145,7 @@ def importar_extracto(tareas: BackgroundTasks, archivos: list[UploadFile] = File
                       anestesiologo_id=Depends(anestesiologo_actual)):
     """Recibe el extracto (PDF de muchas hojas, fotos, o Excel/CSV del banco) y lo lee en segundo plano.
     La pantalla consulta el avance con GET /api/finanzas/importaciones/{id}."""
+    cupo_ia(conn, anestesiologo_id)
     if len(archivos) > extractos.MAX_HOJAS:
         raise HTTPException(413, f"Máximo {extractos.MAX_HOJAS} archivos.")
     subidos = []
@@ -1193,6 +1234,7 @@ def comprometerse(meta_id: int, c: CompromisoEntrada, conn=Depends(get_conn, sco
 def subir_volante(archivo: UploadFile, conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
     """Sube el volante de AP de un mes: queda como el ingreso real de ese mes."""
     datos, tipo = _leer_subida(archivo)
+    cupo_ia(conn, anestesiologo_id)
     uso_ia.en_nombre_de(anestesiologo_id)
     try:
         volante = extraccion.extraer_volante(datos, tipo)

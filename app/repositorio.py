@@ -1186,3 +1186,17 @@ def unir_cirugias(conn, anestesiologo_id: int, conservar: int, eliminar: int) ->
             conn.execute("UPDATE cirugia_procedimiento SET cirugia_id = %s WHERE cirugia_id = %s", (conservar, eliminar))
     conn.execute("UPDATE pago_detalle SET cirugia_id = %s WHERE cirugia_id = %s", (conservar, eliminar))
     conn.execute("DELETE FROM cirugia WHERE cirugia_id = %s", (eliminar,))
+
+
+def auditar(conn, evento: str, anestesiologo_id: Optional[int] = None, detalle: Optional[str] = None,
+            ip: Optional[str] = None) -> None:
+    """Deja constancia de un hecho de seguridad (nunca datos de pacientes). Va en la transacción de quien llama."""
+    conn.execute("INSERT INTO auditoria (anestesiologo_id, evento, detalle, ip) VALUES (%s, %s, %s, %s)",
+                 (anestesiologo_id, evento, (detalle or None) and detalle[:200], (ip or None) and ip[:45]))
+
+
+def ver_auditoria(conn, limite: int = 200) -> list[dict]:
+    return conn.execute(
+        """SELECT a.auditoria_id, a.creado_en, a.evento, a.detalle, a.ip, u.nombre
+             FROM auditoria a LEFT JOIN anestesiologo u USING (anestesiologo_id)
+            ORDER BY a.creado_en DESC, a.auditoria_id DESC LIMIT %s""", (limite,)).fetchall()

@@ -78,3 +78,8 @@ def por_tipo(conn, desde=None) -> list[dict]:
                   round(avg(tokens_entrada + tokens_salida)) AS tokens_promedio
              FROM uso_ia WHERE creado_en >= COALESCE(%s, date_trunc('month', now()))
             GROUP BY tipo ORDER BY costo_usd DESC""", (desde,)).fetchall()
+
+
+def lecturas_ultimas_24h(conn, anestesiologo_id: int) -> int:
+    return conn.execute("SELECT count(*) AS n FROM uso_ia WHERE anestesiologo_id = %s AND creado_en > now() - interval '24 hours'",
+                        (anestesiologo_id,)).fetchone()["n"]
