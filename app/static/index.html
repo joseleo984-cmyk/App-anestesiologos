@@ -621,6 +621,16 @@
 .pago-global { margin-top: 6px; }
 .pago-global select { width: 100%; }
 .chip.PAGO_GLOBAL { background: var(--info-bg); color: var(--info-text); border-color: transparent; }
+.modo-escaner { display: flex; gap: 8px; align-items: flex-start; margin: 10px 0 2px; font-size: .85rem; color: var(--muted); }
+.modo-escaner input { margin-top: 3px; flex: 0 0 auto; }
+.capa-escaner { position: fixed; inset: 0; z-index: 80; background: var(--bg); display: flex; flex-direction: column; gap: 8px; padding: 12px 12px calc(12px + env(safe-area-inset-bottom)); overflow: auto; }
+.capa-escaner.oculto { display: none; }
+.esc-cab { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.esc-lienzo { position: relative; flex: 1 1 auto; min-height: 220px; display: grid; place-items: center; background: #0b0f0f; border-radius: 12px; overflow: hidden; }
+.esc-lienzo canvas { max-width: 100%; max-height: 100%; touch-action: none; }
+.esc-trabajando { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,.55); color: #fff; font-weight: 600; }
+.esc-botones { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.esc-botones .ancho { grid-column: 1 / -1; }
 </style>
 </head>
 <body>
@@ -653,6 +663,8 @@
     <h2>Sube la orden</h2>
     <div id="zona" class="zona">
       <button type="button" class="boton primario grande" id="elegir">📷 Tomar foto o elegir archivo</button>
+      <label class="modo-escaner"><input type="checkbox" id="modo-escaner" checked>
+        <span><strong>Modo escáner:</strong> detecta la hoja, la endereza y aclara el fondo. Tú ajustas los bordes antes de usarla.</span></label>
       <div id="bandeja" class="oculto">
         <p class="sub" id="bandeja-texto"></p>
         <div class="miniaturas" id="miniaturas"></div>
@@ -1318,6 +1330,16 @@
 <div id="toast" role="status" aria-live="polite"></div>
 <div id="historia" class="oculto" role="dialog" aria-modal="true" aria-label="Historias de noticias"></div>
 <div id="capa-ficha" class="capa oculto"><div class="ficha" id="ficha" role="dialog" aria-modal="true" aria-label="Ficha de la noticia"></div></div>
+<div id="capa-escaner" class="capa-escaner oculto" role="dialog" aria-modal="true" aria-labelledby="esc-titulo">
+  <div class="esc-cab"><strong id="esc-titulo">Ajusta los bordes</strong><span class="sub" id="esc-pagina"></span></div>
+  <div class="esc-lienzo" id="esc-lienzo"><canvas id="esc-canvas"></canvas><div class="esc-trabajando oculto" id="esc-trabajando">Escaneando…</div></div>
+  <div class="segmentos oculto" id="esc-modos">
+    <button type="button" data-modo="escaner" aria-pressed="true">Escáner<span class="sub">Blanco y negro, limpio</span></button>
+    <button type="button" data-modo="color" aria-pressed="false">Color<span class="sub">Fondo aclarado</span></button>
+  </div>
+  <p class="sub" id="esc-ayuda"></p>
+  <div class="esc-botones" id="esc-botones"></div>
+</div>
 <div id="capa-terminos" class="capa oculto" style="z-index:70"><div class="ficha" role="dialog" aria-modal="true" aria-labelledby="terminos-titulo">
   <h3 id="terminos-titulo">Términos y política de datos</h3>
   <p style="margin:0">Para seguir usando Auditorías AP lee y acepta la versión vigente de los
@@ -1345,6 +1367,7 @@
 <script src="/static/infusiones.js"></script>
 <script src="/static/tiva.js"></script>
 <script src="/static/regional.js"></script>
+<script src="/static/escaner.js"></script>
 <script>
 const $ = (sel) => document.querySelector(sel);
 const campo = (id) => document.getElementById(id);
@@ -1659,15 +1682,132 @@ $("#paso-revisar").onsubmit = async (ev) => {
 const MAX_PAGINAS = 8;
 let bandeja = [];  // [{nombre, tipo, blob, url}]
 
+// ---------------------------------------------------------------- escáner de la foto
+const escanerEncendido = () => $("#modo-escaner").checked;
+try { $("#modo-escaner").checked = localStorage.getItem("modo-escaner") !== "no"; } catch (e) {}
+$("#modo-escaner").addEventListener("change", () => { try { localStorage.setItem("modo-escaner", escanerEncendido() ? "si" : "no"); } catch (e) {} });
+
+async function imagenParaEscanear(archivo, maxLado = 2000) {
+  let fuente;
+  try { fuente = await createImageBitmap(archivo, { imageOrientation: "from-image" }); }
+  catch (e) {
+    fuente = await new Promise((ok, mal) => { const im = new Image(); im.onload = () => ok(im); im.onerror = mal; im.src = URL.createObjectURL(archivo); });
+  }
+  const ancho = fuente.width || fuente.naturalWidth, alto = fuente.height || fuente.naturalHeight;
+  const k = Math.min(1, maxLado / Math.max(ancho, alto));
+  const lienzo = document.createElement("canvas");
+  lienzo.width = Math.round(ancho * k); lienzo.height = Math.round(alto * k);
+  lienzo.getContext("2d").drawImage(fuente, 0, 0, lienzo.width, lienzo.height);
+  return lienzo.getContext("2d").getImageData(0, 0, lienzo.width, lienzo.height);
+}
+
+function aLienzo(img) {
+  const c = document.createElement("canvas"); c.width = img.width; c.height = img.height;
+  c.getContext("2d").putImageData(new ImageData(img.data, img.width, img.height), 0, 0);
+  return c;
+}
+
+// Abre el escáner con una foto. Devuelve {blob, nombre} (escaneo), "original" (usar la foto tal cual) o null (descartar).
+function escanearArchivo(archivo, numero) {
+  return new Promise(async (resolver) => {
+    const capa = $("#capa-escaner"), cv = $("#esc-canvas"), ctx = cv.getContext("2d");
+    const botones = $("#esc-botones"), trabajando = $("#esc-trabajando");
+    let img;
+    try { img = await imagenParaEscanear(archivo); } catch (e) { return resolver("original"); }   // formato que el navegador no abre
+    const fuente = aLienzo(img);
+    let esquinas = Escaner.detectarHoja(img).esquinas.map((p) => ({ ...p }));
+    let modo = "escaner", resultado = null, arrastrando = null, escala = 1;
+    const cerrar = (valor) => { capa.classList.add("oculto"); cv.onpointerdown = cv.onpointermove = cv.onpointerup = null; resolver(valor); };
+    $("#esc-pagina").textContent = `Foto ${numero}`;
+    capa.classList.remove("oculto");
+
+    const ajustarTamano = (ancho, alto) => {
+      const caja = $("#esc-lienzo").getBoundingClientRect();
+      escala = Math.min((caja.width || 320) / ancho, Math.max(220, caja.height || 320) / alto, 1.5);
+      cv.width = Math.round(ancho * escala); cv.height = Math.round(alto * escala);
+    };
+    const dibujarAjuste = () => {
+      ajustarTamano(img.width, img.height);
+      ctx.drawImage(fuente, 0, 0, cv.width, cv.height);
+      ctx.beginPath();
+      esquinas.forEach((p, i) => (i ? ctx.lineTo(p.x * escala, p.y * escala) : ctx.moveTo(p.x * escala, p.y * escala)));
+      ctx.closePath(); ctx.fillStyle = "rgba(13,116,112,.18)"; ctx.fill();
+      ctx.lineWidth = 3; ctx.strokeStyle = "#35b3a9"; ctx.stroke();
+      esquinas.forEach((p) => { ctx.beginPath(); ctx.arc(p.x * escala, p.y * escala, 13, 0, 7); ctx.fillStyle = "#fff"; ctx.fill(); ctx.lineWidth = 3; ctx.stroke(); });
+    };
+    const verAjuste = () => {
+      $("#esc-titulo").textContent = "Ajusta los bordes"; $("#esc-modos").classList.add("oculto");
+      $("#esc-ayuda").textContent = "Arrastra los círculos hasta las esquinas de la hoja.";
+      botones.innerHTML = `<button type="button" id="esc-original">Usar la foto tal cual</button>
+        <button type="button" class="primario" id="esc-escanear">Escanear ✓</button>
+        <button type="button" class="ancho enlace" id="esc-descartar" style="border:0;background:none">Descartar esta foto</button>`;
+      $("#esc-original").onclick = () => cerrar("original");
+      $("#esc-descartar").onclick = () => cerrar(null);
+      $("#esc-escanear").onclick = () => hacerEscaneo();
+      dibujarAjuste();
+      cv.onpointerdown = (e) => {
+        const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * img.width, y = (e.clientY - r.top) / r.height * img.height;
+        const cerca = esquinas.map((p, i) => [Math.hypot(p.x - x, p.y - y) * escala, i]).sort((a, b) => a[0] - b[0])[0];
+        if (cerca[0] < 48) { arrastrando = cerca[1]; cv.setPointerCapture(e.pointerId); }
+      };
+      cv.onpointermove = (e) => {
+        if (arrastrando === null) return;
+        const r = cv.getBoundingClientRect();
+        esquinas[arrastrando] = { x: Math.min(Math.max((e.clientX - r.left) / r.width * img.width, 0), img.width - 1),
+                                  y: Math.min(Math.max((e.clientY - r.top) / r.height * img.height, 0), img.height - 1) };
+        dibujarAjuste();
+      };
+      cv.onpointerup = () => { arrastrando = null; };
+    };
+    const verResultado = () => {
+      const rec = Escaner.enderezar(img, Escaner.ordenarEsquinas(esquinas), 2000);
+      resultado = Escaner.mejorar(rec, modo);
+      const lienzo = aLienzo(resultado);
+      ajustarTamano(lienzo.width, lienzo.height);
+      ctx.drawImage(lienzo, 0, 0, cv.width, cv.height);
+      lienzo.toBlob((blob) => { resultado.blob = blob; }, "image/jpeg", 0.85);
+      return lienzo;
+    };
+    const hacerEscaneo = () => {
+      trabajando.classList.remove("oculto"); cv.onpointerdown = cv.onpointermove = cv.onpointerup = null;
+      setTimeout(() => {          // deja pintar «Escaneando…» antes del cálculo
+        verResultado(); trabajando.classList.add("oculto");
+        $("#esc-titulo").textContent = "Así quedó"; $("#esc-modos").classList.remove("oculto");
+        $("#esc-ayuda").textContent = "Si se ve bien, úsala. Si recortó mal, vuelve a ajustar los bordes.";
+        botones.innerHTML = `<button type="button" id="esc-ajustar">← Ajustar bordes</button>
+          <button type="button" class="primario" id="esc-usar">Usar este escaneo</button>`;
+        $("#esc-ajustar").onclick = verAjuste;
+        $("#esc-usar").onclick = () => {
+          const listo = (b) => cerrar({ blob: b, nombre: `orden-escaneada-${numero}.jpg` });
+          if (resultado.blob) listo(resultado.blob); else setTimeout(() => listo(resultado.blob || archivo), 400);
+        };
+      }, 40);
+    };
+    document.querySelectorAll("#esc-modos [data-modo]").forEach((b) => b.onclick = () => {
+      modo = b.dataset.modo;
+      document.querySelectorAll("#esc-modos [data-modo]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+      trabajando.classList.remove("oculto");
+      setTimeout(() => { resultado = null; verResultado(); trabajando.classList.add("oculto"); }, 40);
+    });
+    verAjuste();
+  });
+}
+
 async function agregarABandeja(archivos) {
   const estado = $("#estado-subida");
   aviso(estado, "", "");
   for (const archivo of archivos) {
     if (bandeja.length >= MAX_PAGINAS) { aviso(estado, "err", `Máximo ${MAX_PAGINAS} fotos o archivos por orden.`); break; }
     try {
-      const blob = new Blob([await archivo.arrayBuffer()], { type: archivo.type || "application/octet-stream" });
+      let origen = archivo, nombre = archivo.name || `foto-${bandeja.length + 1}.jpg`;
+      if (escanerEncendido() && /^image\//.test(archivo.type || "")) {
+        const r = await escanearArchivo(archivo, bandeja.length + 1);
+        if (r === null) continue;                       // descartada
+        if (r !== "original") { origen = r.blob; nombre = r.nombre; }
+      }
+      const blob = new Blob([await origen.arrayBuffer()], { type: origen.type || archivo.type || "application/octet-stream" });
       if (!blob.size) { aviso(estado, "err", `El archivo «${archivo.name || "sin nombre"}» llegó vacío.`); continue; }
-      bandeja.push({ nombre: archivo.name || `foto-${bandeja.length + 1}.jpg`, tipo: blob.type, blob, url: URL.createObjectURL(blob) });
+      bandeja.push({ nombre, tipo: blob.type, blob, url: URL.createObjectURL(blob) });
     } catch (e) {
       aviso(estado, "err", `No se pudo abrir «${archivo.name || "el archivo"}» en este equipo (${e.name || e}). Prueba arrastrándolo.`);
     }
