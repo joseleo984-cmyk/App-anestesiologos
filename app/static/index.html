@@ -532,11 +532,12 @@
   .tono-info .franja { background: var(--info-text); } .tono-info .accion { background: var(--info-bg); color: var(--info-text); }
   /* Antigüedad de lo que falta por cobrar */
   .franjas { display: grid; gap: 4px; }
-  .franja-fila { display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: 10px; align-items: center; width: 100%;
+  .franja-fila { display: grid; grid-template-columns: 84px minmax(0, 1fr) 132px; gap: 10px; align-items: center; width: 100%;
     text-align: left; border: 0; background: transparent; border-radius: 10px; padding: 6px 4px; font-size: .9rem; }
   .franja-fila:hover { background: var(--bg); }
   .franja-fila .pista { height: 12px; border-radius: 6px; background: var(--line); overflow: hidden; }
   .franja-fila .pista i { display: block; height: 100%; border-radius: 6px; min-width: 3px; }
+  .franja-fila > span:first-child { white-space: nowrap; font-size: .85rem; }
   .franja-fila .cuanto { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
   .franja-fila .cuanto small { display: block; font-weight: 400; color: var(--muted); font-size: .75rem; }
   /* Recorrido del cobro */
@@ -4025,12 +4026,16 @@ async function cargarResumen() {
 }
 const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`;
 function htmlAntiguedad(d) {
-  const max = Math.max(...d.antiguedad.map((f) => Number(f.valor)), 1);
+  // La barra mide cuántas cirugías hay en cada franja (las que no tienen valor también cuentan); el valor va a la derecha
+  const total = d.antiguedad.reduce((s, f) => s + f.cirugias, 0);
+  const max = Math.max(...d.antiguedad.map((f) => f.cirugias), 1);
   const colores = ["var(--accent)", "var(--info-text)", "var(--warn-line)", "var(--err-text)"];
+  const valor = (f) => Number(f.valor) > 0 ? pesosCorto(f.valor) : "sin valor";
   return `<div class="franjas">${d.antiguedad.map((f, i) => `<button type="button" class="franja-fila" data-desde="${f.desde}" data-hasta="${f.hasta ?? ""}">
       <span>${f.hasta == null ? `+${f.desde - 1} días` : `${f.desde}–${f.hasta} días`}</span>
-      <span class="pista">${f.cirugias ? `<i style="width:${Math.max(3, Number(f.valor) / max * 100)}%;background:${colores[i]}"></i>` : ""}</span>
-      <span class="cuanto">${f.cirugias ? pesosCorto(f.valor) : "—"}<small>${plural(f.cirugias, "cirugía", "cirugías")}</small></span>
+      <span class="pista">${f.cirugias ? `<i style="width:${Math.max(3, f.cirugias / max * 100)}%;background:${colores[i]}"></i>` : ""}</span>
+      <span class="cuanto">${f.cirugias ? valor(f) : "—"}<small>${plural(f.cirugias, "cirugía", "cirugías")}${f.cirugias && total ? ` · ${Math.round(f.cirugias / total * 100)} %` : ""}${
+        f.sin_valor && Number(f.valor) > 0 ? ` · ${f.sin_valor} s. valor` : ""}</small></span>
     </button>`).join("")}</div>`;
 }
 function enlazarAntiguedad(cont) {
@@ -4843,7 +4848,7 @@ function ranking(titulo, filas, enTarjeta = true) {
       <div class="nombre"><span>${escapar(f.nombre)}</span><span class="valor">${texto(f)}</span></div>
       <div class="pista"><div class="barra" style="width:${Math.max(valor(f) / max * 100, 0.5)}%"></div></div>
       <div class="detalle">${!reporteConValores ? `${Math.round(f.cirugias / suma * 100)} % de las cirugías`
-        : `${metricaVista === "total" ? `${f.cirugias} cirugía${f.cirugias === 1 ? "" : "s"} · ` : `${pesos(f.total)} · `}pagado ${pesos(f.pagado)} · por cobrar ${pesos(f.por_cobrar)}${f.sin_valor ? ` · ${f.sin_valor} sin valor` : ""}`}</div>
+        : `${metricaVista === "total" ? `${f.cirugias} cirugía${f.cirugias === 1 ? "" : "s"} · ` : `${pesos(f.total)} · `}pagado ${pesos(f.pagado)} · por cobrar ${pesos(f.por_cobrar)}${f.sin_valor ? ` · ${f.sin_valor} s. valor` : ""}`}</div>
     </li>`).join("")}</ul>`;
   return enTarjeta ? `<section class="card"><h2>${titulo}</h2>${lista}</section>` : lista;
 }
