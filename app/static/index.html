@@ -4297,6 +4297,14 @@ async function compararVolante(reporteId, archivo) {
   }
 }
 
+// Cédula de una línea de documento: si la cirugía ligada tiene otra (se corrigió después de leer la hoja), se muestran las dos
+function cedulaLinea(f) {
+  const dig = (v) => String(v || "").replace(/\D/g, "").replace(/^0+/, "");
+  const hoja = f.documento_paciente || "";
+  if (f.documento_cirugia && dig(f.documento_cirugia) !== dig(hoja)) return `${f.documento_cirugia} (corregida; la hoja decía ${hoja || "—"})`;
+  return hoja;
+}
+
 function htmlPagoGlobal(f, rep) {
   if (f.radicado_id) return `<div class="sub" style="margin-top:4px">✓ Es el pago del radicado de ${escapar(f.radicado_pagador || "la clínica")} del ${escapar(f.radicado_fecha || "—")}.</div>`;
   const abiertos = rep.radicados_por_cobrar || [];
@@ -4336,7 +4344,7 @@ function pintarReportePago(rep) {
        cuenta("PAGO_GLOBAL") ? ` · ${plural(cuenta("PAGO_GLOBAL"), "pago global de clínica", "pagos globales de clínica")}` : ""}</p>
     <div>${rep.filas.map((f) => `<div class="linea-pago" data-linea="${f.detalle_id}">
       <div class="item-cab"><strong>${escapar(f.paciente || "—")}</strong><span class="valor">${pesos(f.neto)}</span></div>
-      <div class="sub">${[f.documento_paciente, f.fecha_servicio, f.empresa, f.procedimiento, f.numero_orden && `orden ${f.numero_orden}`]
+      <div class="sub">${[cedulaLinea(f), f.fecha_servicio, f.empresa, f.procedimiento, f.numero_orden && `orden ${f.numero_orden}`]
           .filter(Boolean).map(escapar).join(" · ")}
         ${Number(f.glosas) ? ` · glosas ${pesos(f.glosas)}` : ""}${Number(f.descuentos) ? ` · descuentos ${pesos(f.descuentos)}` : ""}</div>
       <div style="margin-top:4px"><span class="chip ${f.resultado}">${etiquetaResultado(f)}</span>
@@ -4481,7 +4489,7 @@ async function buscarPacientePago() {
     ${lineas.length ? `<h3 class="titulo-busqueda">En los reportes subidos (${lineas.length})</h3>
       ${lineas.map((l) => `<button type="button" class="resultado-busqueda" data-reporte="${l.reporte_id}" data-linea-busqueda="${l.detalle_id}">
         <span class="item-cab"><strong>${escapar(l.paciente || "—")}</strong>${l.neto != null ? `<span class="valor">${pesos(l.neto)}</span>` : ""}</span>
-        <span class="sub">${escapar(l.documento_paciente || "")} · ${TIPO_REPORTE[l.tipo] || "Reporte"} · ${escapar(l.pagador || "")}${l.fecha_proceso ? ` · ${escapar(fechaBreve(l.fecha_proceso, true))}` : ""}</span>
+        <span class="sub">${escapar(cedulaLinea(l))} · ${TIPO_REPORTE[l.tipo] || "Reporte"} · ${escapar(l.pagador || "")}${l.fecha_proceso ? ` · ${escapar(fechaBreve(l.fecha_proceso, true))}` : ""}</span>
         <span>${l.cirugia_id ? `<span class="chip ${l.estado_cirugia}">✓ ${{ PAGADA: "Pagada", FACTURADA: "Radicada" }[l.estado_cirugia] || "Encontrada"}</span>`
           : `<span class="chip SIN_CIRUGIA">⚠ Sin cirugía en la app</span>`}</span>
       </button>`).join("")}` : ""}
@@ -4573,7 +4581,7 @@ function pintarRadicado(rep) {
        ${plural(cuenta("SIN_CIRUGIA"), "sin cirugía en la app", "sin cirugía en la app")}</p>
     <div id="lineas-radicado">${rep.filas.map((f) => `<div class="linea-pago" data-linea="${f.detalle_id}">
       <div class="item-cab"><strong>${escapar(f.paciente || "—")}</strong>${f.neto != null ? `<span class="valor">${pesos(f.neto)}</span>` : ""}</div>
-      <div class="sub">${[f.documento_paciente, f.empresa, f.procedimiento, f.numero_orden && `orden ${f.numero_orden}`].filter(Boolean).map(escapar).join(" · ")}</div>
+      <div class="sub">${[cedulaLinea(f), f.empresa, f.procedimiento, f.numero_orden && `orden ${f.numero_orden}`].filter(Boolean).map(escapar).join(" · ")}</div>
       <div style="margin-top:4px"><span class="chip ${f.resultado === "COINCIDE" ? f.estado_cirugia : f.resultado}">${etiqueta(f)}</span>
         ${f.cirugia_id ? `<span class="sub"> · cirugía del ${escapar(f.fecha_procedimiento)} (${escapar(f.paciente_app)})</span>` : ""}</div>
       ${f.cirugia_id ? `<button type="button" class="boton-linea" data-corregir="${f.cirugia_id}">✏️ Corregir cirugía</button>`

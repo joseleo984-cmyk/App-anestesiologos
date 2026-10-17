@@ -907,7 +907,7 @@ def obtener_reporte(conn, anestesiologo_id: int, reporte_id: int) -> Optional[di
                   d.numero_orden, d.procedimiento, d.radicado_id, rr.fecha_proceso AS radicado_fecha,
                   rr.pagador AS radicado_pagador,
                   c.fecha_procedimiento, c.estado AS estado_cirugia, c.valor_honorarios AS valor_cirugia,
-                  p.nombres || ' ' || p.apellidos AS paciente_app,
+                  p.nombres || ' ' || p.apellidos AS paciente_app, p.numero_documento AS documento_cirugia,
                   CASE WHEN d.pago_global THEN 'PAGO_GLOBAL'
                        WHEN NOT d.es_paciente THEN 'OTRO_CONCEPTO'
                        WHEN d.cirugia_id IS NULL THEN 'SIN_CIRUGIA'
@@ -1116,8 +1116,9 @@ def buscar_en_pagos(conn, anestesiologo_id: int, texto: str, maximo: int = 30) -
     lineas = conn.execute(
         f"""SELECT d.detalle_id, d.reporte_id, d.paciente, d.documento_paciente, d.empresa, d.procedimiento,
                    d.fecha_servicio, d.neto, d.cirugia_id, r.tipo, r.pagador, r.fecha_proceso,
-                   r.estado AS estado_reporte, c.estado AS estado_cirugia
+                   r.estado AS estado_reporte, c.estado AS estado_cirugia, p.numero_documento AS documento_cirugia
               FROM pago_detalle d JOIN reporte_pago r USING (reporte_id) LEFT JOIN cirugia c ON c.cirugia_id = d.cirugia_id
+              LEFT JOIN paciente p ON p.paciente_id = c.paciente_id
              WHERE r.anestesiologo_id = %(anest)s AND d.es_paciente AND {filtro_d}
              ORDER BY r.fecha_proceso DESC NULLS LAST, d.detalle_id LIMIT %(max)s""", params).fetchall()
     return {"cirugias": cirugias, "lineas": lineas}
