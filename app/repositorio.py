@@ -997,7 +997,7 @@ def pagar_pacientes(conn, anestesiologo_id: int, reporte_id: int, fecha_pago, li
         fila = conn.execute("SELECT cirugia_id FROM pago_detalle WHERE detalle_id = %s AND reporte_id = %s",
                             (detalle_id, reporte_id)).fetchone()
         if fila is None or fila["cirugia_id"] is None:
-            raise ValueError("Uno de los pacientes no tiene cirugía en la app: búscala o créala primero.")
+            raise ValueError("Uno de los pacientes no tiene cirugía en la app: primero hay que buscarla o crearla.")
         marcadas += conn.execute(
             """UPDATE cirugia SET estado = 'PAGADA', fecha_pago = %s, valor_honorarios = COALESCE(%s, valor_honorarios)
                 WHERE cirugia_id = %s AND anestesiologo_id = %s AND estado NOT IN ('PAGADA', 'CANCELADA')""",
@@ -1159,7 +1159,7 @@ def unir_cirugias(conn, anestesiologo_id: int, conservar: int, eliminar: int) ->
     original, cirujano, cobertura, procedimientos si los suyos están por confirmar), el estado más avanzado
     de las dos (con su fecha de pago) y sus líneas de los reportes. Luego se borra la repetida."""
     if conservar == eliminar:
-        raise ValueError("Elige dos cirugías distintas.")
+        raise ValueError("Deben ser dos cirugías distintas.")
     filas = {f["cirugia_id"]: f for f in conn.execute(
         """SELECT c.*, doc_norm(p.numero_documento) AS doc FROM cirugia c JOIN paciente p ON p.paciente_id = c.paciente_id
             WHERE c.cirugia_id IN (%s, %s) AND c.anestesiologo_id = %s FOR UPDATE OF c""",

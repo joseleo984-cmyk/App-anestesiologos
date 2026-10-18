@@ -190,12 +190,12 @@ def _llamar_claude(archivos: list[Archivo], instrucciones: str, esquema: dict, p
     except anthropic.BadRequestError as e:
         raise ExtraccionError(f"El archivo no se pudo procesar: {e.message}") from e
     except (anthropic.RateLimitError, anthropic.APIConnectionError, anthropic.InternalServerError) as e:
-        raise ExtraccionError("El servicio de lectura no está disponible, intenta de nuevo en un momento.") from e
+        raise ExtraccionError("El servicio de lectura no está disponible; intentar de nuevo en un momento.") from e
 
     if respuesta.stop_reason == "refusal":
         raise ExtraccionError("No fue posible leer este documento.")
     if respuesta.stop_reason == "max_tokens":
-        raise ExtraccionError("La lectura quedó incompleta, intenta de nuevo.")
+        raise ExtraccionError("La lectura quedó incompleta; intentar de nuevo.")
     texto = next((b.text for b in respuesta.content if b.type == "text"), None)
     if not texto:
         raise ExtraccionError("La lectura no devolvió datos.")

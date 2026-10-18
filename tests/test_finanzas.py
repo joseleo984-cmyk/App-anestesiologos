@@ -28,7 +28,7 @@ def test_ingreso_base_con_los_tres_meses_mas_bajos(conn):
     assert [m["periodo"].month for m in e["meses"]] == [10, 9, 8, 7, 6, 5, 4]
     assert e["meses"][0]["total"] == 4506281 + 1614308 and e["meses"][0]["fuente"] == "VOLANTE"
     # el último mes (octubre) entró por encima de la base: sugerir llevarlo a metas
-    assert any("por encima de tu ingreso base" in c["texto"] for c in e["consejos"])
+    assert any("por encima del ingreso base" in c["texto"] for c in e["consejos"])
 
 
 def test_gastos_con_semaforo_y_metas(cliente):
@@ -171,7 +171,7 @@ def test_compromiso_de_ahorro_con_racha(conn):
     assert [(h["periodo"].month, h["estado"]) for h in m["historial"]] == [(8, "CUMPLIDO"), (9, "CUMPLIDO"), (10, "EN_CURSO")]
     assert m["fecha_con_compromiso"] == date(2027, 8, 1)          # 4,7 M / 500 mil = 10 meses
     textos = " ".join(c["texto"] for c in e["consejos"])
-    assert "llevas $200.000 de tu compromiso de $500.000" in textos and "08/2027" in textos
+    assert "van $200.000 del compromiso de $500.000" in textos and "08/2027" in textos
     # septiembre, mirado como mes elegido: cumplido
     sept = finanzas.estado(conn, 1, hoy=date(2026, 10, 20), mes=date(2026, 9, 1))
     assert sept["metas"][0]["cumple_mes"] and sept["metas"][0]["aportado_mes"] == 600000

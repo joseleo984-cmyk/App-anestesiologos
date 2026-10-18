@@ -108,7 +108,7 @@ def crear_faltantes(conn, anestesiologo_id: int, reporte_id: int) -> dict:
             "fecha_procedimiento": rep["fecha_proceso"],
             "estado": "REALIZADA",
             "observaciones": (f"Creada desde el radicado de {clinica} del {rep['fecha_proceso']:%d/%m/%Y}: la fecha es "
-                              "la del radicado. Revisa la fecha, el nombre, la entidad, el código y el valor."),
+                              "la del radicado. Revisar la fecha, el nombre, la entidad, el código y el valor."),
         })
         repositorio.guardar_orden(conn, anestesiologo_id, orden)   # se cruza sola con el radicado
         creadas += 1

@@ -61,12 +61,12 @@
   <form id="nueva" novalidate>
     <label for="clave">Contraseña nueva (mínimo 10 caracteres)</label>
     <input id="clave" type="password" autocomplete="new-password" required>
-    <label for="clave2">Repítela</label>
+    <label for="clave2">Repetir la contraseña</label>
     <input id="clave2" type="password" autocomplete="new-password" required>
     <div id="error"></div>
     <button type="submit">Guardar contraseña</button>
   </form>
-  <div id="listo" class="oculto ok"><strong>✓ Contraseña cambiada.</strong> Ya puedes entrar con ella.
+  <div id="listo" class="oculto ok"><strong>✓ Contraseña cambiada.</strong> Ya se puede entrar con ella.
     <a href="/login" style="display:block;margin-top:10px;font-weight:600;color:var(--accent)">Ir a iniciar sesión</a></div>
 </main>
 <script>
@@ -74,7 +74,7 @@ const token = new URLSearchParams(location.search).get("token") || "";
 history.replaceState(null, "", "/restablecer");  // que el token no quede en el historial
 const caja = document.getElementById("error");
 function error(t) { caja.innerHTML = `<div class="error"></div>`; caja.firstChild.textContent = t; }
-if (!token) error("Falta el enlace completo. Ábrelo desde el correo o pide uno nuevo en «Olvidé mi contraseña».");
+if (!token) error("Falta el enlace completo. Abrirlo desde el correo o pedir uno nuevo en «Olvidé mi contraseña».");
 document.getElementById("nueva").onsubmit = async (ev) => {
   ev.preventDefault();
   const nueva = document.getElementById("clave").value, boton = ev.submitter;
@@ -89,7 +89,7 @@ document.getElementById("nueva").onsubmit = async (ev) => {
     document.getElementById("nueva").classList.add("oculto");
     document.getElementById("listo").classList.remove("oculto");
   } catch {
-    error("Sin conexión. Intenta de nuevo.");
+    error("Sin conexión. Intentar de nuevo.");
   } finally {
     boton.disabled = false;
   }

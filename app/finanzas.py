@@ -249,37 +249,37 @@ def estado(conn, anestesiologo_id: int, hoy: Optional[date] = None, mes: Optiona
 
     consejos = []
     if not meses:
-        consejos.append(("INFO", "Sube tus reportes de pago o tus volantes en la pestaña Pagos para calcular tu ingreso base."))
+        consejos.append(("INFO", "Subir los reportes de pago o los volantes en la pestaña Pagos para calcular el ingreso base."))
     elif len(meses) < 3:
-        consejos.append(("INFO", f"Tu ingreso base se calcula con {len(meses)} mes(es). Con al menos 3 meses será más confiable."))
+        consejos.append(("INFO", f"El ingreso base se calcula con {len(meses)} mes(es). Con al menos 3 meses será más confiable."))
     if base and total_gastos:
         if pct(total_gastos) > LIMITE_GASTOS:
             consejos.append(("MUY_ALTO" if pct(total_gastos) > 100 else "ALTO",
-                             f"Tus gastos son el {_num(pct(total_gastos))} % de tu ingreso base. Lo sano es no pasar del "
+                             f"Los gastos son el {_num(pct(total_gastos))} % del ingreso base. Lo sano es no pasar del "
                              f"{LIMITE_GASTOS} % para poder ahorrar al menos el 20 %."))
         if pct(fijos) > LIMITE_FIJOS:
-            consejos.append(("ALTO", f"Tus gastos fijos son el {_num(pct(fijos))} % del ingreso base (lo sano es hasta "
-                                     f"el {LIMITE_FIJOS} %): un mes de recaudo bajo te deja sin margen."))
+            consejos.append(("ALTO", f"Los gastos fijos son el {_num(pct(fijos))} % del ingreso base (lo sano es hasta "
+                                     f"el {LIMITE_FIJOS} %): un mes de recaudo bajo deja sin margen."))
         for c in por_categoria:
             if c["estado"] != "SANO":
                 consejos.append((c["estado"], f"{c['nombre']}: {_num(c['porcentaje'])} % del ingreso base; la referencia "
                                               f"sana es hasta el {c['referencia']} %."))
     if total_gastos and not emergencia:
-        consejos.append(("ALTO", f"Crea un fondo de emergencias de {MESES_EMERGENCIA} meses de gastos "
+        consejos.append(("ALTO", f"Conviene crear un fondo de emergencias de {MESES_EMERGENCIA} meses de gastos "
                                  f"({_pesos(total_gastos * MESES_EMERGENCIA)}). Con ingresos variables es la primera meta."))
     elif meses_colchon is not None and meses_colchon < MESES_EMERGENCIA:
-        consejos.append(("INFO", f"Tu fondo de emergencias cubre {_num(meses_colchon)} meses de gastos; la meta es "
+        consejos.append(("INFO", f"El fondo de emergencias cubre {_num(meses_colchon)} meses de gastos; la meta es "
                                  f"{MESES_EMERGENCIA}."))
     if cuotas and capacidad < cuotas:
         consejos.append(("MUY_ALTO" if capacidad <= 0 else "ALTO",
-                         f"Tus metas piden {_pesos(cuotas)} al mes y tu capacidad de ahorro es {_pesos(max(capacidad, 0))}: "
-                         "amplía los plazos o reduce gastos."))
+                         f"Las metas piden {_pesos(cuotas)} al mes y la capacidad de ahorro es {_pesos(max(capacidad, 0))}: "
+                         "conviene ampliar los plazos o reducir gastos."))
     if meses and base_ap:
         ultimo = meses[0]
         excedente = ultimo["total"] - base_ap
         if excedente > 0:
-            consejos.append(("SANO", f"En {ultimo['periodo']:%m/%Y} entraron {_pesos(excedente)} por encima de tu ingreso "
-                                     "base: llévalos a tus metas (primero al fondo de emergencias) en lugar de gastarlos."))
+            consejos.append(("SANO", f"En {ultimo['periodo']:%m/%Y} entraron {_pesos(excedente)} por encima del ingreso "
+                                     "base: conviene llevarlos a las metas (primero al fondo de emergencias) en lugar de gastarlos."))
 
     # ---- fase 2: lo que viene, ahorros de AP, proyección de metas, créditos y vivienda
     por_cobrar = ingresos_por_cobrar(conn, anestesiologo_id, hoy)
@@ -288,29 +288,29 @@ def estado(conn, anestesiologo_id: int, hoy: Optional[date] = None, mes: Optiona
     creditos = analizar_creditos(gastos, hoy)
     for m in lista_metas:
         if m["fecha_objetivo"] and m["fecha_estimada"] and not m["a_tiempo"]:
-            consejos.append(("ALTO", f"Con tu capacidad de ahorro actual, «{m['nombre']}» se cumpliría en "
-                                     f"{m['fecha_estimada']:%m/%Y}, después de la fecha que te pusiste."))
+            consejos.append(("ALTO", f"Con la capacidad de ahorro actual, «{m['nombre']}» se cumpliría en "
+                                     f"{m['fecha_estimada']:%m/%Y}, después de la fecha objetivo."))
     for m in lista_metas:
         if not m["compromiso_mensual"] or not m["falta"]:
             continue
         if m["cumple_mes"]:
-            consejos.append(("SANO", f"Cumpliste tu compromiso de {mes:%m/%Y} con «{m['nombre']}»"
-                                     + (f": llevas {m['racha']} meses seguidos." if m["racha"] > 1 else ".")))
+            consejos.append(("SANO", f"Compromiso de {mes:%m/%Y} con «{m['nombre']}» cumplido"
+                                     + (f": {m['racha']} meses seguidos." if m["racha"] > 1 else ".")))
         elif mes == _primer_dia(hoy):
-            consejos.append(("INFO", f"Este mes llevas {_pesos(m['aportado_mes'])} de tu compromiso de "
+            consejos.append(("INFO", f"Este mes van {_pesos(m['aportado_mes'])} del compromiso de "
                                      f"{_pesos(m['compromiso_mensual'])} para «{m['nombre']}»."))
         if m["fecha_objetivo"] and m["fecha_con_compromiso"] and m["fecha_con_compromiso"] > _primer_dia(m["fecha_objetivo"]):
-            consejos.append(("ALTO", f"Con tu compromiso de {_pesos(m['compromiso_mensual'])} al mes, «{m['nombre']}» "
-                                     f"se cumple en {m['fecha_con_compromiso']:%m/%Y}: para llegar a tiempo necesitas "
+            consejos.append(("ALTO", f"Con el compromiso de {_pesos(m['compromiso_mensual'])} al mes, «{m['nombre']}» "
+                                     f"se cumple en {m['fecha_con_compromiso']:%m/%Y}: para llegar a tiempo se necesitan "
                                      f"{_pesos(m['cuota_mensual'])} al mes."))
     for c in mes_info["categorias"]:
         if c["estado"] in ("ALTO", "MUY_ALTO"):
-            consejos.append((c["estado"], f"En {mes:%m/%Y} llevas {_pesos(c['real'])} en {c['nombre'].split(' (')[0].lower()}, "
+            consejos.append((c["estado"], f"En {mes:%m/%Y} van {_pesos(c['real'])} en {c['nombre'].split(' (')[0].lower()}, "
                                           f"el {_num(c['uso'])} % de lo presupuestado ({_pesos(c['presupuesto'])})."))
     if creditos["recomendacion"]:
         consejos.append(("INFO", creditos["recomendacion"]))
     if ahorros and emergencia and meses_colchon is not None and meses_colchon < MESES_EMERGENCIA:
-        consejos.append(("INFO", "Cuando AP te pague la compensación semestral o la anual, llévala primero al fondo "
+        consejos.append(("INFO", "Cuando AP pague la compensación semestral o la anual, conviene llevarla primero al fondo "
                                  "de emergencias hasta completar 6 meses de gastos."))
 
     return {
@@ -470,10 +470,10 @@ def analizar_creditos(gastos: list[dict], hoy: Optional[date] = None) -> dict:
     malos = [c for c in creditos if not c["cubre_intereses"]]
     if malos:
         recomendacion = (f"La cuota de «{malos[0]['nombre']}» no alcanza ni para los intereses: la deuda crece cada mes. "
-                         "Habla con el banco o súbele la cuota.")
+                         "Conviene hablar con el banco o subir la cuota.")
     elif len(con_tasa) >= 2:
-        recomendacion = (f"Si te sobra plata, abónala a «{con_tasa[0]['nombre']}» ({_num(con_tasa[0]['tasa_ea'], 2)} % EA): es "
-                         "el crédito más caro. Paga la cuota mínima en los demás.")
+        recomendacion = (f"Si sobra plata, conviene abonarla a «{con_tasa[0]['nombre']}» ({_num(con_tasa[0]['tasa_ea'], 2)} % EA): es "
+                         "el crédito más caro. En los demás, pagar la cuota mínima.")
     return {"creditos": creditos, "saldo_total": sum((c["saldo"] or Decimal(0) for c in creditos), Decimal(0)),
             "recomendacion": recomendacion}
 

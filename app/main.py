@@ -55,8 +55,8 @@ EXTENSIONES = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp",
 def cupo_ia(conn, anestesiologo_id: int) -> None:
     """Máximo de lecturas con IA por anestesiólogo en 24 horas (frena el abuso y el gasto de la API)."""
     if uso_ia.lecturas_ultimas_24h(conn, anestesiologo_id) >= config.MAX_LECTURAS_IA_DIA:
-        raise HTTPException(429, f"Llegaste al límite de {config.MAX_LECTURAS_IA_DIA} lecturas con IA en 24 horas. "
-                                 "Intenta más tarde o escribe los datos a mano.")
+        raise HTTPException(429, f"Se alcanzó el límite de {config.MAX_LECTURAS_IA_DIA} lecturas con IA en 24 horas. "
+                                 "Intentar más tarde o escribir los datos a mano.")
 
 
 def get_conn():
@@ -73,15 +73,15 @@ def cuenta_sesion(sesion: str | None = Cookie(default=None), conn=Depends(get_co
     datos = auth.leer_sesion(sesion)
     cuenta = repositorio.obtener_cuenta(conn, datos[0]) if datos else None
     if cuenta is None or not cuenta["activo"] or cuenta["version_sesion"] != datos[1]:
-        raise HTTPException(401, "Inicia sesión para continuar.")
+        raise HTTPException(401, "Iniciar sesión para continuar.")
     return cuenta
 
 
 def anestesiologo_actual(cuenta: dict = Depends(cuenta_sesion)) -> int:
     if cuenta["debe_cambiar_clave"]:
-        raise HTTPException(403, {"mensaje": "Cambia tu contraseña temporal para continuar.", "cambiar_clave": True})
+        raise HTTPException(403, {"mensaje": "Cambiar la contraseña temporal para continuar.", "cambiar_clave": True})
     if config.EXIGIR_2FA_ADMIN and cuenta["es_admin"] and not cuenta["totp_activo"]:
-        raise HTTPException(403, {"mensaje": "Activa la verificación en dos pasos para continuar.", "activar_2fa": True})
+        raise HTTPException(403, {"mensaje": "Activar la verificación en dos pasos para continuar.", "activar_2fa": True})
     return cuenta["anestesiologo_id"]
 
 
@@ -165,7 +165,7 @@ _fallos_por_ip: dict[str, list[float]] = {}
 def _mensaje_bloqueo(hasta) -> str:
     minutos = max(1, int((hasta - datetime.now(timezone.utc)).total_seconds() // 60) + 1)
     return (f"Demasiados intentos fallidos: la cuenta queda bloqueada por {minutos} minuto{'s' if minutos != 1 else ''}. "
-            "Si no recuerdas la contraseña, usa «Olvidé mi contraseña».")
+            "Para recuperar la contraseña: «Olvidé mi contraseña».")
 
 
 @app.post("/api/login")
@@ -174,7 +174,7 @@ def iniciar_sesion(datos: Credenciales, request: Request, response: Response, co
     fallos = [t for t in _fallos_por_ip.get(ip, []) if ahora - t < VENTANA_FALLOS_IP]
     _fallos_por_ip[ip] = fallos
     if len(fallos) >= MAX_FALLOS_IP:
-        raise HTTPException(429, "Demasiados intentos fallidos desde esta conexión. Espera 15 minutos.")
+        raise HTTPException(429, "Demasiados intentos fallidos desde esta conexión. Esperar 15 minutos.")
     usuario = repositorio.buscar_anestesiologo_por_email(conn, datos.email)
     if usuario and usuario["bloqueado_hasta"] and usuario["bloqueado_hasta"] > datetime.now(timezone.utc):
         raise HTTPException(429, _mensaje_bloqueo(usuario["bloqueado_hasta"]))  # ni siquiera se prueba la clave
@@ -196,7 +196,7 @@ def iniciar_sesion(datos: Credenciales, request: Request, response: Response, co
         repositorio.limpiar_intentos(conn, usuario["anestesiologo_id"])
         conn.commit()
     if usuario["estado_registro"] == "PENDIENTE":
-        raise HTTPException(403, "Tu solicitud de registro está pendiente: el administrador de AP debe aprobarla.")
+        raise HTTPException(403, "La solicitud de registro está pendiente: el administrador de AP debe aprobarla.")
     if not usuario["activo"]:
         time.sleep(1)
         raise HTTPException(401, "Correo o contraseña incorrectos.")
@@ -220,11 +220,11 @@ def iniciar_sesion_segundo_paso(datos: SegundoPaso, request: Request, response: 
     fallos = [t for t in _fallos_por_ip.get(ip, []) if ahora - t < VENTANA_FALLOS_IP]
     _fallos_por_ip[ip] = fallos
     if len(fallos) >= MAX_FALLOS_IP:
-        raise HTTPException(429, "Demasiados intentos fallidos desde esta conexión. Espera 15 minutos.")
+        raise HTTPException(429, "Demasiados intentos fallidos desde esta conexión. Esperar 15 minutos.")
     leido = auth.leer_token_2fa(datos.token_2fa)
     cuenta = repositorio.obtener_cuenta(conn, leido[0]) if leido else None
     if not cuenta or cuenta["version_sesion"] != leido[1] or not cuenta["activo"] or not cuenta["totp_activo"]:
-        raise HTTPException(401, "La verificación venció. Vuelve a iniciar sesión.")
+        raise HTTPException(401, "La verificación venció. Volver a iniciar sesión.")
     if cuenta["bloqueado_hasta"] and cuenta["bloqueado_hasta"] > datetime.now(timezone.utc):
         raise HTTPException(429, _mensaje_bloqueo(cuenta["bloqueado_hasta"]))
     uso = None
@@ -241,7 +241,7 @@ def iniciar_sesion_segundo_paso(datos: SegundoPaso, request: Request, response: 
         if hasta and hasta > datetime.now(timezone.utc):
             raise HTTPException(429, _mensaje_bloqueo(hasta))
         time.sleep(1)
-        raise HTTPException(401, "Código incorrecto. Revisa que la hora de tu teléfono sea automática.")
+        raise HTTPException(401, "Código incorrecto. Revisar que la hora del teléfono sea automática.")
     repositorio.limpiar_intentos(conn, cuenta["anestesiologo_id"])
     repositorio.auditar(conn, "LOGIN_OK", cuenta["anestesiologo_id"], f"con {uso}", ip)
     conn.commit()
@@ -321,7 +321,7 @@ def iniciar_dos_pasos(datos: ClaveActual, conn=Depends(get_conn, scope="function
     """Empieza la activación: devuelve el QR y la clave para la app de verificación. Pide la contraseña para que
     quien tenga la sesión abierta en un teléfono ajeno no pueda activarla con su propio dispositivo."""
     if cuenta["debe_cambiar_clave"]:
-        raise HTTPException(403, {"mensaje": "Cambia tu contraseña temporal primero.", "cambiar_clave": True})
+        raise HTTPException(403, {"mensaje": "Primero hay que cambiar la contraseña temporal.", "cambiar_clave": True})
     _cuenta_con_clave(cuenta, datos.password)
     if cuenta["totp_activo"]:
         raise HTTPException(409, "La verificación en dos pasos ya está activa.")
@@ -335,11 +335,11 @@ def iniciar_dos_pasos(datos: ClaveActual, conn=Depends(get_conn, scope="function
 @app.post("/api/2fa/activar")
 def activar_dos_pasos(datos: SoloCodigo, conn=Depends(get_conn, scope="function"), cuenta: dict = Depends(cuenta_sesion)):
     if cuenta["totp_activo"] or not cuenta["totp_secreto"]:
-        raise HTTPException(409, "Primero inicia la activación.")
+        raise HTTPException(409, "Primero hay que iniciar la activación.")
     paso = dospasos.verificar(cuenta["totp_secreto"], datos.codigo, 0)
     if paso is None:
         time.sleep(1)
-        raise HTTPException(400, "El código no coincide. Revisa que la hora de tu teléfono sea automática e intenta con el código nuevo.")
+        raise HTTPException(400, "El código no coincide. Revisar que la hora del teléfono sea automática e intentar con el código nuevo.")
     codigos = dospasos.codigos_de_recuperacion()
     repositorio.activar_totp(conn, cuenta["anestesiologo_id"], paso, [dospasos.hash_recuperacion(c) for c in codigos])
     repositorio.auditar(conn, "DOS_PASOS_ACTIVADO", cuenta["anestesiologo_id"])
@@ -377,7 +377,7 @@ def renovar_codigos_de_recuperacion(datos: ClaveYCodigo, conn=Depends(get_conn, 
 def restablecer_dos_pasos(usuario_id: int, conn=Depends(get_conn, scope="function"), admin=Depends(admin_actual)):
     """Quien perdió el teléfono y los códigos: se apaga su verificación en dos pasos y se cierran sus sesiones."""
     if usuario_id == admin["anestesiologo_id"]:
-        raise HTTPException(400, "Para tu propia cuenta usa «Desactivar» o, si perdiste todo, cambia ADMIN_PASSWORD en Render.")
+        raise HTTPException(400, "Para la cuenta propia se usa «Desactivar» o, si se perdió todo, se cambia ADMIN_PASSWORD en Render.")
     if repositorio.obtener_cuenta(conn, usuario_id) is None:
         raise HTTPException(404, "Cuenta no encontrada.")
     repositorio.desactivar_totp(conn, usuario_id, cerrar_sesiones=True)
@@ -412,16 +412,16 @@ def olvide_clave_disponible():
 
 
 def _enviar_enlace(destino: str, nombre: str, enlace: str) -> None:
-    texto = (f"Hola, {nombre}.\n\nPara crear una contraseña nueva en Auditorías AP abre este enlace (sirve una sola vez "
+    texto = (f"Hola, {nombre}.\n\nPara crear una contraseña nueva en Auditorías AP, abrir este enlace (sirve una sola vez "
              f"y vence en {repositorio.MINUTOS_ENLACE_CLAVE} minutos):\n\n{enlace}\n\n"
-             "Si no lo pediste, ignora este correo: tu contraseña no cambia.")
-    html = (f"<p>Hola, {html_escape(nombre)}.</p><p>Para crear una contraseña nueva en <strong>Auditorías AP</strong> toca el botón. "
+             "Si no fue una solicitud propia, ignorar este correo: la contraseña no cambia.")
+    html = (f"<p>Hola, {html_escape(nombre)}.</p><p>Para crear una contraseña nueva en <strong>Auditorías AP</strong>, tocar el botón. "
             f"El enlace sirve una sola vez y vence en {repositorio.MINUTOS_ENLACE_CLAVE} minutos.</p>"
             f"<p><a href=\"{html_escape(enlace)}\" style=\"background:#0d7470;color:#fff;padding:12px 18px;border-radius:10px;"
             f"text-decoration:none;display:inline-block\">Crear contraseña nueva</a></p>"
-            "<p style=\"color:#56686a\">Si no lo pediste, ignora este correo: tu contraseña no cambia.</p>")
+            "<p style=\"color:#56686a\">Si no fue una solicitud propia, ignorar este correo: la contraseña no cambia.</p>")
     try:
-        correo.enviar(destino, "Restablecer tu contraseña de Auditorías AP", texto, html)
+        correo.enviar(destino, "Restablecer la contraseña de Auditorías AP", texto, html)
     except correo.CorreoError as e:
         log.warning("No se pudo enviar el enlace para restablecer la clave: %s", e)
 
@@ -429,14 +429,14 @@ def _enviar_enlace(destino: str, nombre: str, enlace: str) -> None:
 @app.post("/api/olvide-clave")
 def olvide_clave(datos: OlvideClave, request: Request, tareas: BackgroundTasks, conn=Depends(get_conn, scope="function")):
     """Envía un enlace para crear una clave nueva. Responde lo mismo exista o no la cuenta (no revela correos)."""
-    respuesta = {"ok": True, "mensaje": "Si el correo está registrado, en unos minutos te llega un enlace para crear una "
-                                        "contraseña nueva. Revisa también el correo no deseado."}
+    respuesta = {"ok": True, "mensaje": "Si el correo está registrado, en unos minutos llega un enlace para crear una "
+                                        "contraseña nueva. Revisar también el correo no deseado."}
     if not correo.configurado():
-        raise HTTPException(503, "El envío de correos no está configurado: pídele una clave temporal al administrador de AP.")
+        raise HTTPException(503, "El envío de correos no está configurado: pedir una clave temporal al administrador de AP.")
     ip, ahora = (request.client.host if request.client else "?"), time.time()
     recientes = [t for t in _olvide_por_ip.get(ip, []) if ahora - t < 3600]
     if len(recientes) >= MAX_OLVIDE_HORA:
-        raise HTTPException(429, "Demasiadas solicitudes desde esta conexión. Intenta más tarde.")
+        raise HTTPException(429, "Demasiadas solicitudes desde esta conexión. Intentar más tarde.")
     _olvide_por_ip[ip] = recientes + [ahora]
     usuario = repositorio.buscar_anestesiologo_por_email(conn, datos.email)
     if not usuario or not usuario["activo"] or usuario["estado_registro"] != "APROBADA":
@@ -455,7 +455,7 @@ def restablecer_con_enlace(datos: NuevaClave, conn=Depends(get_conn, scope="func
     cuenta = repositorio.usar_enlace_clave(conn, hashlib.sha256(datos.token.encode()).hexdigest())
     if cuenta is None:
         conn.rollback()
-        raise HTTPException(400, "El enlace no sirve: ya se usó o venció. Pide uno nuevo en «Olvidé mi contraseña».")
+        raise HTTPException(400, "El enlace no sirve: ya se usó o venció. Pedir uno nuevo en «Olvidé mi contraseña».")
     repositorio.cambiar_clave(conn, cuenta, auth.hash_password(datos.nueva), False)  # cierra las sesiones abiertas
     repositorio.auditar(conn, "CLAVE_RESTABLECIDA_ENLACE", cuenta)
     conn.commit()
@@ -510,13 +510,13 @@ def aceptar_terminos(conn=Depends(get_conn, scope="function"), cuenta: dict = De
 def registrarse(datos: Registro, request: Request, conn=Depends(get_conn, scope="function")):
     """Un anestesiólogo crea su cuenta; queda pendiente hasta que el administrador la apruebe."""
     if not config.REGISTRO_ABIERTO:
-        raise HTTPException(403, "El registro está cerrado. Pide la cuenta al administrador de AP.")
+        raise HTTPException(403, "El registro está cerrado. La cuenta se pide al administrador de AP.")
     if not datos.autoriza_datos or not datos.acepta_terminos:
-        raise HTTPException(422, "Debes aceptar los términos de uso y la política de tratamiento de datos para registrarte.")
+        raise HTTPException(422, "Para el registro hay que aceptar los términos de uso y la política de tratamiento de datos.")
     ahora, ip = time.time(), (request.client.host if request.client else "?")
     recientes = [t for t in _registros_por_ip.get(ip, []) if ahora - t < 3600]
     if len(recientes) >= MAX_REGISTROS_HORA:
-        raise HTTPException(429, "Demasiados registros desde esta conexión. Intenta más tarde.")
+        raise HTTPException(429, "Demasiados registros desde esta conexión. Intentar más tarde.")
     _registros_por_ip[ip] = recientes + [ahora]
     if datos.sitio_web:  # robot: se responde igual que a una persona, sin crear nada
         return {"ok": True}
@@ -526,9 +526,9 @@ def registrarse(datos: Registro, request: Request, conn=Depends(get_conn, scope=
                                         auth.hash_password(datos.password), config.TERMINOS_VERSION)
     except repositorio.EmailYaRegistrado:
         conn.rollback()
-        raise HTTPException(409, "Ya existe una cuenta con ese correo o registro médico. Si es tuya, inicia sesión.")
+        raise HTTPException(409, "Ya existe una cuenta con ese correo o registro médico. Si es propia, iniciar sesión.")
     except repositorio.DemasiadasSolicitudes:
-        raise HTTPException(429, "Hay muchas solicitudes sin revisar. Avísale al administrador de AP.")
+        raise HTTPException(429, "Hay muchas solicitudes sin revisar. Avisar al administrador de AP.")
     conn.commit()
     return {"ok": True}
 
@@ -591,7 +591,7 @@ def crear_usuario(datos: NuevoUsuario, conn=Depends(get_conn, scope="function"),
 @app.put("/api/usuarios/{usuario_id}")
 def activar_usuario(usuario_id: int, datos: EstadoUsuario, conn=Depends(get_conn, scope="function"), admin=Depends(admin_actual)):
     if usuario_id == admin["anestesiologo_id"] and not datos.activo:
-        raise HTTPException(400, "No puedes desactivar tu propia cuenta.")
+        raise HTTPException(400, "No se puede desactivar la cuenta propia.")
     if not repositorio.cambiar_activo(conn, usuario_id, datos.activo):
         raise HTTPException(404, "Cuenta no encontrada.")
     repositorio.auditar(conn, "CUENTA_ACTIVADA" if datos.activo else "CUENTA_DESACTIVADA", admin["anestesiologo_id"], f"cuenta {usuario_id}")
@@ -603,7 +603,7 @@ def activar_usuario(usuario_id: int, datos: EstadoUsuario, conn=Depends(get_conn
 def restablecer_clave(usuario_id: int, conn=Depends(get_conn, scope="function"), admin=Depends(admin_actual)):
     """Nueva clave temporal (se muestra una sola vez); cierra las sesiones abiertas de esa cuenta."""
     if usuario_id == admin["anestesiologo_id"]:
-        raise HTTPException(400, "Para tu propia cuenta usa «Cambiar contraseña».")
+        raise HTTPException(400, "Para la cuenta propia se usa «Cambiar contraseña».")
     if repositorio.obtener_cuenta(conn, usuario_id) is None:
         raise HTTPException(404, "Cuenta no encontrada.")
     clave = auth.clave_temporal()
@@ -716,7 +716,7 @@ def subir_documento(archivos: list[UploadFile] = File(default=[]), archivo: Opti
         log.exception("Error inesperado extrayendo el documento %s", documento_id)
         repositorio.marcar_error(conn, documento_id, "error inesperado")
         conn.commit()
-        raise HTTPException(502, {"mensaje": "No se pudo leer el documento, intenta de nuevo.",
+        raise HTTPException(502, {"mensaje": "No se pudo leer el documento; intentar de nuevo.",
                                   "documento_id": documento_id})
 
     ajustar_clinica(conn, orden)
@@ -772,7 +772,7 @@ def que_te_falto(datos: Comentario, conn=Depends(get_conn, scope="function"), an
         documento = None  # no es suyo: el comentario se guarda sin el documento
     if conn.execute("""SELECT count(*) AS n FROM comentario_lectura WHERE anestesiologo_id = %s
                         AND creado_en > now() - interval '1 day'""", (anestesiologo_id,)).fetchone()["n"] >= 50:
-        raise HTTPException(429, "Ya enviaste muchos comentarios hoy. Gracias, intenta mañana.")
+        raise HTTPException(429, "Ya se enviaron muchos comentarios hoy. Gracias; intentar mañana.")
     cid = calidad.guardar_comentario(conn, anestesiologo_id, documento, datos.texto)
     conn.commit()
     return {"comentario_id": cid}
@@ -1245,7 +1245,7 @@ def comparar_volante(reporte_id: int, archivo: UploadFile, conn=Depends(get_conn
     if volante.periodo_hasta and reporte["periodo_hasta"] and \
             (volante.periodo_hasta.year, volante.periodo_hasta.month) != (reporte["periodo_hasta"].year, reporte["periodo_hasta"].month):
         avisos.append(f"El volante es del periodo que termina el {volante.periodo_hasta:%d/%m/%Y} y el reporte de pagos "
-                      f"del que termina el {reporte['periodo_hasta']:%d/%m/%Y}: revisa que sean del mismo mes.")
+                      f"del que termina el {reporte['periodo_hasta']:%d/%m/%Y}: revisar que sean del mismo mes.")
     if volante.otros:
         avisos.append("El volante trae otros conceptos que la fórmula no calcula: " +
                       ", ".join(o.concepto or "sin nombre" for o in volante.otros) + ".")

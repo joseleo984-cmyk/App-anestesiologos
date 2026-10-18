@@ -119,8 +119,8 @@ def tipo_archivo(datos: bytes, nombre: str = "") -> str:
     if datos.startswith(b"%PDF"):
         return "PDF"
     if datos.startswith(b"\xd0\xcf\x11\xe0"):
-        raise ExtractoError("Ese Excel es del formato antiguo (.xls). Ábrelo y guárdalo como .xlsx o CSV, "
-                            "o sube el PDF del extracto.")
+        raise ExtractoError("Ese Excel es del formato antiguo (.xls). Conviene abrirlo y guardarlo como .xlsx o CSV, "
+                            "o subir el PDF del extracto.")
     if datos.startswith(b"PK\x03\x04"):
         return "EXCEL"
     tipo = _tipo_imagen(datos)
@@ -157,7 +157,7 @@ def partes_pdf(datos: bytes, clave: Optional[str] = None) -> tuple[list[bytes], 
         lector = PdfReader(io.BytesIO(datos))
         if lector.is_encrypted:
             if not lector.decrypt(clave or ""):
-                raise ExtractoError("El PDF tiene clave. Escríbela en «Clave del PDF» (suele ser tu cédula)."
+                raise ExtractoError("El PDF tiene clave. Escribirla en «Clave del PDF» (suele ser la cédula)."
                                     if not clave else "La clave del PDF no es correcta.")
         total = len(lector.pages)
     except ExtractoError:
@@ -165,7 +165,7 @@ def partes_pdf(datos: bytes, clave: Optional[str] = None) -> tuple[list[bytes], 
     except (PdfReadError, ValueError, KeyError) as e:
         raise ExtractoError("El PDF está dañado o no se pudo abrir.") from e
     if total > MAX_HOJAS:
-        raise ExtractoError(f"El PDF tiene {total} hojas; el máximo es {MAX_HOJAS}. Súbelo por meses.")
+        raise ExtractoError(f"El PDF tiene {total} hojas; el máximo es {MAX_HOJAS}. Conviene subirlo por meses.")
     partes = []
     for inicio in range(0, total, HOJAS_POR_PARTE):
         escritor = PdfWriter()
@@ -183,12 +183,12 @@ def preparar_partes(archivos: list[tuple[bytes, str]], clave: Optional[str] = No
     tipos = [tipo_archivo(d, n) for d, n in archivos]
     if any(t in ("EXCEL", "CSV") for t in tipos):
         if len(archivos) > 1:
-            raise ExtractoError("Sube el Excel o CSV solo, un archivo a la vez.")
+            raise ExtractoError("El Excel o CSV se sube solo, un archivo a la vez.")
         datos, nombre = archivos[0]
         filas = leer_excel(datos) if tipos[0] == "EXCEL" else leer_csv(datos)
         if not filas:
-            raise ExtractoError("No se encontraron movimientos en el archivo. Revisa que tenga columnas de fecha, "
-                                "descripción y valor, o sube el PDF del extracto.")
+            raise ExtractoError("No se encontraron movimientos en el archivo. Revisar que tenga columnas de fecha, "
+                                "descripción y valor, o subir el PDF del extracto.")
         return {"filas": filas, "hojas": 0}
     partes: list[list] = []
     hojas = 0
@@ -204,7 +204,7 @@ def preparar_partes(archivos: list[tuple[bytes, str]], clave: Optional[str] = No
     for i in range(0, len(fotos), HOJAS_POR_PARTE):
         partes.append(fotos[i:i + HOJAS_POR_PARTE])
     if hojas > MAX_HOJAS:
-        raise ExtractoError(f"Son {hojas} hojas; el máximo es {MAX_HOJAS}. Súbelas por meses.")
+        raise ExtractoError(f"Son {hojas} hojas; el máximo es {MAX_HOJAS}. Conviene subirlas por meses.")
     return {"partes": partes, "hojas": hojas}
 
 
@@ -506,10 +506,10 @@ def armar_resultado(conn, anestesiologo_id: int, encabezado: dict, filas: list[d
         if it["huella"] in ya:
             motivo = "Ya importado antes"
         elif not it["es_gasto"]:
-            motivo = {"PAGO_TARJETA": "Pago de la tarjeta: no es gasto", "TRANSFERENCIA_PROPIA": "Entre tus cuentas",
+            motivo = {"PAGO_TARJETA": "Pago de la tarjeta: no es gasto", "TRANSFERENCIA_PROPIA": "Entre cuentas propias",
                       }.get(it["tipo"], "Abono o ingreso: no es gasto" if it["naturaleza"] == "ABONO" else "No es gasto")
         elif (it["fecha"], it["valor"]) in manuales:
-            motivo = "Posible duplicado de un gasto que anotaste a mano"
+            motivo = "Posible duplicado de un gasto anotado a mano"
         elif desde and it["fecha"] < desde.isoformat():
             motivo = "Compra de un mes anterior (diferida)"
         it["duplicado"] = it["huella"] in ya
@@ -586,7 +586,7 @@ def procesar(importacion_id: int, anestesiologo_id: int, preparado: dict) -> Non
         except Exception as e:  # noqa: BLE001  cualquier falla queda registrada para la pantalla
             conn.rollback()
             mensaje = str(e) if isinstance(e, (extraccion.ExtraccionError, ExtractoError)) else \
-                "No se pudo leer el extracto. Intenta de nuevo."
+                "No se pudo leer el extracto. Intentar de nuevo."
             if not isinstance(e, (extraccion.ExtraccionError, ExtractoError)):
                 log.exception("Falló la importación %s", importacion_id)
             conn.execute("""UPDATE fin_importacion SET estado = 'ERROR', error = %s, actualizado_en = now()
@@ -609,7 +609,7 @@ def obtener(conn, anestesiologo_id: int, importacion_id: int) -> Optional[dict]:
     if fila and fila["estado"] == "PROCESANDO" and \
             fila["actualizado_en"] < datetime.now(fila["actualizado_en"].tzinfo) - timedelta(minutes=MINUTOS_ATASCADA):
         # el servidor se reinició a mitad de la lectura
-        fila["estado"], fila["error"] = "ERROR", "La lectura se interrumpió. Sube el extracto de nuevo."
+        fila["estado"], fila["error"] = "ERROR", "La lectura se interrumpió. Subir el extracto de nuevo."
         conn.execute("UPDATE fin_importacion SET estado = 'ERROR', error = %s WHERE importacion_id = %s",
                      (fila["error"], importacion_id))
         conn.commit()

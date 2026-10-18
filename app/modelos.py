@@ -346,9 +346,9 @@ class MovimientoEntrada(_Base):
     def _segun_clase(self):
         from app.finanzas import CATEGORIAS
         if self.clase == "GASTO" and self.categoria not in [c[0] for c in CATEGORIAS]:
-            raise ValueError("elige la categoría del gasto")
+            raise ValueError("falta elegir la categoría del gasto")
         if self.clase == "APORTE" and not self.meta_id:
-            raise ValueError("elige la meta del aporte")
+            raise ValueError("falta elegir la meta del aporte")
         return self
 
 
@@ -394,7 +394,7 @@ class ImportacionConfirmada(_Base):
         validas = [c[0] for c in CATEGORIAS]
         for i in self.items:
             if i.incluir and i.categoria not in validas:
-                raise ValueError(f"elige la categoría de la fila {i.indice + 1}")
+                raise ValueError(f"falta elegir la categoría de la fila {i.indice + 1}")
         return self
 
 
@@ -464,5 +464,5 @@ class PruebaValidacion(_Base):
         if len(json.dumps(self.parametros)) > 4000:
             raise ValueError("los parámetros del caso son demasiado largos")
         if not any(p.referencia is not None for p in self.comparacion):
-            raise ValueError("escribe al menos una cifra de la referencia para comparar")
+            raise ValueError("falta escribir al menos una cifra de la referencia para comparar")
         return self

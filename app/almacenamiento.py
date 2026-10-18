@@ -62,10 +62,10 @@ def guardar(nombre: str, datos: bytes, content_type: str, cliente: Optional[http
             r = c.post(f"/object/{config.SUPABASE_BUCKET}/{nombre}", content=datos,
                        headers={"Content-Type": content_type, "x-upsert": "false"})
     except httpx.HTTPError as e:
-        raise AlmacenamientoError("No se pudo guardar el archivo, intenta de nuevo.") from e
+        raise AlmacenamientoError("No se pudo guardar el archivo; intentar de nuevo.") from e
     if not r.is_success:
         log.error("Supabase Storage respondió %s: %s", r.status_code, r.text[:200])
-        raise AlmacenamientoError("No se pudo guardar el archivo, intenta de nuevo.")
+        raise AlmacenamientoError("No se pudo guardar el archivo; intentar de nuevo.")
     return f"supabase://{config.SUPABASE_BUCKET}/{nombre}"
 
 
@@ -79,10 +79,10 @@ def leer(ubicacion: str, cliente: Optional[httpx.Client] = None) -> bytes:
             with _cliente(cliente) as c:
                 r = c.get(f"/object/{ruta}")
         except httpx.HTTPError as e:
-            raise AlmacenamientoError("No se pudo abrir el archivo, intenta de nuevo.") from e
+            raise AlmacenamientoError("No se pudo abrir el archivo; intentar de nuevo.") from e
         if not r.is_success:
             log.error("Supabase Storage respondió %s al leer %s: %s", r.status_code, ruta, r.text[:200])
-            raise AlmacenamientoError("No se pudo abrir el archivo, intenta de nuevo.")
+            raise AlmacenamientoError("No se pudo abrir el archivo; intentar de nuevo.")
         return r.content
     try:
         return Path(ubicacion).read_bytes()

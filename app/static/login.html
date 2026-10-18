@@ -59,7 +59,7 @@
   <img src="/static/icono-192.png" alt="" width="72" height="72" style="border-radius:16px;display:block;margin:0 auto 12px">
   <h1 style="text-align:center">Auditorías AP</h1>
   <p style="text-align:center">Anestesiólogos Permanentes</p>
-  <p id="texto-login">Inicia sesión para continuar.</p>
+  <p id="texto-login">Iniciar sesión para continuar.</p>
   <form id="login">
     <label for="email">Correo</label>
     <input id="email" type="email" autocomplete="username" required>
@@ -71,32 +71,32 @@
   </form>
   <form id="paso2" class="oculto" novalidate>
     <h2 style="margin-top:0">Verificación en dos pasos</h2>
-    <p>Escribe el código de 6 dígitos de tu app de verificación (Google Authenticator, Microsoft Authenticator…).</p>
+    <p>Escribir el código de 6 dígitos de la app de verificación (Google Authenticator, Microsoft Authenticator…).</p>
     <label for="codigo2">Código</label>
     <input id="codigo2" inputmode="numeric" autocomplete="one-time-code" maxlength="20" required>
     <div id="error-paso2"></div>
     <button type="submit">Confirmar</button>
-    <p class="cambiar" style="margin:12px 0 0">¿Perdiste el teléfono? Escribe uno de tus <strong>códigos de recuperación</strong> en el mismo campo.
+    <p class="cambiar" style="margin:12px 0 0">¿Teléfono perdido? Escribir uno de los <strong>códigos de recuperación</strong> en el mismo campo.
       <a href="/login" id="volver-paso2">Volver</a></p>
   </form>
   <form id="olvide" class="oculto" novalidate>
     <h1 style="font-size:1.15rem;margin:0 0 4px">Olvidé mi contraseña</h1>
-    <p class="nota" style="margin:0 0 6px">Escribe tu correo y te enviamos un enlace para crear una contraseña nueva.</p>
+    <p class="nota" style="margin:0 0 6px">Escribir el correo para recibir un enlace y crear una contraseña nueva.</p>
     <label for="o-email">Correo</label><input id="o-email" type="email" autocomplete="username" required>
     <div id="error-olvide"></div>
     <button type="submit">Enviarme el enlace</button>
   </form>
-  <p class="cambiar oculto" id="ir-registro">¿Eres anestesiólogo de AP y no tienes cuenta? <a href="#registro">Regístrate</a></p>
+  <p class="cambiar oculto" id="ir-registro">¿Anestesiólogo de AP sin cuenta? <a href="#registro">Registrarse</a></p>
 
   <form id="registro" class="oculto" novalidate>
     <h1 style="font-size:1.15rem;margin:0 0 4px">Crear mi cuenta</h1>
-    <p class="nota" style="margin:0 0 6px">Tu cuenta queda pendiente hasta que el administrador de AP la apruebe.</p>
+    <p class="nota" style="margin:0 0 6px">La cuenta queda pendiente hasta que el administrador de AP la apruebe.</p>
     <label for="r-nombre">Nombre completo</label><input id="r-nombre" autocomplete="name" required>
     <label for="r-registro">Registro médico (RETHUS)</label><input id="r-registro" autocomplete="off" required>
     <label for="r-email">Correo</label><input id="r-email" type="email" autocomplete="email" required>
-    <label for="r-telefono">Celular (opcional, para contactarte)</label><input id="r-telefono" type="tel" autocomplete="tel">
+    <label for="r-telefono">Celular (opcional, para contacto)</label><input id="r-telefono" type="tel" autocomplete="tel">
     <label for="r-clave">Contraseña (mínimo 10 caracteres)</label><input id="r-clave" type="password" autocomplete="new-password" required>
-    <label for="r-clave2">Repite la contraseña</label><input id="r-clave2" type="password" autocomplete="new-password" required>
+    <label for="r-clave2">Repetir la contraseña</label><input id="r-clave2" type="password" autocomplete="new-password" required>
     <div class="trampa" aria-hidden="true"><label for="r-sitio">No llenar</label><input id="r-sitio" tabindex="-1" autocomplete="off"></div>
     <label class="autoriza"><input type="checkbox" id="r-terminos">
       <span>Acepto los <a href="/terminos" target="_blank" rel="noopener">términos de uso</a>.</span></label>
@@ -107,8 +107,8 @@
     <button type="submit">Enviar solicitud</button>
   </form>
   <div id="registro-listo" class="oculto ok">
-    <strong>✓ Solicitud enviada.</strong> El administrador de AP revisará tus datos. Cuando la apruebe podrás entrar con tu
-    correo y la contraseña que escogiste.
+    <strong>✓ Solicitud enviada.</strong> El administrador de AP revisará los datos. Cuando la apruebe, se podrá entrar con el
+    correo y la contraseña registrados.
   </div>
   <p class="cambiar oculto" id="ir-login"><a href="#">Ya tengo cuenta: iniciar sesión</a></p>
 </main>
@@ -128,7 +128,7 @@ $("#olvide").onsubmit = async (ev) => {
   ev.preventDefault();
   const caja = $("#error-olvide"), boton = ev.submitter, email = $("#o-email").value.trim();
   caja.innerHTML = "";
-  if (!email) return error(caja, "Escribe tu correo.");
+  if (!email) return error(caja, "Falta el correo.");
   boton.disabled = true;
   try {
     const r = await fetch("/api/olvide-clave", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
@@ -136,7 +136,7 @@ $("#olvide").onsubmit = async (ev) => {
     if (!r.ok) return error(caja, cuerpo && typeof cuerpo.detail === "string" ? cuerpo.detail : "No se pudo enviar el enlace.");
     caja.innerHTML = `<div class="ok" style="margin-top:12px"></div>`; caja.firstChild.textContent = cuerpo.mensaje;
   } catch {
-    error(caja, "Sin conexión. Intenta de nuevo.");
+    error(caja, "Sin conexión. Intentar de nuevo.");
   } finally {
     boton.disabled = false;
   }
@@ -153,13 +153,13 @@ $("#registro").onsubmit = async (ev) => {
   const datos = { nombre: $("#r-nombre").value.trim(), registro_medico: $("#r-registro").value.trim(),
     email: $("#r-email").value.trim(), telefono: $("#r-telefono").value.trim() || null, password: $("#r-clave").value,
     autoriza_datos: $("#r-autoriza").checked, acepta_terminos: $("#r-terminos").checked, sitio_web: $("#r-sitio").value || null };
-  if (datos.nombre.length < 5) return error(caja, "Escribe tu nombre completo.");
-  if (datos.registro_medico.length < 3) return error(caja, "Escribe tu registro médico.");
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(datos.email)) return error(caja, "Revisa el correo.");
+  if (datos.nombre.length < 5) return error(caja, "Falta el nombre completo.");
+  if (datos.registro_medico.length < 3) return error(caja, "Falta el registro médico.");
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(datos.email)) return error(caja, "Revisar el correo.");
   if (datos.password.length < 10) return error(caja, "La contraseña debe tener al menos 10 caracteres.");
   if (datos.password !== $("#r-clave2").value) return error(caja, "Las contraseñas no coinciden.");
-  if (!datos.acepta_terminos) return error(caja, "Debes aceptar los términos de uso.");
-  if (!datos.autoriza_datos) return error(caja, "Debes autorizar el tratamiento de tus datos.");
+  if (!datos.acepta_terminos) return error(caja, "Falta aceptar los términos de uso.");
+  if (!datos.autoriza_datos) return error(caja, "Falta autorizar el tratamiento de datos.");
   boton.disabled = true;
   try {
     const r = await fetch("/api/registro", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(datos) });
@@ -168,7 +168,7 @@ $("#registro").onsubmit = async (ev) => {
     $("#registro").classList.add("oculto");
     $("#registro-listo").classList.remove("oculto"); $("#registro-listo").classList.add("visto");
   } catch {
-    error(caja, "Sin conexión. Intenta de nuevo.");
+    error(caja, "Sin conexión. Intentar de nuevo.");
   } finally {
     boton.disabled = false;
   }
@@ -186,7 +186,7 @@ document.getElementById("paso2").onsubmit = async (ev) => {
     error(caja, (cuerpo && typeof cuerpo.detail === "string") ? cuerpo.detail : "No se pudo verificar el código.");
     if (r.status === 401 && cuerpo && /venci/.test(cuerpo.detail || "")) setTimeout(() => location.reload(), 2500);
   } catch {
-    error(caja, "Sin conexión. Intenta de nuevo.");
+    error(caja, "Sin conexión. Intentar de nuevo.");
   } finally {
     boton.disabled = false;
   }
@@ -215,7 +215,7 @@ document.getElementById("login").onsubmit = async (ev) => {
     error.innerHTML = `<div class="error"></div>`;
     error.firstChild.textContent = (cuerpo && typeof cuerpo.detail === "string") ? cuerpo.detail : "No se pudo iniciar sesión.";
   } catch {
-    error.innerHTML = `<div class="error">Sin conexión. Intenta de nuevo.</div>`;
+    error.innerHTML = `<div class="error">Sin conexión. Intentar de nuevo.</div>`;
   } finally {
     boton.disabled = false;
   }
