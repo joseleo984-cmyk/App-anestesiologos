@@ -665,11 +665,11 @@
 
   <div id="pestana-nueva" class="pestana oculto">
   <section class="card" id="paso-subir">
-    <h2>Sube la orden</h2>
+    <h2>Subir la orden</h2>
     <div id="zona" class="zona">
       <button type="button" class="boton primario grande" id="elegir">📷 Tomar foto o elegir archivo</button>
       <label class="modo-escaner"><input type="checkbox" id="modo-escaner" checked>
-        <span><strong>Modo escáner:</strong> detecta la hoja, la endereza y aclara el fondo. Tú ajustas los bordes antes de usarla.</span></label>
+        <span><strong>Modo escáner:</strong> detecta la hoja, la endereza y aclara el fondo. Los bordes se ajustan antes de usarla.</span></label>
       <div id="bandeja" class="oculto">
         <p class="sub" id="bandeja-texto"></p>
         <div class="miniaturas" id="miniaturas"></div>
@@ -679,10 +679,10 @@
         </div>
         <button type="button" id="vaciar-bandeja" class="enlace" style="border:0;background:none;padding:6px 0">Quitar todas</button>
       </div>
-      <p class="sub">Si la orden tiene varias hojas (o la orden y su autorización), agrega todas las fotos antes de
-        leerla. También puedes <strong>arrastrar los archivos aquí</strong>. La IA llenará los datos y tú los revisas.</p>
+      <p class="sub">Si la orden tiene varias hojas (o la orden y su autorización), conviene agregar todas las fotos antes de
+        leerla. También se pueden <strong>arrastrar los archivos aquí</strong>. La IA llena los datos y luego se revisan.</p>
     </div>
-    <p class="sub" style="margin-bottom:4px">¿El botón no funciona? Usa este selector:</p>
+    <p class="sub" style="margin-bottom:4px">¿El botón no funciona? Usar este selector:</p>
     <input id="foto-libre" type="file" class="selector-simple" multiple>
     <button type="button" id="manual">Escribir los datos a mano</button>
     <div id="estado-subida"></div>
@@ -728,9 +728,9 @@
     </section>
     <section class="card" id="antiguedad-pagos"><h2>Por cobrar</h2><p class="sub">Cargando…</p></section>
     <section class="card">
-      <h2>Sube la relación de pagos</h2>
-      <p class="sub">El reporte que te entrega la asociación o el pagador con los pacientes que te pagaron.
-        La app lo lee, lo cruza con tus cirugías y te muestra cuáles quedan pagadas y cuáles siguen pendientes.</p>
+      <h2>Subir la relación de pagos</h2>
+      <p class="sub">El reporte que entrega la asociación o el pagador con los pacientes pagados.
+        La app lo lee, lo cruza con las cirugías y muestra cuáles quedan pagadas y cuáles siguen pendientes.</p>
       <div id="zona-pago" class="zona">
         <button type="button" class="boton primario grande" id="elegir-pago">📄 Elegir reporte (PDF o foto)</button>
       </div>
@@ -738,18 +738,18 @@
     </section>
     <section class="card">
       <h2>Radicados de clínicas</h2>
-      <p class="sub">Para cualquier clínica a la que entregas (radicas) la relación de órdenes y que paga después, todo junto o por paciente.
-        Sube la hoja (foto o PDF, todas sus páginas; puede estar escrita a mano): la app cruza cada paciente con su cirugía.</p>
-      <div class="segmentos" id="relacion-tipo" role="radiogroup" aria-label="Qué vas a subir">
+      <p class="sub">Para cualquier clínica a la que se entrega (radica) la relación de órdenes y que paga después, todo junto o por paciente.
+        Subir la hoja (foto o PDF, todas sus páginas; puede estar escrita a mano): la app cruza cada paciente con su cirugía.</p>
+      <div class="segmentos" id="relacion-tipo" role="radiogroup" aria-label="Qué se va a subir">
         <button type="button" data-tipo="RADICADO" aria-pressed="true">Radicado<span class="sub">Órdenes entregadas, aún sin pagar</span></button>
         <button type="button" data-tipo="RELACION" aria-pressed="false">Relación pagada<span class="sub">La clínica ya pagó el total</span></button>
       </div>
       <div class="fila">
-        <div><label for="relacion-pagador">Clínica</label><input id="relacion-pagador" list="clinicas-radicado" placeholder="Si la dejas vacía, la que diga la hoja" autocomplete="off"><datalist id="clinicas-radicado"></datalist></div>
+        <div><label for="relacion-pagador">Clínica</label><input id="relacion-pagador" list="clinicas-radicado" placeholder="Si queda vacía, la que diga la hoja" autocomplete="off"><datalist id="clinicas-radicado"></datalist></div>
         <div><label for="relacion-fecha" id="relacion-fecha-etiqueta">Fecha del radicado</label><input id="relacion-fecha" type="date"></div>
       </div>
-      <p class="sub" id="relacion-ayuda">Si no pones la fecha se usa la del sello de recibido o la de la hoja. Al aplicarlo, las
-        cirugías quedan facturadas (radicadas); cuando la clínica pague, registras el pago y quedan pagadas.</p>
+      <p class="sub" id="relacion-ayuda">Si no se pone la fecha, se usa la del sello de recibido o la de la hoja. Al aplicarlo, las
+        cirugías quedan facturadas (radicadas); cuando la clínica pague, se registra el pago y quedan pagadas.</p>
       <button type="button" class="boton primario" id="elegir-relacion">📄 Elegir radicado (foto o PDF de cada página)</button>
       <div id="estado-relacion"></div>
     </section>
@@ -759,7 +759,7 @@
       <div class="item-cab"><h2>Reportes subidos</h2>
         <button type="button" id="ver-pendientes" style="flex:0 0 auto">Ver pendientes de pago</button></div>
       <div class="atajos"><button type="button" id="cruzar-todos">↻ Volver a cruzar todos los reportes</button></div>
-      <p class="sub">Úsalo después de registrar cirugías que ya venían en reportes subidos antes (las cirugías nuevas
+      <p class="sub">Usarlo después de registrar cirugías que ya venían en reportes subidos antes (las cirugías nuevas
         se cruzan solas al guardarlas).</p>
       <div id="estado-cruzar"></div>
       <div id="lista-pagos"><p class="sub">Cargando…</p></div>
@@ -769,7 +769,7 @@
   <div id="pestana-relacion" class="pestana oculto">
     <section class="card">
       <h2>Relación de órdenes</h2>
-      <p class="sub">Para entregar a facturación. En cada filtro puedes elegir uno o varios; si no eliges ninguno, salen todos.</p>
+      <p class="sub">Para entregar a facturación. En cada filtro se pueden elegir uno o varios; si no se elige ninguno, salen todos.</p>
       <div class="atajos">
         <button type="button" id="rel-prepagadas">Solo prepagadas</button>
         <button type="button" id="rel-santa-ana">Clínica Santa Ana de Dios</button>
@@ -831,7 +831,7 @@
     <section class="card" id="inf-calc"></section>
     <section class="card oculto" id="inf-prep-peso"></section>
     <section class="card" id="inf-tabla"></section>
-    <p class="sub" style="margin:0 4px 16px">Diluciones y rangos orientativos, pendientes de validar con el protocolo de AP. Verifica siempre
+    <p class="sub" style="margin:0 4px 16px">Diluciones y rangos orientativos, pendientes de validar con el protocolo de AP. Verificar siempre
       la preparación y la velocidad de la bomba (doble chequeo) antes de iniciar la infusión.</p>
   </div>
 
@@ -890,7 +890,7 @@
         <div class="fila"><div><label for="tv-velmax">Velocidad máxima de la bomba (mL/h)</label><input id="tv-velmax" type="text" inputmode="decimal"></div><div></div></div>
       </details>
     </section>
-    <section class="card"><h2>Simulación</h2><div id="tv-resultado"><p class="sub">Completa los datos del paciente.</p></div>
+    <section class="card"><h2>Simulación</h2><div id="tv-resultado"><p class="sub">Completar los datos del paciente.</p></div>
       <details id="tv-parametros" style="margin-top:12px"></details></section>
     <p class="sub" style="margin:0 4px 16px">Simulación con modelos poblacionales: la concentración real de cada paciente puede variar 20–30 % o más.
       Es una guía para la TIVA manual y la docencia, no reemplaza una bomba TCI ni el monitoreo (BIS o EEG) ni el juicio clínico.
@@ -902,11 +902,11 @@
     <section class="card">
       <h2>Cómo probar</h2>
       <ol style="margin:4px 0 8px;padding-left:20px;line-height:1.5">
-        <li>Abre en TIVA uno de los casos sugeridos (o uno propio).</li>
-        <li>Simula el mismo caso en SimTIVA o en una bomba TCI: mismo modelo, objetivo, jeringa y duración.</li>
-        <li>En TIVA toca «Registrar prueba» y escribe las cifras de la otra fuente. La app calcula la diferencia.</li>
+        <li>Abrir en TIVA uno de los casos sugeridos (o uno propio).</li>
+        <li>Simular el mismo caso en SimTIVA o en una bomba TCI: mismo modelo, objetivo, jeringa y duración.</li>
+        <li>En TIVA, tocar «Registrar prueba» y escribir las cifras de la otra fuente. La app calcula la diferencia.</li>
       </ol>
-      <p class="sub" style="margin:0">Solo casos simulados: no escribas nombres ni datos de pacientes. Todos los anestesiólogos ven la bitácora.</p>
+      <p class="sub" style="margin:0">Solo casos simulados: no escribir nombres ni datos de pacientes. Todos los anestesiólogos ven la bitácora.</p>
     </section>
     <section class="card"><h2>Resumen por modelo</h2><div id="val-resumen"><p class="sub">Cargando…</p></div></section>
     <section class="card"><h2>Casos sugeridos</h2><div id="val-casos"></div></section>
@@ -923,9 +923,9 @@
       <h2>Dosis máxima de anestésico local</h2>
       <div class="fila">
         <div><label for="rg-peso">Peso (kg)</label><input id="rg-peso" type="text" inputmode="decimal" autocomplete="off" placeholder="Ej: 70"></div>
-        <div><label for="rg-planeado">Volumen que vas a usar (mL)</label><input id="rg-planeado" type="text" inputmode="decimal" autocomplete="off" placeholder="Opcional"></div>
+        <div><label for="rg-planeado">Volumen planeado (mL)</label><input id="rg-planeado" type="text" inputmode="decimal" autocomplete="off" placeholder="Opcional"></div>
       </div>
-      <p class="sub" style="margin:6px 0 0">En obesidad usa el peso ideal o magro.</p>
+      <p class="sub" style="margin:6px 0 0">En obesidad, usar el peso ideal o magro.</p>
       <label>Anestésico</label><div class="inf-preps" id="rg-anestesicos"></div>
       <label>Concentración</label><div class="inf-preps" id="rg-concs"></div>
       <label class="principal"><input type="checkbox" id="rg-epi"> Con epinefrina</label>
@@ -940,10 +940,10 @@
     <section class="card" style="border-color:var(--err-text)">
       <h2 style="color:var(--err-text)">Toxicidad sistémica (LAST)</h2>
       <ol class="lista-last" style="padding-left:1.3em">
-        <li>Detén la inyección, pide ayuda y el carro de LAST. Vía aérea con O₂ al 100 %; evita la hipoxia y la acidosis.</li>
-        <li>Convulsiones: benzodiacepina (evita el propofol si hay inestabilidad).</li>
+        <li>Detener la inyección, pedir ayuda y el carro de LAST. Vía aérea con O₂ al 100 %; evitar la hipoxia y la acidosis.</li>
+        <li>Convulsiones: benzodiacepina (evitar el propofol si hay inestabilidad).</li>
         <li><strong>Emulsión lipídica al 20 %</strong> apenas haya signos graves.</li>
-        <li>Paro: RCP; epinefrina en dosis bajas (≤ 1 µg/kg); evita vasopresina, betabloqueadores, calcioantagonistas y lidocaína. Considera circulación extracorpórea.</li>
+        <li>Paro: RCP; epinefrina en dosis bajas (≤ 1 µg/kg); evitar vasopresina, betabloqueadores, calcioantagonistas y lidocaína. Considerar circulación extracorpórea.</li>
       </ol>
       <div id="rg-last-dosis" style="margin-top:8px"></div>
       <p class="sub" style="margin:6px 0 0">Según la lista de chequeo de ASRA (2020).</p>
@@ -962,7 +962,7 @@
         <button type="button" id="not-btn-temas" style="flex:0 0 auto">⚙ Mis temas</button></div>
       <p class="sub">Lo nuevo de fuentes científicas y gremiales seleccionadas, resumido en español.</p>
       <div id="not-temas" class="oculto">
-        <p class="sub" style="margin-bottom:0">Elige los temas que quieres ver (sin ninguno marcado ves todos):</p>
+        <p class="sub" style="margin-bottom:0">Elegir los temas que se quieren ver (sin ninguno marcado se ven todos):</p>
         <div class="temas-elegir" id="not-temas-lista"></div>
         <button type="button" class="primario" id="not-guardar-temas">Guardar mis temas</button>
         <div id="not-estado-temas"></div>
@@ -979,7 +979,7 @@
     </section>
     <section class="card"><div id="not-lista"><p class="sub">Cargando…</p></div></section>
     <p class="sub" style="margin:0 4px 16px">Los resúmenes los hace la IA a partir del resumen público de cada
-      publicación. Son informativos: antes de cambiar una conducta clínica, lee el artículo original.</p>
+      publicación. Son informativos: antes de cambiar una conducta clínica, conviene leer el artículo original.</p>
     <section class="card oculto" id="not-admin">
       <h2>Fuentes de noticias (administrador)</h2>
       <p class="sub">Solo se leen las fuentes activas. «Probar» revisa la dirección sin guardar nada.
@@ -1004,8 +1004,8 @@
   <div id="pestana-finanzas" class="pestana oculto">
     <section class="card">
       <h2>Mis finanzas</h2>
-      <p class="sub">🔒 Solo tú ves esta información. El presupuesto se arma sobre tu <strong>ingreso base</strong>
-        (el promedio de tus 3 meses más bajos), así un mes flojo no te descuadra.</p>
+      <p class="sub">🔒 Esta información solo la ve quien tiene la cuenta. El presupuesto se arma sobre el <strong>ingreso base</strong>
+        (el promedio de los 3 meses más bajos), así un mes flojo no descuadra las cuentas.</p>
       <div class="kpis" id="fin-kpis"></div>
       <div id="fin-reparto"></div>
       <div id="fin-consejos"></div>
@@ -1016,7 +1016,7 @@
           <button type="button" id="fin-mes-ant" aria-label="Mes anterior">◀</button>
           <strong id="fin-mes-nombre" style="min-width:80px;text-align:center"></strong>
           <button type="button" id="fin-mes-sig" aria-label="Mes siguiente">▶</button></div></div>
-      <p class="sub">Anota lo que gastas y lo que ahorras: la app lo compara con tu presupuesto y tus compromisos.</p>
+      <p class="sub">Anotar lo gastado y lo ahorrado: la app lo compara con el presupuesto y los compromisos.</p>
       <form id="fin-form-mov" novalidate>
         <div class="fila">
           <div><label for="fin-mov-clase">Es un</label>
@@ -1035,9 +1035,9 @@
     </section>
     <section class="card" id="fin-card-extractos">
       <h2>Extractos del banco</h2>
-      <p class="sub">Sube el extracto de tu tarjeta, cuenta o crédito y la app anota tus gastos por ti. Sirve el PDF
-        (aunque tenga muchas hojas), fotos de las hojas, o el Excel/CSV que descargas del banco. Antes de guardar,
-        revisas todo. 🔒 El archivo no se guarda: solo los gastos que apruebes.</p>
+      <p class="sub">Subir el extracto de la tarjeta, cuenta o crédito y la app anota los gastos. Sirve el PDF
+        (aunque tenga muchas hojas), fotos de las hojas, o el Excel/CSV que se descarga del banco. Antes de guardar,
+        se revisa todo. 🔒 El archivo no se guarda: solo los gastos aprobados.</p>
       <h3>Mis cuentas y tarjetas</h3>
       <div id="ext-cuentas"></div>
       <form id="ext-form-cuenta" class="fila" novalidate>
@@ -1054,7 +1054,7 @@
       <h3 style="margin-top:16px">Subir un extracto</h3>
       <div class="fila">
         <div><label for="ext-clave">Clave del PDF (si tiene)</label>
-          <input id="ext-clave" type="password" autocomplete="off" placeholder="Suele ser tu cédula"></div>
+          <input id="ext-clave" type="password" autocomplete="off" placeholder="Suele ser la cédula del titular"></div>
       </div>
       <div class="atajos"><button type="button" id="ext-subir" class="primario">🏦 Subir extracto</button></div>
       <p class="sub">Un extracto a la vez: el PDF completo, o todas las fotos de sus hojas juntas. No sirve el Excel antiguo (.xls).</p>
@@ -1078,22 +1078,22 @@
     </section>
     <section class="card">
       <h2>Lo que viene</h2>
-      <p class="sub">Lo que AP te pagaría en los próximos meses por tus cirugías aún sin pagar.</p>
+      <p class="sub">Lo que AP pagaría en los próximos meses por las cirugías aún sin pagar.</p>
       <div id="fin-por-cobrar"></div>
     </section>
     <section class="card" id="fin-card-ahorros-ap">
-      <h2>Tus ahorros en AP</h2>
+      <h2>Mis ahorros en AP</h2>
       <div id="fin-ahorros-ap"></div>
     </section>
     <section class="card">
       <h2>Gastos mensuales</h2>
-      <p class="sub">Cada categoría se compara con una referencia sana sobre tu ingreso base.</p>
+      <p class="sub">Cada categoría se compara con una referencia sana sobre el ingreso base.</p>
       <div id="fin-gastos"></div>
       <form id="fin-form-gasto" class="fila" novalidate>
         <div><label for="fin-gas-cat">Categoría</label><select id="fin-gas-cat"></select></div>
         <div><label for="fin-gas-nombre">Descripción</label><input id="fin-gas-nombre" placeholder="Ej: colegio de los niños"></div>
         <div><label for="fin-gas-valor">Valor mensual ($)</label><input id="fin-gas-valor" class="pesos" inputmode="numeric"></div>
-        <div class="solo-credito oculto"><label for="fin-gas-saldo">Saldo que debes ($)</label><input id="fin-gas-saldo" class="pesos" inputmode="numeric"></div>
+        <div class="solo-credito oculto"><label for="fin-gas-saldo">Saldo pendiente ($)</label><input id="fin-gas-saldo" class="pesos" inputmode="numeric"></div>
         <div class="solo-credito oculto"><label for="fin-gas-tasa">Tasa efectiva anual (%)</label><input id="fin-gas-tasa" inputmode="decimal" placeholder="Ej: 24,5"></div>
         <div style="align-self:end"><button type="submit" class="primario">Agregar gasto</button></div>
       </form>
@@ -1123,21 +1123,21 @@
   <div id="pestana-clave" class="pestana oculto">
     <form class="card" id="form-clave" novalidate>
       <h2>Cambiar contraseña</h2>
-      <div id="aviso-clave-obligatoria" class="aviso warn oculto">Estás usando una contraseña temporal. Crea la tuya para continuar.</div>
+      <div id="aviso-clave-obligatoria" class="aviso warn oculto">La contraseña actual es temporal. Para continuar, crear una nueva.</div>
       <label for="clave-actual">Contraseña actual</label>
       <input id="clave-actual" type="password" autocomplete="current-password">
       <label for="clave-nueva">Contraseña nueva (mínimo 10 caracteres)</label>
       <input id="clave-nueva" type="password" autocomplete="new-password" minlength="10">
-      <label for="clave-repetir">Repite la contraseña nueva</label>
+      <label for="clave-repetir">Repetir la contraseña nueva</label>
       <input id="clave-repetir" type="password" autocomplete="new-password">
       <div id="estado-clave"></div>
       <button type="submit" class="primario grande" style="margin-top:12px">Guardar contraseña</button>
-      <p class="sub">Al cambiarla se cierra tu sesión en los demás dispositivos.</p>
+      <p class="sub">Al cambiarla se cierra la sesión en los demás dispositivos.</p>
     </form>
     <section class="card" id="dos-pasos">
       <h2>Verificación en dos pasos</h2>
-      <p class="sub">Además de la contraseña, pide un código de 6 dígitos de una app en tu teléfono (Google Authenticator, Microsoft Authenticator…).
-        Así, aunque alguien conozca tu contraseña, no puede entrar a los datos de tus pacientes.</p>
+      <p class="sub">Además de la contraseña, pide un código de 6 dígitos de una app en el teléfono (Google Authenticator, Microsoft Authenticator…).
+        Así, aunque alguien conozca la contraseña, no puede entrar a los datos de los pacientes.</p>
       <div id="dos-pasos-contenido"><p class="sub">Cargando…</p></div>
     </section>
   </div>
@@ -1145,7 +1145,7 @@
   <div id="pestana-usuarios" class="pestana oculto">
     <section class="card oculto" id="solicitudes" style="border-color:var(--warn-line)">
       <h2>Solicitudes de registro</h2>
-      <p class="sub">Anestesiólogos que se registraron solos. Verifica que sean de AP (nombre y registro médico) antes de aprobar.</p>
+      <p class="sub">Anestesiólogos que se registraron solos. Conviene verificar que sean de AP (nombre y registro médico) antes de aprobar.</p>
       <div id="lista-solicitudes"></div>
     </section>
     <form class="card" id="form-usuario" novalidate>
@@ -1162,8 +1162,8 @@
     <section class="card">
       <h2>Cuentas</h2>
       <p class="sub">Cada anestesiólogo ve solo sus propias cirugías, pagos y reportes. Los anestesiólogos también pueden
-        registrarse solos desde la página de entrada (<strong id="url-login">/login</strong>, «Regístrate»): sus cuentas aparecen
-        arriba para que las apruebes.</p>
+        registrarse solos desde la página de entrada (<strong id="url-login">/login</strong>, «Registrarse»): sus cuentas aparecen
+        arriba para aprobarlas.</p>
       <div id="lista-usuarios"><p class="sub">Cargando…</p></div>
     </section>
     <section class="card">
@@ -1179,18 +1179,18 @@
     <section class="card">
       <h2>Calidad de la lectura</h2>
       <p class="sub">Campos que los anestesiólogos corrigen después de leer una orden (últimos 90 días) y sus comentarios de
-        «¿Qué te faltó?». Solo se guarda qué campo cambió, nunca el dato.</p>
+        «¿Qué faltó?». Solo se guarda qué campo cambió, nunca el dato.</p>
       <div id="calidad-lectura"><p class="sub">Cargando…</p></div>
     </section>
     <form class="card" id="form-copia" novalidate>
       <h2>Copia de seguridad</h2>
-      <p class="sub">Descarga toda la base de datos (cirugías, pacientes, pagos, finanzas, noticias…) en un archivo
-        cifrado. Guárdalo en tu Drive o en tu computador. Hazla al menos una vez por semana.</p>
-      <p class="sub">🔒 Escoge una clave de al menos 10 caracteres y <strong>anótala en un lugar seguro</strong>: sin ella
+      <p class="sub">Descargar toda la base de datos (cirugías, pacientes, pagos, finanzas, noticias…) en un archivo
+        cifrado y guardarlo en Drive o en el computador. Conviene hacerla al menos una vez por semana.</p>
+      <p class="sub">🔒 Escoger una clave de al menos 10 caracteres y <strong>anotarla en un lugar seguro</strong>: sin ella
         la copia no se puede abrir ni restaurar. Las fotos y PDF de las órdenes no van en este archivo.</p>
       <div class="fila">
         <div><label for="copia-clave">Clave de la copia</label><input id="copia-clave" type="password" autocomplete="new-password"></div>
-        <div><label for="copia-clave2">Repite la clave</label><input id="copia-clave2" type="password" autocomplete="new-password"></div>
+        <div><label for="copia-clave2">Repetir la clave</label><input id="copia-clave2" type="password" autocomplete="new-password"></div>
       </div>
       <button type="submit" class="primario" style="margin-top:12px">⬇ Descargar copia de seguridad</button>
       <div id="estado-copia"></div>
@@ -1221,7 +1221,7 @@
   </div>
 
   <form class="card oculto" id="paso-revisar" novalidate>
-    <h2><span id="titulo-form">Revisa y confirma</span><span id="por-revisar" class="por-revisar oculto"></span></h2>
+    <h2><span id="titulo-form">Revisar y confirmar</span><span id="por-revisar" class="por-revisar oculto"></span></h2>
     <div id="cobro-cirugia"></div>
     <p id="ver-original" class="oculto"></p>
     <div id="avisos"></div>
@@ -1300,8 +1300,8 @@
     </fieldset>
 
     <details id="que-falto" class="que-falto oculto">
-      <summary>💬 ¿Qué te faltó? Cuéntanos qué leyó mal la IA</summary>
-      <p class="sub">Ej.: «no leyó el segundo procedimiento», «confundió la aseguradora». No escribas nombres ni documentos del paciente.</p>
+      <summary>💬 ¿Qué faltó? Contar qué leyó mal la IA</summary>
+      <p class="sub">Ej.: «no leyó el segundo procedimiento», «confundió la aseguradora». No escribir nombres ni documentos del paciente.</p>
       <textarea id="que-falto-texto" maxlength="1000" placeholder="¿Qué no leyó o leyó mal?"></textarea>
       <div id="que-falto-aviso"></div>
       <button type="button" id="que-falto-enviar" style="margin-top:8px">Enviar comentario</button>
@@ -1347,7 +1347,7 @@
 <div id="historia" class="oculto" role="dialog" aria-modal="true" aria-label="Historias de noticias"></div>
 <div id="capa-ficha" class="capa oculto"><div class="ficha" id="ficha" role="dialog" aria-modal="true" aria-label="Ficha de la noticia"></div></div>
 <div id="capa-escaner" class="capa-escaner oculto" role="dialog" aria-modal="true" aria-labelledby="esc-titulo">
-  <div class="esc-cab"><strong id="esc-titulo">Ajusta los bordes</strong><span class="sub" id="esc-pagina"></span></div>
+  <div class="esc-cab"><strong id="esc-titulo">Ajustar los bordes</strong><span class="sub" id="esc-pagina"></span></div>
   <div class="esc-lienzo" id="esc-lienzo"><canvas id="esc-canvas"></canvas><div class="esc-trabajando oculto" id="esc-trabajando">Escaneando…</div></div>
   <div class="segmentos oculto" id="esc-modos">
     <button type="button" data-modo="escaner" aria-pressed="true">Escáner<span class="sub">Blanco y negro, limpio</span></button>
@@ -1358,7 +1358,7 @@
 </div>
 <div id="capa-terminos" class="capa oculto" style="z-index:70"><div class="ficha" role="dialog" aria-modal="true" aria-labelledby="terminos-titulo">
   <h3 id="terminos-titulo">Términos y política de datos</h3>
-  <p style="margin:0">Para seguir usando Auditorías AP lee y acepta la versión vigente de los
+  <p style="margin:0">Para seguir usando Auditorías AP, es necesario leer y aceptar la versión vigente de los
     <a href="/terminos" target="_blank" rel="noopener">términos de uso</a> y de la
     <a href="/privacidad" target="_blank" rel="noopener">política de tratamiento de datos</a>.</p>
   <label class="principal"><input type="checkbox" id="acepto-terminos"> Acepto los términos de uso</label>
@@ -1480,8 +1480,8 @@ function filaProcedimiento(p = {}, dudosos = []) {
     });
   };
   if (p.sugerencias && p.sugerencias.length && (!p.codigo || p.codigo_sugerido))
-    mostrar(p.codigo_sugerido ? "El código lo tomé del catálogo CUPS: revísalo. Otras opciones:"
-                              : "La orden no trae el código. Elige del catálogo CUPS:", p.sugerencias, false);
+    mostrar(p.codigo_sugerido ? "El código se tomó del catálogo CUPS: conviene revisarlo. Otras opciones:"
+                              : "La orden no trae el código. Elegir del catálogo CUPS:", p.sugerencias, false);
 
   let espera;
   const consultar = (texto, ponerNombre) => {
@@ -1533,7 +1533,7 @@ function llenarFormulario(datos) {
   campo("valor_honorarios").value = datos.valor_honorarios != null ? formatoMiles(datos.valor_honorarios) : "";
   campo("fecha_pago").value = datos.fecha_pago || "";
   campo("observaciones").value = modo.tipo === "editar" ? (datos.observaciones || "") : "";
-  $("#titulo-form").textContent = modo.tipo === "editar" ? "Cirugía" : "Revisa y confirma";
+  $("#titulo-form").textContent = modo.tipo === "editar" ? "Cirugía" : "Revisar y confirmar";
   const docId = modo.tipo === "documento" ? modo.id : datos.documento_id;
   const paginas = (modo.tipo === "documento" ? modo.paginas : datos.paginas) || 1;
   $("#ver-original").classList.toggle("oculto", !docId);
@@ -1544,7 +1544,7 @@ function llenarFormulario(datos) {
 
   const avisos = [];
   if (datos.confianza !== undefined && datos.confianza < 0.8)
-    avisos.push(`<div class="aviso warn">La lectura no es del todo segura (${Math.round(datos.confianza * 100)} %). Revisa todos los datos.</div>`);
+    avisos.push(`<div class="aviso warn">La lectura no es del todo segura (${Math.round(datos.confianza * 100)} %). Conviene revisar todos los datos.</div>`);
   if (dudosos.length)
     avisos.push(`<div class="aviso warn">Los campos en amarillo pueden estar mal leídos.</div>`);
   if (datos.observaciones && modo.tipo === "documento")
@@ -1633,7 +1633,7 @@ const SITUACION = {
 function pintarCobro(c) {
   const [tono, texto] = SITUACION[c.situacion] || ["", ""];
   const tipica = c.demora_tipica == null ? "" : c.demora_base === "CLINICA"
-    ? `${escapar(tipoTitulo(c.clinica))} suele pagar a ${c.demora_tipica} días.` : `Tus pagos suelen llegar a ${c.demora_tipica} días.`;
+    ? `${escapar(tipoTitulo(c.clinica))} suele pagar a ${c.demora_tipica} días.` : `Los pagos suelen llegar a ${c.demora_tipica} días.`;
   $("#cobro-cirugia").innerHTML = `<div class="cobro">
     <div class="item-cab"><strong>Cobro</strong>${c.dias != null && c.situacion !== "CANCELADA"
       ? `<span class="chip ${tono === "err" ? "ATRASADA" : tono === "warn" ? "SIN_VALOR" : "PAGADA"}">${texto} · día ${c.dias}</span>` : ""}</div>
@@ -1647,7 +1647,7 @@ function pintarCobro(c) {
 
 $("#que-falto-enviar").onclick = async () => {
   const texto = $("#que-falto-texto").value.trim();
-  if (texto.length < 3) return aviso($("#que-falto-aviso"), "err", "Escribe qué te faltó.");
+  if (texto.length < 3) return aviso($("#que-falto-aviso"), "err", "Escribir qué faltó.");
   const boton = $("#que-falto-enviar"); boton.disabled = true;
   try {
     const documento = Number($("#que-falto").dataset.documento) || null;
@@ -1659,7 +1659,7 @@ $("#que-falto-enviar").onclick = async () => {
     $("#que-falto").open = false;
     toast("¡Gracias! Lo usaremos para mejorar la lectura");
   } catch {
-    aviso($("#que-falto-aviso"), "err", "Sin conexión. Intenta de nuevo.");
+    aviso($("#que-falto-aviso"), "err", "Sin conexión. Intentar de nuevo.");
   } finally {
     boton.disabled = false;
   }
@@ -1669,9 +1669,9 @@ $("#paso-revisar").onsubmit = async (ev) => {
   ev.preventDefault();
   const datos = leerFormulario();
   if (datos.aseguradora && !datos.aseguradora.nombre)
-    return aviso($("#error-guardar"), "err", "Escribe el nombre de la aseguradora o elige «Particular».");
+    return aviso($("#error-guardar"), "err", "Escribir el nombre de la aseguradora o elegir «Particular».");
   if (!datos.procedimientos.length)
-    return aviso($("#error-guardar"), "err", "Agrega al menos un procedimiento.");
+    return aviso($("#error-guardar"), "err", "Agregar al menos un procedimiento.");
   const [url, metodo] = modo.tipo === "documento" ? [`/api/documentos/${modo.id}/confirmar`, "POST"]
                       : modo.tipo === "editar" ? [`/api/cirugias/${modo.id}`, "PUT"]
                       : ["/api/cirugias", "POST"];
@@ -1687,7 +1687,7 @@ $("#paso-revisar").onsubmit = async (ev) => {
     cargarOpciones();
     cargarCirugias();
   } catch {
-    aviso($("#error-guardar"), "err", "Sin conexión. Intenta de nuevo.");
+    aviso($("#error-guardar"), "err", "Sin conexión. Intentar de nuevo.");
   } finally {
     boton.disabled = false;
   }
@@ -1753,8 +1753,8 @@ function escanearArchivo(archivo, numero) {
       esquinas.forEach((p) => { ctx.beginPath(); ctx.arc(p.x * escala, p.y * escala, 13, 0, 7); ctx.fillStyle = "#fff"; ctx.fill(); ctx.lineWidth = 3; ctx.stroke(); });
     };
     const verAjuste = () => {
-      $("#esc-titulo").textContent = "Ajusta los bordes"; $("#esc-modos").classList.add("oculto");
-      $("#esc-ayuda").textContent = "Arrastra los círculos hasta las esquinas de la hoja.";
+      $("#esc-titulo").textContent = "Ajustar los bordes"; $("#esc-modos").classList.add("oculto");
+      $("#esc-ayuda").textContent = "Arrastrar los círculos hasta las esquinas de la hoja.";
       botones.innerHTML = `<button type="button" id="esc-original">Usar la foto tal cual</button>
         <button type="button" class="primario" id="esc-escanear">Escanear ✓</button>
         <button type="button" class="ancho enlace" id="esc-descartar" style="border:0;background:none">Descartar esta foto</button>`;
@@ -1790,7 +1790,7 @@ function escanearArchivo(archivo, numero) {
       setTimeout(() => {          // deja pintar «Escaneando…» antes del cálculo
         verResultado(); trabajando.classList.add("oculto");
         $("#esc-titulo").textContent = "Así quedó"; $("#esc-modos").classList.remove("oculto");
-        $("#esc-ayuda").textContent = "Si se ve bien, úsala. Si recortó mal, vuelve a ajustar los bordes.";
+        $("#esc-ayuda").textContent = "Si se ve bien, usarla. Si recortó mal, volver a ajustar los bordes.";
         botones.innerHTML = `<button type="button" id="esc-ajustar">← Ajustar bordes</button>
           <button type="button" class="primario" id="esc-usar">Usar este escaneo</button>`;
         $("#esc-ajustar").onclick = verAjuste;
@@ -1826,7 +1826,7 @@ async function agregarABandeja(archivos) {
       if (!blob.size) { aviso(estado, "err", `El archivo «${archivo.name || "sin nombre"}» llegó vacío.`); continue; }
       bandeja.push({ nombre, tipo: blob.type, blob, url: URL.createObjectURL(blob) });
     } catch (e) {
-      aviso(estado, "err", `No se pudo abrir «${archivo.name || "el archivo"}» en este equipo (${e.name || e}). Prueba arrastrándolo.`);
+      aviso(estado, "err", `No se pudo abrir «${archivo.name || "el archivo"}» en este equipo (${e.name || e}). Probar arrastrándolo.`);
     }
   }
   pintarBandeja();
@@ -1844,7 +1844,7 @@ function pintarBandeja() {
   $("#bandeja").classList.toggle("oculto", !hay);
   if (!hay) return;
   $("#bandeja-texto").textContent = bandeja.length === 1
-    ? "1 foto o archivo de la orden. ¿Tiene más hojas? Agrégalas antes de leerla."
+    ? "1 foto o archivo de la orden. ¿Tiene más hojas? Agregarlas antes de leerla."
     : `${bandeja.length} fotos o archivos de la misma orden.`;
   $("#leer-orden").textContent = bandeja.length === 1 ? "Leer orden" : `Leer orden (${bandeja.length})`;
   $("#agregar-foto").disabled = bandeja.length >= MAX_PAGINAS;
@@ -1877,13 +1877,13 @@ async function leerOrden() {
       vaciarBandeja();
       return aviso(estado, "warn", mensajeError(cuerpo, "Esta orden ya se había subido."));
     }
-    if (!r.ok) return aviso(estado, "err", `No se pudo leer la orden (error ${r.status}): ${mensajeError(cuerpo, "intenta de nuevo.")}`);
+    if (!r.ok) return aviso(estado, "err", `No se pudo leer la orden (error ${r.status}): ${mensajeError(cuerpo, "intentar de nuevo.")}`);
     modo = { tipo: "documento", id: cuerpo.documento_id, paginas: cuerpo.paginas };
     vaciarBandeja();
     aviso(estado, "", "");
     llenarFormulario(cuerpo.datos);
   } catch (e) {
-    aviso(estado, "err", `No se pudo enviar (${e.name || "error"}: ${e.message || e}). Revisa la conexión e intenta de nuevo.`);
+    aviso(estado, "err", `No se pudo enviar (${e.name || "error"}: ${e.message || e}). Revisar la conexión e intentar de nuevo.`);
   } finally {
     $("#leer-orden").disabled = false;
   }
@@ -2070,14 +2070,14 @@ function pintarReparto(f) {
   const variables = Math.max(0, gastos - fijos), metas = Number(f.cuotas_metas || 0);
   const usado = fijos + variables + metas, total = Math.max(base, usado), libre = Math.max(0, base - usado);
   const partes = [["Gastos fijos", fijos, "var(--serie-1)"], ["Gastos variables", variables, "var(--serie-2)"],
-                  ["Metas de ahorro", metas, "var(--serie-3)"], ["Te queda libre", libre, "var(--libre)"]].filter(([, v]) => v > 0);
+                  ["Metas de ahorro", metas, "var(--serie-3)"], ["Queda libre", libre, "var(--libre)"]].filter(([, v]) => v > 0);
   const pct = (v) => `${Math.round(v / base * 100)} %`;
-  $("#fin-reparto").innerHTML = `<h3 style="margin:16px 0 0">¿A dónde va tu ingreso base?</h3>
+  $("#fin-reparto").innerHTML = `<h3 style="margin:16px 0 0">¿A dónde va el ingreso base?</h3>
     <div class="reparto" role="img" aria-label="${partes.map(([n, v]) => `${n} ${pct(v)}`).join(", ")}">
       ${partes.map(([n, v, c]) => `<span style="flex:${v / total} 1 0;background:${c}" title="${n}: ${pesos(v)}"></span>`).join("")}</div>
     <div class="reparto-leyenda">${partes.map(([n, v, c]) => `<span class="leyenda" style="margin:0"><span><i style="background:${c}"></i>${n}</span></span>
       <span class="v">${pesos(v)}</span><span class="p">${pct(v)}</span>`).join("")}</div>
-    ${usado > base ? `<div class="consejo MUY_ALTO" style="margin-top:8px">✕ Gastos y metas suman ${pesos(usado)}: ${pesos(usado - base)} más que tu ingreso base.</div>` : ""}`;
+    ${usado > base ? `<div class="consejo MUY_ALTO" style="margin-top:8px">✕ Gastos y metas suman ${pesos(usado)}: ${pesos(usado - base)} más que el ingreso base.</div>` : ""}`;
 }
 
 let finMes = null;  // primer día del mes elegido (AAAA-MM-01)
@@ -2105,7 +2105,7 @@ async function cargarFinanzas() {
   const estadoTexto = (e) => e ? `<span class="estado-fin ${e}">${ETIQUETA_ESTADO[e]}</span>` : "";
   $("#fin-kpis").innerHTML = `
     <div class="kpi destacado"><div class="etiqueta">Ingreso base mensual</div><div class="cifra">${pesos(f.ingreso_base)}</div>
-      <div class="sub">${f.meses_base ? `Promedio de tus ${f.meses_base} meses más bajos de AP` : "Aún sin meses cargados"}${
+      <div class="sub">${f.meses_base ? `Promedio de los ${f.meses_base} meses más bajos de AP` : "Aún sin meses cargados"}${
         Number(f.otros_ingresos) ? ` + ${pesos(f.otros_ingresos)} de otros ingresos` : ""} · promedio de AP: ${pesos(f.promedio_ap)}</div></div>
     <div class="kpi"><div class="etiqueta">Gastos del mes</div><div class="cifra">${pesos(f.gastos)}</div>
       <div class="sub">${f.porcentaje_gastos != null ? `${pct(f.porcentaje_gastos)} de la base ` : ""}${estadoTexto(f.estado_gastos)}</div></div>
@@ -2127,8 +2127,8 @@ async function cargarFinanzas() {
       <tr><th>Mes</th><th class="v">Neto + probienestar</th><th class="v">Total</th></tr>
       ${f.meses.map((m) => `<tr><td class="mes">${nombreMes(m.periodo)}<br><small class="sub">${m.fuente === "VOLANTE" ? "volante" : "calculado"}</small></td>
         <td class="v">${pesos(m.neto)}<br><small class="sub">+ ${pesos(m.probienestar)}</small></td><td class="v"><strong>${pesos(m.total)}</strong></td></tr>`).join("")}
-    </table></div><p class="sub">«Calculado»: el mes tiene reporte de pagos pero no volante; sube el volante para usar el valor real.</p>`
-    : `<p class="sub">Sube tus reportes de pago en la pestaña Pagos, o tus volantes aquí, para conocer tu ingreso.</p>`;
+    </table></div><p class="sub">«Calculado»: el mes tiene reporte de pagos pero no volante; al subir el volante se usa el valor real.</p>`
+    : `<p class="sub">Subir los reportes de pago en la pestaña Pagos, o los volantes aquí, para conocer el ingreso.</p>`;
 
   // ingresos adicionales y gastos
   const partida = (p, conMedidor) => `<div class="fin-item" data-partida="${p.partida_id}">
@@ -2136,7 +2136,7 @@ async function cargarFinanzas() {
       <div class="acciones"><button type="button" data-accion="valor">Cambiar valor</button>
         <button type="button" data-accion="quitar">Quitar</button></div></div>`;
   const ingresos = f.partidas.filter((p) => p.clase === "INGRESO");
-  $("#fin-ingresos").innerHTML = ingresos.length ? ingresos.map((p) => partida(p)).join("") : `<p class="sub">No has agregado ingresos adicionales.</p>`;
+  $("#fin-ingresos").innerHTML = ingresos.length ? ingresos.map((p) => partida(p)).join("") : `<p class="sub">Aún no hay ingresos adicionales.</p>`;
   const gastos = f.partidas.filter((p) => p.clase === "GASTO");
   $("#fin-gastos").innerHTML = f.por_categoria.length ? f.por_categoria.map((cat) => `
     <div style="margin:14px 0 4px">
@@ -2144,7 +2144,7 @@ async function cargarFinanzas() {
       <div class="medidor ${cat.estado}" role="img" aria-label="${pct(cat.porcentaje)} del ingreso base"><span style="width:${Math.min(100, Number(cat.porcentaje) / (cat.referencia * 1.5) * 100)}%"></span></div>
       <div class="sub">${pesos(cat.valor)} · ${pct(cat.porcentaje)} del ingreso base · sano hasta ${cat.referencia} %</div>
       ${gastos.filter((g) => g.categoria === cat.categoria).map((g) => partida(g)).join("")}
-    </div>`).join("") : `<p class="sub">Agrega tus gastos de cada mes: vivienda, colegios, mercado, créditos…</p>`;
+    </div>`).join("") : `<p class="sub">Agregar los gastos de cada mes: vivienda, colegios, mercado, créditos…</p>`;
   document.querySelectorAll("[data-partida] button").forEach((b) => b.onclick = () => accionPartida(b));
 
   // metas
@@ -2152,15 +2152,15 @@ async function cargarFinanzas() {
       <div class="item-cab"><strong>${escapar(m.nombre)}</strong><span>${pesos(m.valor_objetivo)}</span></div>
       <div class="medidor" role="img" aria-label="${pct(m.avance)} ahorrado"><span style="width:${Math.min(100, Number(m.avance))}%"></span></div>
       <div class="sub">Ahorrado ${pesos(m.ahorrado)} (${pct(m.avance)}) · faltan ${pesos(m.falta)}${m.fecha_objetivo
-        ? ` · aparta <strong>${pesos(m.cuota_mensual)} al mes</strong> por ${m.meses_restantes} mes${m.meses_restantes === 1 ? "" : "es"} (hasta ${nombreMes(m.fecha_objetivo)})`
-        : " · ponle una fecha para calcular cuánto apartar al mes"}</div>
+        ? ` · apartar <strong>${pesos(m.cuota_mensual)} al mes</strong> por ${m.meses_restantes} mes${m.meses_restantes === 1 ? "" : "es"} (hasta ${nombreMes(m.fecha_objetivo)})`
+        : " · con una fecha se calcula cuánto apartar al mes"}</div>
       <div class="compromiso"></div>
       <div class="acciones">${m.compromiso_mensual
           ? `<button type="button" data-accion="aporte" class="primario">💰 Registrar ahorro</button><button type="button" data-accion="compromiso">Cambiar compromiso</button>`
           : `<button type="button" data-accion="compromiso" class="primario">🤝 Comprometerme</button>`}
         <button type="button" data-accion="ahorro">Corregir lo ahorrado</button>
         <button type="button" data-accion="quitar">Quitar</button></div></div>`).join("")
-    : `<p class="sub">Empieza por el fondo de emergencias (6 meses de gastos${Number(f.fondo_sugerido) ? `: ${pesos(f.fondo_sugerido)}` : ""}); luego viajes, carro, casa…</p>`;
+    : `<p class="sub">Conviene empezar por el fondo de emergencias (6 meses de gastos${Number(f.fondo_sugerido) ? `: ${pesos(f.fondo_sugerido)}` : ""}); luego viajes, carro, casa…</p>`;
   document.querySelectorAll("[data-meta] button").forEach((b) => b.onclick = () => accionMeta(b));
   pintarFase2(f);
   pintarMes(f);
@@ -2182,7 +2182,7 @@ function pintarMes(f) {
     <div class="kpis" style="margin-top:14px">
       <div class="kpi"><div class="etiqueta">Presupuesto del mes</div><div class="cifra">${pesos(m.presupuesto)}</div></div>
       <div class="kpi"><div class="etiqueta">Gastado</div><div class="cifra">${pesos(m.real)}</div>
-        <div class="sub">${Number(m.presupuesto) ? (Number(m.disponible) >= 0 ? `te quedan ${pesos(m.disponible)}` : `te pasaste ${pesos(-m.disponible)}`) : ""}</div></div>
+        <div class="sub">${Number(m.presupuesto) ? (Number(m.disponible) >= 0 ? `quedan ${pesos(m.disponible)}` : `excedido en ${pesos(-m.disponible)}`) : ""}</div></div>
       <div class="kpi"><div class="etiqueta">Ahorrado para metas</div><div class="cifra">${pesos(m.aportes)}</div></div>
     </div>
     <div id="fin-grafica-mes"></div>
@@ -2195,11 +2195,11 @@ function pintarMes(f) {
         <span>${escapar(x.fecha.slice(8, 10))}/${escapar(x.fecha.slice(5, 7))} · ${x.clase === "APORTE" ? `💰 ${escapar(x.meta || "Meta")}` : escapar((f.catalogos.gastos.find((g) => g.clave === x.categoria) || {}).nombre?.split(" (")[0] || x.categoria)}${x.descripcion ? ` · ${escapar(x.descripcion)}` : ""}${x.cuenta ? ` <small class="sub">(${escapar(x.cuenta)})</small>` : ""}</span>
         <strong>${pesos(x.valor)}</strong></div>
         <div class="acciones"><button type="button">Quitar</button></div></div>`).join("")}`
-      : `<p class="sub" style="margin-top:10px">Aún no has anotado nada en ${nombreMes(m.periodo)}.</p>`}`;
+      : `<p class="sub" style="margin-top:10px">Aún no hay nada anotado en ${nombreMes(m.periodo)}.</p>`}`;
   const anotado = m.historial.some((h) => Number(h.gastos) || Number(h.aportes));
   if (anotado) graficaColumnas($("#fin-grafica-mes"), { titulo: "Gastos de los últimos 6 meses",
     puntos: m.historial.map((h) => ({ periodo: h.periodo, valores: [h.gastos],
-      detalle: Number(h.aportes) ? `Ahorraste ${pesos(h.aportes)} para metas` : "" })),
+      detalle: Number(h.aportes) ? `${pesos(h.aportes)} ahorrados para metas` : "" })),
     series: [{ nombre: "Gastos", color: "var(--serie-1)" }],
     referencia: Number(m.presupuesto) ? { valor: m.presupuesto, nombre: "Presupuesto de gastos" } : null });
   document.querySelectorAll("[data-mov] button").forEach((b) => b.onclick = async () => {
@@ -2211,7 +2211,7 @@ function llenarDestinoMov() {
   $("#fin-mov-destino-label").textContent = aporte ? "Meta" : "Categoría";
   const actual = $("#fin-mov-destino").value;
   $("#fin-mov-destino").innerHTML = aporte
-    ? (f.metas.length ? f.metas.map((m) => `<option value="${m.meta_id}">${escapar(m.nombre)}</option>`).join("") : `<option value="">Primero crea una meta</option>`)
+    ? (f.metas.length ? f.metas.map((m) => `<option value="${m.meta_id}">${escapar(m.nombre)}</option>`).join("") : `<option value="">Primero, crear una meta</option>`)
     : f.catalogos.gastos.map((g) => `<option value="${g.clave}">${escapar(g.nombre.split(" (")[0])}</option>`).join("");
   if ([...$("#fin-mov-destino").options].some((o) => o.value === actual)) $("#fin-mov-destino").value = actual;
 }
@@ -2221,8 +2221,8 @@ $("#fin-mes-sig").onclick = () => moverMes(1);
 $("#fin-form-mov").onsubmit = async (e) => {
   e.preventDefault();
   const aporte = $("#fin-mov-clase").value === "APORTE";
-  if (!valorPesos("#fin-mov-valor")) return aviso($("#fin-estado-mov"), "err", "Escribe el valor.");
-  if (!$("#fin-mov-destino").value) return aviso($("#fin-estado-mov"), "err", "Primero crea una meta abajo.");
+  if (!valorPesos("#fin-mov-valor")) return aviso($("#fin-estado-mov"), "err", "Escribir el valor.");
+  if (!$("#fin-mov-destino").value) return aviso($("#fin-estado-mov"), "err", "Primero, crear una meta abajo.");
   const ok = await enviar("/api/finanzas/movimientos", "POST", { clase: aporte ? "APORTE" : "GASTO",
     categoria: aporte ? null : $("#fin-mov-destino").value, meta_id: aporte ? Number($("#fin-mov-destino").value) : null,
     descripcion: $("#fin-mov-desc").value.trim() || null, valor: valorPesos("#fin-mov-valor"),
@@ -2233,56 +2233,56 @@ $("#fin-form-mov").onsubmit = async (e) => {
 function pintarFase2(f) {
   // lo que viene
   const pc = f.por_cobrar;
-  $("#fin-por-cobrar").innerHTML = !pc ? `<p class="sub">Cuando subas reportes de pago, la app aprende cuánto y en cuánto tiempo paga AP, y estima lo que viene.</p>`
-    : !pc.meses.length ? `<p class="sub">No tienes cirugías pendientes de pago para proyectar.</p>`
-    : `<div class="kpi" style="margin-bottom:10px"><div class="etiqueta">Te llegaría en los próximos meses</div>
+  $("#fin-por-cobrar").innerHTML = !pc ? `<p class="sub">Al subir reportes de pago, la app aprende cuánto y en cuánto tiempo paga AP, y estima lo que viene.</p>`
+    : !pc.meses.length ? `<p class="sub">No hay cirugías pendientes de pago para proyectar.</p>`
+    : `<div class="kpi" style="margin-bottom:10px"><div class="etiqueta">Por recibir en los próximos meses</div>
          <div class="cifra">${pesos(pc.total_te_llega)}</div><div class="sub">por ${pc.cirugias} cirugía${pc.cirugias === 1 ? "" : "s"} pendiente${pc.cirugias === 1 ? "" : "s"}</div></div>
        <div id="fin-grafica-viene"></div>
-       <table class="liq"><tr><th>Mes</th><th class="v">Cirugías</th><th class="v">Recaudo</th><th class="v">Te llega</th></tr>
+       <table class="liq"><tr><th>Mes</th><th class="v">Cirugías</th><th class="v">Recaudo</th><th class="v">Por recibir</th></tr>
        ${pc.meses.map((m) => `<tr><td>${nombreMes(m.periodo)}</td><td class="v">${m.cirugias}</td><td class="v">${pesos(m.recaudo)}</td>
          <td class="v"><strong>${pesos(m.te_llega)}</strong></td></tr>`).join("")}</table>
-       <p class="sub">Estimado con lo que AP te ha pagado: unos ${pesos(pc.valor_promedio)} por paciente y ${pc.rezago_dias} días
+       <p class="sub">Estimado con lo que AP ha pagado: unos ${pesos(pc.valor_promedio)} por paciente y ${pc.rezago_dias} días
          desde la cirugía hasta el pago. No incluye pagos globales (como honorarios de una IPS) ni lo que pueda glosarse.
-         ${pc.atrasadas ? `<br>⚠ ${pc.atrasadas} cirugía${pc.atrasadas === 1 ? "" : "s"} de hace más de 9 meses sigue${pc.atrasadas === 1 ? "" : "n"} sin pago: revísala${pc.atrasadas === 1 ? "" : "s"} en Cirugías → pendientes.` : ""}</p>`;
-  if (pc && pc.meses.length) graficaColumnas($("#fin-grafica-viene"), { titulo: "Lo que te llegaría por mes",
+         ${pc.atrasadas ? `<br>⚠ ${pc.atrasadas} cirugía${pc.atrasadas === 1 ? "" : "s"} de hace más de 9 meses sigue${pc.atrasadas === 1 ? "" : "n"} sin pago: revisarla${pc.atrasadas === 1 ? "" : "s"} en Cirugías → pendientes.` : ""}</p>`;
+  if (pc && pc.meses.length) graficaColumnas($("#fin-grafica-viene"), { titulo: "Lo que llegaría por mes",
     puntos: pc.meses.map((m) => ({ periodo: m.periodo, valores: [m.te_llega],
       detalle: `${m.cirugias} cirugía${m.cirugias === 1 ? "" : "s"} · recaudo ${pesos(m.recaudo)}` })),
-    series: [{ nombre: "Te llega", color: "var(--serie-1)" }] });
+    series: [{ nombre: "Por recibir", color: "var(--serie-1)" }] });
   // ahorros en AP
   const a = f.ahorros_ap;
-  $("#fin-ahorros-ap").innerHTML = !a ? `<p class="sub">Sube un volante reciente: trae al final los «acumulados de aportes» (semestral, anual y vacaciones).</p>`
+  $("#fin-ahorros-ap").innerHTML = !a ? `<p class="sub">Subir un volante reciente: trae al final los «acumulados de aportes» (semestral, anual y vacaciones).</p>`
     : `<table class="liq">
         <tr><td>Compensación semestral</td><td class="v">${pesos(a.semestral)}</td></tr>
         <tr><td>Compensación anual</td><td class="v">${pesos(a.anual)}</td></tr>
         <tr><td>Vacaciones</td><td class="v">${pesos(a.vacaciones)}</td></tr>
         <tr class="sub-total"><td>Total ahorrado en AP</td><td class="v">${pesos(a.total)}</td></tr>
         <tr><td class="sub">Aporte sindical acumulado (cuotas)</td><td class="v sub">${pesos(a.aporte_sindical)}</td></tr></table>
-      <p class="sub">Según tu volante de ${nombreMes(a.periodo)}. AP paga la semestral con los cortes de junio y diciembre: la próxima llega en ${a.proximo_semestral}.
-        Es plata que llega en bloque: decide desde ya a qué meta va, empezando por el fondo de emergencias.</p>`;
+      <p class="sub">Según el volante de ${nombreMes(a.periodo)}. AP paga la semestral con los cortes de junio y diciembre: la próxima llega en ${a.proximo_semestral}.
+        Es plata que llega en bloque: conviene decidir desde ya a qué meta va, empezando por el fondo de emergencias.</p>`;
   // créditos
   const cr = f.creditos.creditos;
-  $("#fin-creditos").innerHTML = !cr.length ? "" : `<h3 style="margin-top:16px">Tus créditos</h3>${cr.map((c) => `
+  $("#fin-creditos").innerHTML = !cr.length ? "" : `<h3 style="margin-top:16px">Mis créditos</h3>${cr.map((c) => `
     <div class="fin-item"><div class="item-cab"><strong>${escapar(c.nombre)}</strong><span>${pesos(c.cuota)} al mes</span></div>
-      <div class="sub">${c.saldo == null || c.tasa_ea == null ? `Agrega el saldo y la tasa (con «Cambiar valor») para saber cuándo terminas de pagarlo.`
+      <div class="sub">${c.saldo == null || c.tasa_ea == null ? `Agregar el saldo y la tasa (con «Cambiar valor») para saber cuándo termina de pagarse.`
         : !c.cubre_intereses ? `<span class="estado-fin MUY_ALTO">✕ La cuota no cubre los intereses</span> Saldo ${pesos(c.saldo)} al ${String(Number(c.tasa_ea)).replace(".", ",")} % EA.`
-        : `Saldo ${pesos(c.saldo)} al ${String(Number(c.tasa_ea)).replace(".", ",")} % EA · terminas en ${c.meses} meses (${nombreMes(c.fecha_fin)}) · pagarías ${pesos(c.intereses)} de intereses.`}</div></div>`).join("")}
+        : `Saldo ${pesos(c.saldo)} al ${String(Number(c.tasa_ea)).replace(".", ",")} % EA · termina en ${c.meses} meses (${nombreMes(c.fecha_fin)}) · se pagarían ${pesos(c.intereses)} de intereses.`}</div></div>`).join("")}
     ${Number(f.creditos.saldo_total) ? `<p class="sub">Deuda total: <strong>${pesos(f.creditos.saldo_total)}</strong></p>` : ""}`;
   // metas: compromiso y proyección
   f.metas.forEach((m) => {
     const caja = document.querySelector(`[data-meta="${m.meta_id}"] .compromiso`);
     if (caja && Number(m.falta)) caja.innerHTML = !m.compromiso_mensual
-      ? `<div class="consejo INFO">Para llegar ${m.fecha_objetivo ? `a ${nombreMes(m.fecha_objetivo)}` : "a tu meta"} necesitas ahorrar
-          <strong>${pesos(m.cuota_mensual || 0)} al mes</strong>${m.fecha_objetivo ? "" : " (ponle una fecha para calcularlo)"}. ¿Te comprometes?</div>`
-      : `<div class="consejo ${m.cumple_mes ? "SANO" : "INFO"}">🤝 Tu compromiso: <strong>${pesos(m.compromiso_mensual)} al mes</strong>.
-          En ${nombreMes(f.mes.periodo)} llevas ${pesos(m.aportado_mes)} ${m.cumple_mes ? "✓ cumplido" : `(faltan ${pesos(Math.max(0, m.compromiso_mensual - m.aportado_mes))})`}.
+      ? `<div class="consejo INFO">Para llegar ${m.fecha_objetivo ? `a ${nombreMes(m.fecha_objetivo)}` : "a la meta"} hay que ahorrar
+          <strong>${pesos(m.cuota_mensual || 0)} al mes</strong>${m.fecha_objetivo ? "" : " (con una fecha se calcula)"}. ¿Fijar un compromiso?</div>`
+      : `<div class="consejo ${m.cumple_mes ? "SANO" : "INFO"}">🤝 Compromiso: <strong>${pesos(m.compromiso_mensual)} al mes</strong>.
+          En ${nombreMes(f.mes.periodo)} van ${pesos(m.aportado_mes)} ${m.cumple_mes ? "✓ cumplido" : `(faltan ${pesos(Math.max(0, m.compromiso_mensual - m.aportado_mes))})`}.
           ${m.racha ? `<br>🔥 ${m.racha} mes${m.racha === 1 ? "" : "es"} seguido${m.racha === 1 ? "" : "s"} cumpliendo.` : ""}
-          ${m.fecha_con_compromiso ? `<br>A este ritmo la cumples en <strong>${nombreMes(m.fecha_con_compromiso)}</strong>.` : ""}
+          ${m.fecha_con_compromiso ? `<br>A este ritmo se cumple en <strong>${nombreMes(m.fecha_con_compromiso)}</strong>.` : ""}
           ${m.historial.length > 1 ? `<br><span class="sub">${m.historial.map((h) => `${MESES_ES[Number(h.periodo.slice(5, 7)) - 1]} ${h.estado === "CUMPLIDO" ? "✓" : h.estado === "EN_CURSO" ? "⏳" : "✗"}`).join(" · ")}</span>` : ""}</div>`;
     const cont = document.querySelector(`[data-meta="${m.meta_id}"] .sub`);
     if (!cont || (m.compromiso_mensual && Number(m.falta))) return;  // con compromiso manda su propia proyección
     const linea = !m.falta || Number(m.falta) === 0 ? "✓ ¡Meta cumplida!"
-      : !m.fecha_estimada ? "Con tu capacidad de ahorro actual no se alcanza: revisa tus gastos."
-      : `Con tu capacidad de ahorro actual la cumples en <strong>${nombreMes(m.fecha_estimada)}</strong>${m.fecha_objetivo ? (m.a_tiempo ? " ✓ a tiempo" : " ⚠ después de tu fecha") : ""}.`;
+      : !m.fecha_estimada ? "Con la capacidad de ahorro actual no se alcanza: conviene revisar los gastos."
+      : `Con la capacidad de ahorro actual se cumple en <strong>${nombreMes(m.fecha_estimada)}</strong>${m.fecha_objetivo ? (m.a_tiempo ? " ✓ a tiempo" : " ⚠ después de la fecha") : ""}.`;
     cont.insertAdjacentHTML("beforeend", `<br>${linea}`);
   });
 }
@@ -2294,7 +2294,7 @@ async function enviar(url, metodo, datos, avisoEn) {
   const r = await fetch(url, { method: metodo, headers: { "Content-Type": "application/json" }, body: datos ? JSON.stringify(datos) : undefined });
   if (!r.ok) {
     const cuerpo = await r.json().catch(() => null);
-    if (avisoEn) aviso($(avisoEn), "err", mensajeError(cuerpo, "No se pudo guardar. Revisa los datos."));
+    if (avisoEn) aviso($(avisoEn), "err", mensajeError(cuerpo, "No se pudo guardar. Revisar los datos."));
     return false;
   }
   if (avisoEn) aviso($(avisoEn), "", "");
@@ -2303,7 +2303,7 @@ async function enviar(url, metodo, datos, avisoEn) {
 }
 $("#fin-form-gasto").onsubmit = async (e) => {
   e.preventDefault();
-  if (!valorPesos("#fin-gas-valor")) return aviso($("#fin-estado-gasto"), "err", "Escribe el valor mensual.");
+  if (!valorPesos("#fin-gas-valor")) return aviso($("#fin-estado-gasto"), "err", "Escribir el valor mensual.");
   const ok = await enviar("/api/finanzas/partidas", "POST", { clase: "GASTO", categoria: $("#fin-gas-cat").value,
     nombre: $("#fin-gas-nombre").value.trim() || $("#fin-gas-cat").selectedOptions[0].text.split(" (")[0],
     valor_mensual: valorPesos("#fin-gas-valor"),
@@ -2326,7 +2326,7 @@ $("#fin-meta-tipo").onchange = () => {
 };
 $("#fin-form-meta").onsubmit = async (e) => {
   e.preventDefault();
-  if (!valorPesos("#fin-meta-valor")) return aviso($("#fin-estado-meta"), "err", "Escribe el valor de la meta.");
+  if (!valorPesos("#fin-meta-valor")) return aviso($("#fin-estado-meta"), "err", "Escribir el valor de la meta.");
   const ok = await enviar("/api/finanzas/metas", "POST", { tipo: $("#fin-meta-tipo").value,
     nombre: $("#fin-meta-nombre").value.trim() || $("#fin-meta-tipo").selectedOptions[0].text,
     valor_objetivo: valorPesos("#fin-meta-valor"), ahorrado: valorPesos("#fin-meta-ahorrado") || "0",
@@ -2344,7 +2344,7 @@ async function accionPartida(boton) {
   if (!nuevo || !nuevo.replace(/\D/g, "")) return;
   let saldo = p.saldo, tasa = p.tasa_ea;
   if (p.categoria === "DEUDAS") {
-    const s = prompt(`¿Cuánto debes todavía en «${p.nombre}»?`, p.saldo != null ? formatoMiles(p.saldo) : "");
+    const s = prompt(`¿Cuánto se debe todavía en «${p.nombre}»?`, p.saldo != null ? formatoMiles(p.saldo) : "");
     if (s !== null) saldo = s.replace(/\D/g, "") || null;
     const t = prompt(`Tasa efectiva anual de «${p.nombre}» (%)`, p.tasa_ea != null ? String(p.tasa_ea).replace(".", ",") : "");
     if (t !== null) tasa = t.trim() || null;
@@ -2357,16 +2357,16 @@ async function accionMeta(boton) {
   const m = finanzasDatos.metas.find((x) => String(x.meta_id) === id);
   if (boton.dataset.accion === "compromiso") {
     const sugerido = m.compromiso_mensual || m.cuota_mensual;
-    const v = prompt(`¿Cuánto te comprometes a ahorrar cada mes para «${m.nombre}»?` +
-      (Number(m.cuota_mensual) ? `\nPara llegar a tiempo necesitas ${formatoMiles(m.cuota_mensual)}.` : "") +
-      "\n(Deja vacío para quitar el compromiso)", Number(sugerido) ? formatoMiles(sugerido) : "");
+    const v = prompt(`Compromiso de ahorro mensual para «${m.nombre}»:` +
+      (Number(m.cuota_mensual) ? `\nPara llegar a tiempo se necesitan ${formatoMiles(m.cuota_mensual)}.` : "") +
+      "\n(Dejar vacío para quitar el compromiso)", Number(sugerido) ? formatoMiles(sugerido) : "");
     if (v === null) return;
     await enviar(`/api/finanzas/metas/${id}/compromiso`, "PUT", { compromiso_mensual: v.replace(/\D/g, "") || null });
     return;
   }
   if (boton.dataset.accion === "aporte") {
     const pendiente = Math.max(0, Number(m.compromiso_mensual) - Number(m.aportado_mes));
-    const v = prompt(`¿Cuánto ahorraste para «${m.nombre}»?`, formatoMiles(pendiente || m.compromiso_mensual));
+    const v = prompt(`¿Cuánto se ahorró para «${m.nombre}»?`, formatoMiles(pendiente || m.compromiso_mensual));
     if (v && v.replace(/\D/g, "")) await enviar("/api/finanzas/movimientos", "POST",
       { clase: "APORTE", meta_id: m.meta_id, valor: v.replace(/\D/g, ""), fecha: finMes === isoMes(new Date()) ? iso(new Date()) : finMes });
     return;
@@ -2375,7 +2375,7 @@ async function accionMeta(boton) {
     if (confirm(`¿Quitar la meta «${m.nombre}»?`)) await enviar(`/api/finanzas/metas/${id}`, "DELETE");
     return;
   }
-  const nuevo = prompt(`¿Cuánto llevas ahorrado para «${m.nombre}»?`, formatoMiles(m.ahorrado));
+  const nuevo = prompt(`¿Cuánto hay ahorrado para «${m.nombre}»?`, formatoMiles(m.ahorrado));
   if (nuevo !== null && nuevo.replace(/\D/g, "") !== "") await enviar(`/api/finanzas/metas/${id}`, "PUT",
     { tipo: m.tipo, nombre: m.nombre, valor_objetivo: m.valor_objetivo, ahorrado: nuevo.replace(/\D/g, ""), fecha_objetivo: m.fecha_objetivo });
 }
@@ -2405,14 +2405,14 @@ function pintarCuentas(f) {
       <div class="item-cab"><span>${escapar(nombreCuenta(c))}</span>
         <span class="sub">${c.ultimo_movimiento ? `hasta ${escapar(c.ultimo_movimiento.split("-").reverse().join("/"))}` : "sin gastos aún"}</span></div>
       <div class="acciones"><button type="button">Quitar</button></div></div>`).join("")
-    : `<p class="sub">Agrega tus tarjetas, cuentas y créditos, o súbelos directo: la app los reconoce del extracto.</p>`;
+    : `<p class="sub">Agregar las tarjetas, cuentas y créditos, o subir directamente el extracto: la app los reconoce.</p>`;
   document.querySelectorAll("[data-cuenta] button").forEach((b) => b.onclick = async () => {
     if (confirm("¿Quitar esta cuenta? Los gastos ya anotados se conservan.")) await enviar(`/api/finanzas/cuentas/${b.closest("[data-cuenta]").dataset.cuenta}`, "DELETE");
   });
 }
 $("#ext-form-cuenta").onsubmit = async (e) => {
   e.preventDefault();
-  if (!$("#ext-cta-banco").value.trim()) return aviso($("#ext-estado-cuenta"), "err", "Escribe el banco.");
+  if (!$("#ext-cta-banco").value.trim()) return aviso($("#ext-estado-cuenta"), "err", "Escribir el banco.");
   const ok = await enviar("/api/finanzas/cuentas", "POST", { banco: $("#ext-cta-banco").value.trim(), tipo: $("#ext-cta-tipo").value,
     ultimos_digitos: $("#ext-cta-digitos").value.trim() || null }, "#ext-estado-cuenta");
   if (ok) { $("#ext-cta-banco").value = ""; $("#ext-cta-digitos").value = ""; }
@@ -2447,7 +2447,7 @@ async function seguirExtracto(id) {
       : `Leyendo hojas ${leidas * 10 + 1} a ${Math.min((leidas + 1) * 10, hojas)} de ${hojas}…`;
     estado.innerHTML = `<div class="cargando">${texto}</div>
       <div class="barra-avance"><span style="width:${Math.round(100 * leidas / imp.partes_total)}%"></span></div>
-      <p class="sub">Puedes seguir usando la app; esto puede tardar uno o dos minutos por cada 10 hojas.</p>`;
+      <p class="sub">Se puede seguir usando la app; esto puede tardar uno o dos minutos por cada 10 hojas.</p>`;
     extTemporizador = setTimeout(() => seguirExtracto(id), 2500);
     return;
   }
@@ -2473,15 +2473,15 @@ function pintarRevision() {
           <strong>${pesos(it.valor)}</strong></div>
         ${it.motivo || it.sin_fecha ? `<div class="ext-motivo">${escapar(it.motivo || "")}${it.sin_fecha ? " · sin fecha: se usó la del corte" : ""}</div>` : ""}
         <select aria-label="Categoría">${cats.map(([c, n]) => `<option value="${c}"${c === (it.categoria || "OTROS") ? " selected" : ""}>${escapar(n)}</option>`).join("")}</select>
-        ${it.regla ? `<div class="ext-motivo">Categoría que aprendió de ti</div>` : ""}
+        ${it.regla ? `<div class="ext-motivo">Categoría aprendida de correcciones anteriores</div>` : ""}
       </div></div>`;
   const marcados = res.items.filter((i) => i.incluir).length;
   $("#ext-revision").innerHTML = `
-    <h3 style="margin-top:16px">Revisa antes de anotar</h3>
+    <h3 style="margin-top:16px">Revisar antes de anotar</h3>
     <p class="sub">${escapar(imp.nombre_archivo || "")}${enc.periodo_desde && enc.periodo_hasta ? ` · periodo ${escapar(enc.periodo_desde.split("-").reverse().join("/"))} a ${escapar(enc.periodo_hasta.split("-").reverse().join("/"))}` : ""}
       · ${res.items.length} movimiento${res.items.length === 1 ? "" : "s"} leído${res.items.length === 1 ? "" : "s"}, ${marcados} parece${marcados === 1 ? "" : "n"} gasto${marcados === 1 ? "" : "s"}.
-      Los pagos a la tarjeta, abonos, lo ya importado y lo dudoso quedan sin marcar: márcalos si sí son gastos.
-      Si cambias una categoría, la app la recuerda para ese comercio.</p>
+      Los pagos a la tarjeta, abonos, lo ya importado y lo dudoso quedan sin marcar: marcarlos si sí son gastos.
+      Si se cambia una categoría, la app la recuerda para ese comercio.</p>
     <div class="fila"><div><label for="ext-cuenta">¿De qué cuenta es?</label><select id="ext-cuenta">${opcionesCuenta}</select></div></div>
     <div id="ext-totales" style="margin:10px 0"></div>
     <div class="atajos"><button type="button" id="ext-todos">Marcar todo</button><button type="button" id="ext-ninguno">Desmarcar todo</button></div>
@@ -2527,7 +2527,7 @@ function pintarRevision() {
     if (!r.ok) { $("#ext-anotar").disabled = false; return aviso($("#ext-estado-anotar"), "err", mensajeError(cuerpo, "No se pudo anotar.")); }
     guardarExt(null); extActual = null; $("#ext-revision").innerHTML = "";
     aviso($("#ext-estado"), "ok", `Listo: ${cuerpo.anotados} gasto${cuerpo.anotados === 1 ? "" : "s"} anotado${cuerpo.anotados === 1 ? "" : "s"} por ${pesos(cuerpo.total)}${
-      cuerpo.repetidos ? ` (${cuerpo.repetidos} ya estaban y no se repitieron)` : ""}. Míralos en «Este mes».`);
+      cuerpo.repetidos ? ` (${cuerpo.repetidos} ya estaban y no se repitieron)` : ""}. Se ven en «Este mes».`);
     await cargarFinanzas();
   };
   actualizar();
@@ -2566,9 +2566,9 @@ async function cargarNoticias() {
   $("#not-leer-todo").classList.toggle("oculto", notVer !== "nuevas" || !d.noticias.length);
   $("#not-estado").textContent = d.revisando ? "Buscando novedades en las fuentes…"
     : d.revisadas_en ? `Fuentes revisadas: ${new Date(d.revisadas_en).toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short" })}` : "";
-  const vacio = !d.hay_fuentes ? "Aún no hay fuentes de noticias activas." + (esAdmin ? " Agrégalas abajo, en «Fuentes de noticias»." : " El administrador las está configurando.")
-    : notVer === "nuevas" ? (d.revisando ? "Buscando novedades…" : "✓ Estás al día: no hay noticias nuevas" + (d.mis_temas ? " en tus temas." : "."))
-    : notVer === "favoritas" ? "No has guardado noticias. Toca ☆ Guardar en una noticia para tenerla aquí." : "Aún no has leído noticias.";
+  const vacio = !d.hay_fuentes ? "Aún no hay fuentes de noticias activas." + (esAdmin ? " Se agregan abajo, en «Fuentes de noticias»." : " El administrador las está configurando.")
+    : notVer === "nuevas" ? (d.revisando ? "Buscando novedades…" : "✓ Al día: no hay noticias nuevas" + (d.mis_temas ? " en los temas elegidos." : "."))
+    : notVer === "favoritas" ? "Aún no hay noticias guardadas. Con ☆ Guardar en una noticia, queda aquí." : "Aún no hay noticias leídas.";
   $("#not-lista").innerHTML = d.noticias.length ? d.noticias.map((n) => `<article class="noticia" data-noticia="${n.noticia_id}">
       <div class="sub">${escapar(n.fuente)} · ${fechaCorta(n.publicado_en || n.listo_en)}${TIPO_NOTICIA[n.tipo] ? ` · <span class="chip">${TIPO_NOTICIA[n.tipo]}</span>` : ""}</div>
       <h3><button type="button" class="enlace" data-accion="ficha" style="text-align:left;color:inherit;text-decoration:none;font:inherit;min-height:0;padding:0;border:0;background:none">${escapar(n.titulo_es || n.titulo)}</button></h3>
@@ -2683,11 +2683,11 @@ function recalcularInf() {
   $("#inf-conc").textContent = textoConc(conc, c.unidad);
   const estado = $("#inf-estado");
   if (porKg && !(inf.peso > 0)) {
-    aviso(estado, "warn", "Escribe el peso del paciente para calcular.");
+    aviso(estado, "warn", "Escribir el peso del paciente para calcular.");
     $("#inf-rango").innerHTML = "";
     return;
   }
-  if (!conc) { aviso(estado, "err", "Revisa la preparación: la cantidad y el volumen deben ser mayores que cero."); return; }
+  if (!conc) { aviso(estado, "err", "Revisar la preparación: la cantidad y el volumen deben ser mayores que cero."); return; }
   if (inf.ultimo === "dosis") {
     inf.mlh = inf.dosis == null ? null : Infusiones.mlPorHora(inf.dosis, c.unidad, inf.peso, conc);
     if (document.activeElement !== $("#inf-mlh")) $("#inf-mlh").value = aCampo(inf.mlh, 3);
@@ -2705,19 +2705,19 @@ function recalcularInf() {
   const textos = {
     BAJA: ["", `Por debajo del rango usual (${fmtInf(c.r[0])}–${fmtInf(c.r[1])} ${c.unidad}).`],
     USUAL: ["ok", `✓ Dentro del rango usual (${fmtInf(c.r[0])}–${fmtInf(c.r[1])} ${c.unidad}).`],
-    ALTA: ["warn", `⚠ Por encima del rango usual (${fmtInf(c.r[1])} ${c.unidad}). Verifica la indicación.`],
-    TOPE: ["err", `⛔ Por encima de la dosis máxima de referencia (${fmtInf(c.tope)} ${c.unidad}). Verifica antes de programar la bomba.`],
+    ALTA: ["warn", `⚠ Por encima del rango usual (${fmtInf(c.r[1])} ${c.unidad}). Verificar la indicación.`],
+    TOPE: ["err", `⛔ Por encima de la dosis máxima de referencia (${fmtInf(c.tope)} ${c.unidad}). Verificar antes de programar la bomba.`],
   };
-  if (n && inf.mlh != null) aviso(estado, textos[n][0], `${textos[n][1]}${inf.mlh > 0 && inf.mlh < 1 ? " La velocidad es menor de 1 mL/h: considera una preparación más diluida." : ""}${inf.mlh > 100 ? " La velocidad es muy alta: considera una preparación más concentrada." : ""}`);
+  if (n && inf.mlh != null) aviso(estado, textos[n][0], `${textos[n][1]}${inf.mlh > 0 && inf.mlh < 1 ? " La velocidad es menor de 1 mL/h: considerar una preparación más diluida." : ""}${inf.mlh > 100 ? " La velocidad es muy alta: considerar una preparación más concentrada." : ""}`);
   else aviso(estado, "", "");
   marcarFilaInf();
 }
 function pintarTablaInf() {
   const c = cfgInf(), conc = concInf(), cont = $("#inf-tabla"), porKg = Infusiones.UNIDADES[c.unidad].porKg;
-  if (!conc || (porKg && !(inf.peso > 0))) { cont.innerHTML = `<h2>Tabla de velocidades</h2><p class="sub" style="margin:0">Escribe el peso y la preparación para ver la tabla.</p>`; return; }
+  if (!conc || (porKg && !(inf.peso > 0))) { cont.innerHTML = `<h2>Tabla de velocidades</h2><p class="sub" style="margin:0">Escribir el peso y la preparación para ver la tabla.</p>`; return; }
   const pasos = Infusiones.pasosDeDosis(c);
   cont.innerHTML = `<h2>Tabla de velocidades</h2>
-    <p class="sub" style="margin:-6px 0 8px">${porKg ? `${fmtInf(inf.peso)} kg · ` : ""}${textoConc(conc, c.unidad)}. Toca una fila para usarla.</p>
+    <p class="sub" style="margin:-6px 0 8px">${porKg ? `${fmtInf(inf.peso)} kg · ` : ""}${textoConc(conc, c.unidad)}. Tocar una fila para usarla.</p>
     <table class="inf-tabla"><thead><tr><th>Dosis (${escapar(c.unidad)})</th><th>mL/h</th></tr></thead><tbody>
     ${pasos.map((d) => `<tr data-d="${d}" style="cursor:pointer"><td>${fmtInf(d, 4)}</td><td>${fmtInf(Infusiones.mlPorHora(d, c.unidad, inf.peso, conc), 3)}</td></tr>`).join("")}
     </tbody></table>`;
@@ -2748,9 +2748,9 @@ function pintarPrepPesoInf() {
       <div><label for="inf-pp-vol">Volumen de la jeringa (mL)</label><input id="inf-pp-vol" type="text" inputmode="decimal" value="${aCampo(vol, 6)}"></div>
       <div><label for="inf-pp-por">1 mL/h = (${escapar(c.unidad)})</label><input id="inf-pp-por" type="text" inputmode="decimal" value="${aCampo(por, 6)}"></div>
     </div>
-    <div id="inf-pp-res" style="margin-top:10px">${r ? `<div class="aviso ok">Diluye <strong>${fmtInf(r.cantidad, 3)} ${r.unidad}</strong> de ${escapar(m.nombre.toLowerCase())}
+    <div id="inf-pp-res" style="margin-top:10px">${r ? `<div class="aviso ok">Diluir <strong>${fmtInf(r.cantidad, 3)} ${r.unidad}</strong> de ${escapar(m.nombre.toLowerCase())}
       hasta completar <strong>${fmtInf(vol)} mL</strong>: así 1 mL/h = ${fmtInf(por)} ${escapar(c.unidad)}.</div>
-      <button type="button" id="inf-pp-usar">Usar esta preparación</button>` : `<p class="sub">Escribe el peso para calcularla.</p>`}</div>`;
+      <button type="button" id="inf-pp-usar">Usar esta preparación</button>` : `<p class="sub">Escribir el peso para calcularla.</p>`}</div>`;
   const repintar = () => {
     const pos = document.activeElement && document.activeElement.id;
     pintarPrepPesoInf();
@@ -2877,7 +2877,7 @@ $("#tv-agregar-evento").onclick = () => {
 };
 $("#tv-roberts").onclick = () => {
   const peso = tiva.paciente.peso;
-  if (!(peso > 0)) return toast("Escribe el peso primero");
+  if (!(peso > 0)) return toast("Escribir el peso primero");
   const mlh = (mgkgh) => Infusiones.redondear(mgkgh * peso / tiva.jeringa, 3);
   tiva.manual = [{ min: 0, bolo: Infusiones.redondear(peso, 3), mlh: mlh(10) }, { min: 10, bolo: null, mlh: mlh(8) }, { min: 20, bolo: null, mlh: mlh(6) }];
   guardarTiva(); pintarManualTiva(); calcularTiva();
@@ -2893,14 +2893,14 @@ function calcularTiva() {
   $("#tv-avisos").innerHTML = [...v.errores.map((t) => `<div class="aviso err">${escapar(t)}</div>`),
     ...v.avisos.map((t) => `<div class="aviso warn">⚠ ${escapar(t)}</div>`)].join("");
   tivaUltima = null;
-  if (v.errores.length) { res.innerHTML = `<p class="sub" style="margin:0">Completa los datos del paciente para ver la simulación.</p>`; $("#tv-parametros").innerHTML = ""; return; }
+  if (v.errores.length) { res.innerHTML = `<p class="sub" style="margin:0">Completar los datos del paciente para ver la simulación.</p>`; $("#tv-parametros").innerHTML = ""; return; }
   const k = mod.calcular(p);
-  if (!(tiva.jeringa > 0)) { res.innerHTML = `<div class="aviso err">Escribe la concentración de la jeringa.</div>`; return; }
+  if (!(tiva.jeringa > 0)) { res.innerHTML = `<div class="aviso err">Escribir la concentración de la jeringa.</div>`; return; }
   const dur = Math.min(Math.max(tiva.duracion || 120, 5), 720);
   const despues = 60, umbral = tiva.despertar ?? f.despertar;
   let serie, objetivos = [];
   if (tiva.modo === "tci") {
-    if (!(tiva.objetivo > 0)) { res.innerHTML = `<div class="aviso err">Escribe la concentración objetivo.</div>`; return; }
+    if (!(tiva.objetivo > 0)) { res.innerHTML = `<div class="aviso err">Escribir la concentración objetivo.</div>`; return; }
     objetivos = [{ min: 0, valor: tiva.objetivo }, ...tiva.cambios.filter((c) => c.min > 0 && c.min < dur && c.valor >= 0)].sort((a, b) => a.min - b.min);
     serie = Tiva.planTCI(k, { objetivos, modo: tiva.sitio, duracion: dur, concJeringa: tiva.jeringa, velocidadMax: tiva.velMax || 1200, despues });
   } else {
@@ -3021,7 +3021,7 @@ function abrirRegistroPrueba() {
       <label for="vf-detalle">Detalle (opcional)</label>
       <input id="vf-detalle" maxlength="150" placeholder="Ej: SimTIVA web, o marca y modelo de la bomba"></div>
     <div><label>Cifras</label>
-      <p class="sub" style="margin:0 0 6px">Escribe lo que muestra la otra fuente. Deja en blanco lo que no muestre.</p>
+      <p class="sub" style="margin:0 0 6px">Escribir lo que muestra la otra fuente. Dejar en blanco lo que no muestre.</p>
       <div class="tabla-scroll"><table class="inf-tabla val-tabla"><thead><tr><th>Cifra</th><th>App</th><th>Referencia</th><th>Dif.</th></tr></thead><tbody>
       ${u.puntos.map((pt, i) => `<tr><td>${escapar(pt.etiqueta)}<div class="sub" style="font-size:.75rem">${escapar(pt.unidad)}</div></td>
         <td>${fmtInf(pt.app, 4)}</td>
@@ -3033,10 +3033,10 @@ function abrirRegistroPrueba() {
     <div><label>Veredicto</label><div class="segmentado seg-veredicto" id="vf-veredicto">
       ${Object.entries(VAL_VEREDICTOS).map(([k, t]) => `<button type="button" data-vver="${k}" aria-pressed="false">${t}</button>`).join("")}</div></div>
     <div><label for="vf-comentario">Comentario (opcional)</label>
-      <textarea id="vf-comentario" maxlength="2000" rows="3" placeholder="Qué diferencias viste y por qué crees que ocurren"></textarea></div>
+      <textarea id="vf-comentario" maxlength="2000" rows="3" placeholder="Qué diferencias se vieron y por qué podrían ocurrir"></textarea></div>
     <div id="vf-error"></div>
     <div class="botones"><button type="button" class="primario" data-vf="guardar">Guardar prueba</button></div>
-    <p class="sub" style="margin:0">No escribas nombres ni datos de pacientes: la bitácora la ven todos los anestesiólogos.</p>`;
+    <p class="sub" style="margin:0">No escribir nombres ni datos de pacientes: la bitácora la ven todos los anestesiólogos.</p>`;
   $("#capa-validacion").classList.remove("oculto");
   $("#ficha-validacion").scrollTop = 0;
   document.body.style.overflow = "hidden";
@@ -3067,8 +3067,8 @@ $("#capa-validacion").addEventListener("click", async (e) => {
   if (b.dataset.vf === "cerrar") cerrarRegistroPrueba();
   if (b.dataset.vf === "guardar") {
     const error = $("#vf-error");
-    if (!valForm.valores.some((v) => v != null)) return aviso(error, "err", "Escribe al menos una cifra de la referencia.");
-    if (!valForm.veredicto) return aviso(error, "err", "Elige el veredicto.");
+    if (!valForm.valores.some((v) => v != null)) return aviso(error, "err", "Escribir al menos una cifra de la referencia.");
+    if (!valForm.veredicto) return aviso(error, "err", "Elegir el veredicto.");
     const u = tivaUltima;
     const datos = {
       modulo: "tiva", elemento: u.elemento, caso: u.caso, referencia: valForm.referencia,
@@ -3101,8 +3101,8 @@ function pintarCasosValidacion() {
       <div class="sub">${f.nombre} · ${fmtInf(p.edad)} años, ${p.sexo === "F" ? "mujer" : "hombre"}, ${fmtInf(p.peso)} kg, ${fmtInf(p.talla)} cm ·
         ${c.sitio === "efecto" ? "Ce" : "Cp"} ${fmtInf(c.objetivo)} ${f.conc} · 60 min</div></div>
       <button type="button" data-caso="${i}">Abrir en TIVA</button></div>`;
-  }).join("") + `<p class="sub" style="margin:10px 0 0">Casos ficticios. Usa jeringa de ${Tiva.FARMACOS.propofol.jeringa[0]} mg/mL de propofol
-    y ${Tiva.FARMACOS.remifentanilo.jeringa[0]} µg/mL de remifentanilo, o cámbiala igual en las dos fuentes.</p>`;
+  }).join("") + `<p class="sub" style="margin:10px 0 0">Casos ficticios. Usar jeringa de ${Tiva.FARMACOS.propofol.jeringa[0]} mg/mL de propofol
+    y ${Tiva.FARMACOS.remifentanilo.jeringa[0]} µg/mL de remifentanilo, o cambiarla igual en las dos fuentes.</p>`;
 }
 function pintarValidacion() {
   const d = valDatos, porModelo = Object.fromEntries(d.resumen.map((g) => [g.elemento, g]));
@@ -3133,7 +3133,7 @@ function pintarValidacion() {
         <p class="sub" style="margin:6px 0 0">Versión de la app: ${escapar(p.version_app || "—")}</p></details>
       <div class="botones"><button type="button" data-val="repetir" data-id="${p.prueba_id}" style="min-height:36px;padding:4px 12px">Repetir en TIVA</button>
         ${p.mia || esAdmin ? `<button type="button" data-val="borrar" data-id="${p.prueba_id}" class="enlace" style="border:0;background:none;min-height:0">Borrar</button>` : ""}</div>
-    </div>`).join("") : `<p class="sub" style="margin:0">Aún no hay pruebas. Abre un caso sugerido y registra la primera.</p>`;
+    </div>`).join("") : `<p class="sub" style="margin:0">Aún no hay pruebas. Abrir un caso sugerido y registrar la primera.</p>`;
 }
 $("#pestana-validacion").addEventListener("click", async (e) => {
   const caso = e.target.closest("[data-caso]");
@@ -3240,7 +3240,7 @@ function pintarDosisReg() {
   $("#rg-concs").innerHTML = a.conc.map((c) => `<button type="button" data-c="${c}" aria-pressed="${c === reg.conc}">${fmtInf(c)} %</button>`).join("");
   $("#rg-concs").querySelectorAll("[data-c]").forEach((b) => b.onclick = () => { reg.conc = Number(b.dataset.c); guardarReg(); pintarDosisReg(); });
   const d = Regional.dosisMaxima(a.id, reg.peso, reg.conc, reg.epi), res = $("#rg-dosis");
-  if (!d) { res.innerHTML = `<p class="sub" style="margin:8px 0 0">Escribe el peso para calcular la dosis máxima.</p>`; return; }
+  if (!d) { res.innerHTML = `<p class="sub" style="margin:8px 0 0">Escribir el peso para calcular la dosis máxima.</p>`; return; }
   const uso = reg.planeado > 0 ? reg.planeado * d.mgPorMl : null, pct = uso != null ? uso / d.mg * 100 : null;
   res.innerHTML = `<div class="kpis" style="margin:10px 0 0">
       <div class="kpi"><div class="etiqueta">Dosis máxima</div><div class="cifra">${fmtInf(d.mg)} mg</div>
@@ -3250,7 +3250,7 @@ function pintarDosisReg() {
     </div>
     ${uso != null ? `<div class="aviso ${pct > 100 ? "err" : pct > 80 ? "warn" : "ok"}">${pct > 100 ? "⛔" : pct > 80 ? "⚠" : "✓"}
       ${fmtInf(reg.planeado)} mL al ${fmtInf(reg.conc)} % = ${fmtInf(uso, 3)} mg: el ${fmtInf(pct, 2)} % de la dosis máxima.
-      ${pct > 100 ? "Supera el máximo: baja la concentración o el volumen." : pct > 80 ? "Cerca del máximo: suma también otros bloqueos y la infiltración del cirujano." : ""}</div>` : ""}`;
+      ${pct > 100 ? "Supera el máximo: bajar la concentración o el volumen." : pct > 80 ? "Cerca del máximo: sumar también otros bloqueos y la infiltración del cirujano." : ""}</div>` : ""}`;
 }
 
 function pintarListaReg() {
@@ -3295,13 +3295,13 @@ function abrirBloque(id) {
           ${esAdmin ? `<button type="button" data-rb="borrar" data-id="${f.imagen_id}" class="enlace" style="border:0;background:none;min-height:0;padding:2px 0">Quitar</button>` : ""}</figure>`).join("")}</div>`
         : `<p class="sub" style="margin:2px 0 0">Aún no hay imágenes propias de este bloqueo.</p>`}
       ${esAdmin ? `<button type="button" data-rb="subir" style="margin-top:8px">📷 Subir imagen ecográfica</button>
-        <p class="sub" style="margin:4px 0 0">Solo imágenes propias y anonimizadas: recorta el nombre, el documento y la fecha de la pantalla del ecógrafo.</p>` : ""}
+        <p class="sub" style="margin:4px 0 0">Solo imágenes propias y anonimizadas: recortar el nombre, el documento y la fecha de la pantalla del ecógrafo.</p>` : ""}
     </div>
     <div class="botones">
       <a class="boton" href="https://www.nysora.com/?s=${encodeURIComponent(b.nysora)}" target="_blank" rel="noopener">Ver técnica e imágenes en NYSORA ↗</a>
       <button type="button" class="primario" data-rb="dosis">Calcular dosis máxima</button>
     </div>
-    <p class="sub" style="margin:0">Volúmenes y fármacos orientativos, pendientes de validar con AP. Ajusta a cada paciente.</p>`;
+    <p class="sub" style="margin:0">Volúmenes y fármacos orientativos, pendientes de validar con AP. Ajustar a cada paciente.</p>`;
   $("#capa-bloque").classList.remove("oculto");
   $("#ficha-bloque").scrollTop = 0;
   document.body.style.overflow = "hidden";
@@ -3348,7 +3348,7 @@ function pintarLastReg() {
       <li><strong>Bolo:</strong> ${escapar(l.bolo)}</li><li><strong>Infusión:</strong> ${escapar(l.infusion)}</li>
       <li><strong>Si sigue inestable:</strong> repetir el bolo 1–2 veces y duplicar la infusión.</li>
       <li><strong>Máximo:</strong> ~${fmtInf(l.maximo)} mL (12 mL/kg) en los primeros 30 min.</li></ul>`
-    : `<p class="sub" style="margin:0">Escribe el peso arriba para ver las dosis de emulsión lipídica.</p>`;
+    : `<p class="sub" style="margin:0">Escribir el peso arriba para ver las dosis de emulsión lipídica.</p>`;
 }
 
 // ---------------------------------------------------------------- historias y boletín semanal
@@ -3428,7 +3428,7 @@ function pintarHistoria() {
       <span class="chico">${hist.i + 1} de ${hist.lista.length}</span></div>
       <button type="button" class="cerrar" data-hacer="cerrar" aria-label="Cerrar">✕</button></div>
     <div class="lienzo">${partes[hist.parte]}</div>
-    <div class="pista-toque">Toca a la derecha para seguir · a la izquierda para volver · desliza hacia abajo para cerrar</div>`;
+    <div class="pista-toque">Tocar a la derecha para seguir · a la izquierda para volver · deslizar hacia abajo para cerrar</div>`;
   hist.inicio = performance.now();
   hist.pausa = 0;
 }
@@ -3524,7 +3524,7 @@ function pintarMonitor() {
           <canvas data-onda="${onda}"></canvas><span class="txt">${escapar(n.titulo_es || n.titulo)}</span></span>
         <span class="num"><b class="${cifra.length > 6 ? "largo" : ""}">${escapar(cifra)}</b><small>${escapar(n.cifra ? (n.cifra_etiqueta || "").slice(0, 28) : c.l.length === 1 ? "nueva" : "nuevas")}</small></span></button>`;
     }).join("")
-      : `<div style="--onda:#2f4a47"><canvas data-onda="plano" style="width:100%;height:30px;display:block"></canvas></div><div class="plano">✓ Estás al día: sin noticias nuevas en tus temas</div>`}
+      : `<div style="--onda:#2f4a47"><canvas data-onda="plano" style="width:100%;height:30px;display:block"></canvas></div><div class="plano">✓ Al día: sin noticias nuevas en los temas elegidos</div>`}
     ${nuevas.length ? `<div class="mon-botones"><button type="button" class="fuerte" id="mon-revisar">▶ Revisar ${nuevas.length}</button>
       <button type="button" id="mon-silenciar">🔕 Silenciar</button></div>` : ""}`;
   cont.querySelectorAll("[data-mon]").forEach((b) => b.onclick = () =>
@@ -3617,7 +3617,7 @@ function abrirFicha(n) {
       ${n.enlace ? `<a class="boton" href="${escapar(n.enlace)}" target="_blank" rel="noopener" data-f="abrir">Leer original ↗</a>` : ""}
       ${n.leida ? "" : `<button type="button" class="primario" data-f="leida">✓ Leída</button>`}
     </div>
-    <p class="sub" style="margin:0">Resumen hecho por IA a partir del resumen público. Antes de cambiar una conducta clínica, lee el artículo original.</p>`;
+    <p class="sub" style="margin:0">Resumen hecho por IA a partir del resumen público. Antes de cambiar una conducta clínica, conviene leer el artículo original.</p>`;
   $("#capa-ficha").classList.remove("oculto");
   ficha.scrollTop = 0;
   document.body.style.overflow = "hidden";
@@ -3680,14 +3680,14 @@ function cartaHtml(n, pos) {
     ${cifra ? `<span class="num ${cifra.length > 7 ? "largo" : ""}">${escapar(cifra)}</span><span class="medida">${escapar(n.cifra_etiqueta || "")}</span>`
       : `<span class="num largo">${n.tipo === "ALERTA" ? "⚠" : "✦"}</span>`}
     <span class="tit">${escapar(n.titulo_es || n.titulo)}</span>
-    <span class="fuente">${escapar(n.fuente)} · ${fechaBreve(n.publicado_en || n.listo_en)} · toca para ver la ficha</span></div>`;
+    <span class="fuente">${escapar(n.fuente)} · ${fechaBreve(n.publicado_en || n.listo_en)} · tocar para ver la ficha</span></div>`;
 }
 function pintarMazo() {
   const quedan = mazo.cartas.slice(mazo.hechas);
   $("#mazo").innerHTML = `<div class="mazo-cab"><strong class="titulo-letra" style="font-size:1.2rem">${quedan.length ? `${quedan.length} por revisar` : "Listo"}</strong>
       <button type="button" id="mazo-cerrar" aria-label="Cerrar">✕ Cerrar</button></div>
     <div class="pila">${quedan.length ? quedan.slice(0, 3).map((n, i) => cartaHtml(n, i)).reverse().join("")
-      : `<div class="vacio"><b>✓ Estás al día</b><span class="sub">Revisaste todas las noticias nuevas.</span></div>`}</div>
+      : `<div class="vacio"><b>✓ Al día</b><span class="sub">Todas las noticias nuevas están revisadas.</span></div>`}</div>
     ${quedan.length ? `<div class="mazo-botones"><button type="button" id="mazo-no" aria-label="Marcar como leída">✕</button>
       <button type="button" class="ver" id="mazo-ver">Ver ficha</button>
       <button type="button" class="si" id="mazo-si" aria-label="Guardar en favoritas">★</button></div>
@@ -3748,7 +3748,7 @@ async function cargarBoletin(semana) {
       <div class="nav"><button type="button" id="bol-ant" ${d.anterior ? "" : "disabled"} aria-label="Semana anterior">‹</button>
         <span class="sem">${d.en_curso ? "Semana en curso · " : "Boletín semanal · "}${rangoSemana(d)}</span>
         <button type="button" id="bol-sig" ${d.siguiente ? "" : "disabled"} aria-label="Semana siguiente">›</button></div>
-      <h2>Tu semana en anestesia</h2>
+      <h2>La semana en anestesia</h2>
       <div class="cuenta"><div><b>${d.total}</b><span>publicaciones</span></div><div><b>${d.alertas.length}</b><span>alertas</span></div>
         <div><b>${d.sin_leer}</b><span>sin leer</span></div></div>
     </div>
@@ -3767,7 +3767,7 @@ async function cargarBoletin(semana) {
     </div>
     <div class="bloque" style="grid-template-columns:1fr 1fr">
       <button type="button" id="bol-ver">▶ Ver como historias</button><button type="button" id="bol-compartir">↗ Compartir</button></div>`
-    : `<div class="bloque"><p class="sub" style="margin:0">No llegaron publicaciones de tus temas esta semana.</p></div>`}`;
+    : `<div class="bloque"><p class="sub" style="margin:0">No llegaron publicaciones de los temas elegidos esta semana.</p></div>`}`;
   $("#bol-ant").onclick = () => cargarBoletin(d.anterior);
   $("#bol-sig").onclick = () => cargarBoletin(d.siguiente);
   const todas = [...d.alertas, ...d.destacadas];
@@ -3779,15 +3779,15 @@ async function cargarBoletin(semana) {
   if ($("#bol-compartir")) $("#bol-compartir").onclick = () => compartirBoletin(d);
 }
 async function compartirBoletin(d) {
-  const lineas = [`🩺 Tu semana en anestesia · ${rangoSemana(d)}`, `${d.total} publicaciones${d.alertas.length ? ` · ${d.alertas.length} alertas` : ""}`, ""];
+  const lineas = [`🩺 La semana en anestesia · ${rangoSemana(d)}`, `${d.total} publicaciones${d.alertas.length ? ` · ${d.alertas.length} alertas` : ""}`, ""];
   for (const n of d.alertas) lineas.push(`⚠ ${n.titulo_es || n.titulo}${n.enlace ? `\n${n.enlace}` : ""}`);
   for (const n of d.destacadas) lineas.push(`• ${n.cifra ? `${n.cifra} ${n.cifra_etiqueta || ""}: ` : ""}${n.titulo_es || n.titulo}${n.enlace ? `\n${n.enlace}` : ""}`);
-  lineas.push("", "Resúmenes hechos por IA: lee el artículo original antes de cambiar una conducta clínica.");
+  lineas.push("", "Resúmenes hechos por IA: conviene leer el artículo original antes de cambiar una conducta clínica.");
   const texto = lineas.join("\n");
   try {
-    if (navigator.share) { await navigator.share({ title: "Tu semana en anestesia", text: texto }); return; }
+    if (navigator.share) { await navigator.share({ title: "La semana en anestesia", text: texto }); return; }
     await navigator.clipboard.writeText(texto);
-    toast("Boletín copiado: pégalo en WhatsApp");
+    toast("Boletín copiado: listo para pegar en WhatsApp");
   } catch (e) {
     if (e && e.name === "AbortError") return;
     toast("No se pudo compartir");
@@ -3851,7 +3851,7 @@ async function cargarFuentes() {
       ${f.ultimo_error ? `<div class="aviso err" style="margin-top:4px">${escapar(f.ultimo_error)}</div>` : ""}
       <div class="acciones"><button type="button" data-accion="activa">${f.activa ? "Desactivar" : "Activar"}</button>
         <button type="button" data-accion="quitar">Quitar</button></div></div>`).join("")
-    : `<p class="sub">Aún no hay fuentes. Agrega la primera: prueba la dirección y luego «Agregar fuente».</p>`;
+    : `<p class="sub">Aún no hay fuentes. Para agregar la primera: probar la dirección y luego «Agregar fuente».</p>`;
   document.querySelectorAll("[data-fuente] button").forEach((b) => b.onclick = async () => {
     const id = b.closest("[data-fuente]").dataset.fuente, f = d.fuentes.find((x) => String(x.fuente_id) === id);
     if (b.dataset.accion === "quitar") {
@@ -3872,7 +3872,7 @@ $("#not-f-tipo").onchange = () => {
 };
 $("#not-probar").onclick = async () => {
   const estado = $("#not-estado-fuente"), f = datosFuente();
-  if (!f.url) return aviso(estado, "err", "Escribe la dirección o la búsqueda.");
+  if (!f.url) return aviso(estado, "err", "Escribir la dirección o la búsqueda.");
   estado.innerHTML = `<div class="cargando">Probando la fuente…</div>`;
   const r = await fetch("/api/noticias/fuentes/probar", { method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ ...f, nombre: f.nombre || "Prueba" }) });
@@ -3884,7 +3884,7 @@ $("#not-probar").onclick = async () => {
 $("#not-form-fuente").onsubmit = async (e) => {
   e.preventDefault();
   const estado = $("#not-estado-fuente"), f = datosFuente();
-  if (!f.nombre || !f.url) return aviso(estado, "err", "Escribe el nombre y la dirección o búsqueda.");
+  if (!f.nombre || !f.url) return aviso(estado, "err", "Escribir el nombre y la dirección o búsqueda.");
   const r = await fetch("/api/noticias/fuentes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(f) });
   const c = await r.json().catch(() => null);
   if (!r.ok) return aviso(estado, "err", mensajeError(c, "No se pudo agregar la fuente."));
@@ -3985,7 +3985,7 @@ $("#rel-prepagadas").onclick = () => {
 $("#rel-santa-ana").onclick = () => {
   const ids = relOpciones.clinicas.filter((c) => sinTildes(c.nombre).includes("SANTA ANA DE DIOS")).map((c) => String(c.id));
   $("#rel-aviso").innerHTML = ids.length ? "" :
-    `<div class="aviso warn">Todavía no tienes cirugías en la Clínica Santa Ana de Dios.</div>`;
+    `<div class="aviso warn">Todavía no hay cirugías en la Clínica Santa Ana de Dios.</div>`;
   marcarSolo("rel-tipos", []); pintarAseguradoras(); marcarSolo("rel-aseguradoras", []);
   marcarSolo("rel-clinicas", ids);
   if (ids.length) cargarRelacion(); else { relFilas = []; $("#rel-filas").innerHTML = ""; recalcularRelacion(); }
@@ -3996,7 +3996,7 @@ $("#rel-todo").onclick = () => {
   pintarAseguradoras(); cargarRelacion();
 };
 $("#rel-imprimir").onclick = () => {
-  if (!filasElegidas().length) return aviso($("#rel-aviso"), "warn", "Elige al menos una orden para imprimir.");
+  if (!filasElegidas().length) return aviso($("#rel-aviso"), "warn", "Elegir al menos una orden para imprimir.");
   // Copia limpia de la hoja: solo las filas elegidas, sin casillas, y el mes como texto
   const copia = $("#hoja-relacion").cloneNode(true);
   copia.querySelectorAll("tr.excluida, .sel").forEach((el) => el.remove());
@@ -4011,7 +4011,7 @@ $("#rel-imprimir").onclick = () => {
 };
 $("#rel-excel").onclick = () => {
   const elegidas = filasElegidas();
-  if (!elegidas.length) return aviso($("#rel-aviso"), "warn", "Elige al menos una orden para el Excel.");
+  if (!elegidas.length) return aviso($("#rel-aviso"), "warn", "Elegir al menos una orden para el Excel.");
   const p = consultaRelacion();
   elegidas.forEach((f) => p.append("ids", f.cirugia_id));
   p.append("mes", $("#rel-mes").value);
@@ -4070,7 +4070,7 @@ function predictivo({ input, caja, items, titulo, nuevo, detalle = () => "", ele
 }
 const sugerirClinicas = predictivo({
   input: campo("clinica.nombre"), caja: $("#sug-clinica"), items: () => clinicas,
-  titulo: "Clínicas registradas:", nuevo: "Clínica nueva: se guardará con este nombre. Revisa que esté bien escrito.",
+  titulo: "Clínicas registradas:", nuevo: "Clínica nueva: se guardará con este nombre. Conviene revisar que esté bien escrito.",
   detalle: (c) => c.ciudad ? ` <span class="sub">· ${escapar(c.ciudad)}</span>` : "",
   elegir: (c) => { if (c.ciudad) campo("clinica.ciudad").value = c.ciudad; },
 });
@@ -4085,13 +4085,13 @@ predictivo({
   // primero las del tipo elegido
   items: () => [...sugerencias.aseguradoras].sort((a, b) =>
     (b.tipo === campo("aseguradora.tipo").value) - (a.tipo === campo("aseguradora.tipo").value)),
-  titulo: "Aseguradoras registradas:", nuevo: "Aseguradora nueva: se guardará con este nombre. Revisa que esté bien escrito.",
+  titulo: "Aseguradoras registradas:", nuevo: "Aseguradora nueva: se guardará con este nombre. Conviene revisar que esté bien escrito.",
   detalle: (a) => ` <span class="sub">· ${TIPO_ASEG[a.tipo] || a.tipo}</span>`,
   elegir: (a) => { campo("aseguradora.tipo").value = a.tipo; },
 });
 predictivo({
   input: campo("cirujano"), caja: $("#sug-cirujano"), items: () => sugerencias.cirujanos,
-  titulo: "Cirujanos registrados:", nuevo: "Cirujano nuevo: se guardará con este nombre. Revisa que esté bien escrito.",
+  titulo: "Cirujanos registrados:", nuevo: "Cirujano nuevo: se guardará con este nombre. Conviene revisar que esté bien escrito.",
 });
 
 function filtrosLista() {
@@ -4208,7 +4208,7 @@ async function cargarAntiguedadPagos() {
   if (!d) { cont.innerHTML = `<h2>Por cobrar</h2><p class="sub">No se pudo cargar.</p>`; return; }
   cont.innerHTML = `<div class="item-cab"><h2>Por cobrar</h2><span class="valor">${pesos(d.por_cobrar.valor)}</span></div>
     <p class="sub" style="margin:-6px 0 8px">${plural(d.por_cobrar.cirugias, "cirugía realizada sin pagar", "cirugías realizadas sin pagar")}, por días desde la cirugía.
-      Toca una franja para verlas.</p>${htmlAntiguedad(d)}`;
+      Tocar una franja para verlas.</p>${htmlAntiguedad(d)}`;
   enlazarAntiguedad(cont);
 }
 // El boletín sale cada lunes con lo de la semana anterior: se avisa en Inicio hasta que se abra
@@ -4221,7 +4221,7 @@ async function avisoBoletin() {
   if (!d.total || visto === d.desde || $("#inicio-boletin")) return;
   const caja = $("#inicio-historias");
   caja.insertAdjacentHTML("beforebegin", `<button type="button" class="tarea tono-ok" id="inicio-boletin"><span class="franja"></span>
-    <span><strong>📰 Tu boletín semanal está listo</strong><span class="sub">${rangoSemana(d)} · ${d.total} publicaciones${d.alertas.length ? ` · ${d.alertas.length} alertas` : ""}</span></span>
+    <span><strong>📰 El boletín semanal está listo</strong><span class="sub">${rangoSemana(d)} · ${d.total} publicaciones${d.alertas.length ? ` · ${d.alertas.length} alertas` : ""}</span></span>
     <span class="accion">Ver</span></button>`);
   $("#inicio-boletin").onclick = () => { mostrarPestana("noticias"); setTimeout(() => $("#not-boletin").scrollIntoView({ behavior: "smooth" }), 300); };
 }
@@ -4230,7 +4230,7 @@ async function cargarInicio() {
   $("#ini-fecha").textContent = `${["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"][hoy.getDay()]} ${hoy.getDate()} de ${MESES_LARGOS[hoy.getMonth()]}`;
   const cont = $("#inicio");
   const d = await cargarResumen();
-  if (!d) { cont.innerHTML = `<div class="aviso err">No se pudo cargar el resumen. Revisa la conexión.</div>`; return; }
+  if (!d) { cont.innerHTML = `<div class="aviso err">No se pudo cargar el resumen. Revisar la conexión.</div>`; return; }
   const ant = Number(d.cobrado_mes_anterior), este = Number(d.cobrado_mes);
   const variacion = ant ? Math.round((este - ant) / ant * 100) : null;
   const tareas = [];
@@ -4239,22 +4239,22 @@ async function cargarInicio() {
   if (d.atrasadas) tareas.push({ tono: "err", titulo: plural(d.atrasadas, "cirugía atrasada", "cirugías atrasadas"),
     sub: `Más de ${d.dias_atraso} días sin pago`, accion: "Ver", ir: () => verLista({ "#f-estado": "ATRASADA" }) });
   if (d.solicitudes) tareas.push({ tono: "warn", titulo: plural(d.solicitudes, "solicitud de registro", "solicitudes de registro"),
-    sub: "Anestesiólogos esperando que apruebes su cuenta", accion: "Revisar", ir: () => mostrarPestana("usuarios") });
+    sub: "Anestesiólogos esperando la aprobación de su cuenta", accion: "Revisar", ir: () => mostrarPestana("usuarios") });
   for (const rad of d.radicados || []) {
     const fecha = rad.fecha_proceso ? aFecha(rad.fecha_proceso) : null;
     const cuando = fecha ? `${fecha.getDate()} ${MESES_LARGOS[fecha.getMonth()].slice(0, 3)}` : "";
     const abrir = () => { mostrarPestana("pagos"); mostrarReportePago(rad.reporte_id); };
     if (rad.estado === "LEIDO") tareas.push({ tono: "warn", titulo: `Radicado ${escapar(rad.pagador || "")} ${cuando} sin aplicar`,
-      sub: `${plural(rad.cirugias, "cirugía encontrada", "cirugías encontradas")} de ${rad.lineas} órdenes: márcalas como radicadas`, accion: "Revisar", ir: abrir });
+      sub: `${plural(rad.cirugias, "cirugía encontrada", "cirugías encontradas")} de ${rad.lineas} órdenes: marcarlas como radicadas`, accion: "Revisar", ir: abrir });
     else tareas.push({ tono: rad.dias > d.dias_atraso ? "err" : "info", titulo: `Radicado ${escapar(rad.pagador || "")} ${cuando}: ${rad.total_neto != null ? pesos(rad.total_neto) : "sin total"} por cobrar`,
       sub: `${plural(rad.cirugias, "cirugía", "cirugías")}${rad.pagadas ? ` (${rad.pagadas} ya pagada${rad.pagadas === 1 ? "" : "s"})` : ""}${rad.dias != null ? ` · hace ${rad.dias} días` : ""}`, accion: "Ver", ir: abrir });
   }
   if (d.repetidas) tareas.push({ tono: "err", titulo: d.repetidas === 1 ? "Una cirugía está registrada dos veces" : `${d.repetidas} cirugías están registradas dos veces`,
-    sub: "Mismo paciente, mismo día y misma clínica: únelas para no contarlas doble", accion: "Revisar", ir: abrirRepetidas });
-  if (d.dos_pasos_pendiente) tareas.push({ tono: "err", titulo: "Activa la verificación en dos pasos",
-    sub: "Tu cuenta ve los datos de todos: protégela con un código además de la contraseña", accion: "Activar", ir: () => { mostrarPestana("clave"); pintarDosPasos(); } });
+    sub: "Mismo paciente, mismo día y misma clínica: conviene unirlas para no contarlas doble", accion: "Revisar", ir: abrirRepetidas });
+  if (d.dos_pasos_pendiente) tareas.push({ tono: "err", titulo: "Activar la verificación en dos pasos",
+    sub: "Esta cuenta ve los datos de todos: conviene protegerla con un código además de la contraseña", accion: "Activar", ir: () => { mostrarPestana("clave"); pintarDosPasos(); } });
   if (d.sin_valor) tareas.push({ tono: "warn", titulo: plural(d.sin_valor, "cirugía sin valor", "cirugías sin valor"),
-    sub: "No cuentan en los reportes ni en lo que te deben", accion: "Completar", ir: () => verLista({ "#f-estado": "SIN_VALOR" }) });
+    sub: "No cuentan en los reportes ni en lo que falta por cobrar", accion: "Completar", ir: () => verLista({ "#f-estado": "SIN_VALOR" }) });
   const p = d.proximo_pago;
   cont.innerHTML = `<div class="cifras">
       <div class="card"><span class="sub">Cobrado en ${MESES_LARGOS[hoy.getMonth()]}</span><span class="grande-cifra">${pesosCorto(este)}</span>
@@ -4262,17 +4262,17 @@ async function cargarInicio() {
       <div class="card"><span class="sub">Por cobrar</span><span class="grande-cifra">${pesosCorto(d.por_cobrar.valor)}</span>
         <span class="sub">${plural(d.por_cobrar.cirugias, "cirugía", "cirugías")}</span></div>
     </div>
-    <div class="titulo-seccion">${tareas.length ? "Necesita tu atención" : "Pendientes"}</div>
+    <div class="titulo-seccion">${tareas.length ? "Requiere atención" : "Pendientes"}</div>
     ${tareas.length ? tareas.map((t, i) => `<button type="button" class="tarea tono-${t.tono}" data-i="${i}"><span class="franja"></span>
         <span><strong>${t.titulo}</strong><span class="sub">${t.sub}</span></span><span class="accion">${t.accion}</span></button>`).join("")
       : `<div class="aviso ok">✓ Todo al día: no hay pagos por marcar, cirugías atrasadas ni órdenes sin valor.</div>`}
     ${p ? `<div class="card" style="margin-top:6px"><div class="item-cab"><span class="sub">Próximo pago estimado de AP</span>
         <span class="chip PROGRAMADA">${MESES_LARGOS[aFecha(p.periodo).getMonth()]}</span></div>
         <div class="item-cab"><strong class="valor">≈ ${pesos(p.te_llega)}</strong><span class="sub">${plural(p.cirugias, "cirugía", "cirugías")}</span></div>
-        <p class="sub" style="margin:4px 0 0">Estimado con lo que AP te ha pagado antes. El detalle está en Finanzas.</p></div>` : ""}
+        <p class="sub" style="margin:4px 0 0">Estimado con lo que AP ha pagado antes. El detalle está en Finanzas.</p></div>` : ""}
     <div id="inicio-historias" class="oculto"><div class="titulo-seccion">Lo nuevo en anestesia</div>
       <div class="historias-fila" id="inicio-historias-fila"></div></div>
-    <div class="titulo-seccion">Lo que te deben, por antigüedad</div>
+    <div class="titulo-seccion">Por cobrar, según antigüedad</div>
     <section class="card" id="inicio-antiguedad">${htmlAntiguedad(d)}</section>
     <button type="button" class="boton primario grande" id="inicio-escanear">📷 Escanear una orden</button>`;
   cont.querySelectorAll(".tarea").forEach((b) => b.onclick = tareas[b.dataset.i].ir);
@@ -4313,7 +4313,7 @@ async function cargarCirugias() {
       return `<div class="grupo-mes"><span>${MESES_LARGOS[f.getMonth()]}${f.getFullYear() !== hoy.getFullYear() ? " " + f.getFullYear() : ""}</span>
         <span>${g.total ? pesos(g.total) : ""}</span></div>
       <div class="lista-mes">${g.filas.map(filaCirugia).join("")}</div>`;
-    }).join("") + (filas.length >= LIMITE_LISTA ? `<p class="sub" style="text-align:center">Se muestran las ${LIMITE_LISTA} más recientes. Usa los filtros o la búsqueda para ver otras.</p>` : "");
+    }).join("") + (filas.length >= LIMITE_LISTA ? `<p class="sub" style="text-align:center">Se muestran las ${LIMITE_LISTA} más recientes. Usar los filtros o la búsqueda para ver otras.</p>` : "");
     cont.querySelectorAll(".cir").forEach((b) => b.onclick = () => abrirCirugia(Number(b.dataset.id)));
 
   } catch (e) {
@@ -4331,14 +4331,14 @@ const etiquetaResultado = (f) => f.resultado === "COINCIDE"
 async function subirReportePago(archivo) {
   const estado = $("#estado-pago");
   $("#detalle-pago").innerHTML = $("#liquidacion-pago").innerHTML = "";
-  estado.innerHTML = `<div class="cargando">Leyendo el reporte con la IA y cruzándolo con tus cirugías… puede tardar hasta un minuto.<br><span class="sub">${escapar(archivo.name || "")}</span></div>`;
+  estado.innerHTML = `<div class="cargando">Leyendo el reporte con la IA y cruzándolo con las cirugías… puede tardar hasta un minuto.<br><span class="sub">${escapar(archivo.name || "")}</span></div>`;
   const form = new FormData();
   try {
     form.append("archivo", new Blob([await archivo.arrayBuffer()], { type: archivo.type || "application/octet-stream" }), archivo.name || "reporte");
     const r = await fetch("/api/pagos", { method: "POST", body: form });
     const cuerpo = await r.json().catch(() => null);
     if (r.status === 409 && cuerpo?.detail?.reporte_id) {
-      aviso(estado, "warn", "Este reporte ya se había subido. Te muestro el que ya está guardado.");
+      aviso(estado, "warn", "Este reporte ya se había subido. Se muestra el que ya está guardado.");
       return mostrarReportePago(cuerpo.detail.reporte_id);
     }
     if (!r.ok) return aviso(estado, "err", mensajeError(cuerpo, `No se pudo leer el reporte (error ${r.status}).`));
@@ -4358,7 +4358,7 @@ zonaPago.addEventListener("drop", (e) => subirReportePago(e.dataTransfer.files[0
 async function subirRelacion(archivos) {
   const estado = $("#estado-relacion");
   $("#detalle-pago").innerHTML = $("#liquidacion-pago").innerHTML = "";
-  estado.innerHTML = `<div class="cargando">Leyendo ${tipoRelacion === "RADICADO" ? "el radicado" : "la relación"} con la IA y cruzándolo con tus cirugías… puede tardar hasta un minuto.<br><span class="sub">${archivos.length} archivo${archivos.length === 1 ? "" : "s"}</span></div>`;
+  estado.innerHTML = `<div class="cargando">Leyendo ${tipoRelacion === "RADICADO" ? "el radicado" : "la relación"} con la IA y cruzándolo con las cirugías… puede tardar hasta un minuto.<br><span class="sub">${archivos.length} archivo${archivos.length === 1 ? "" : "s"}</span></div>`;
   const form = new FormData();
   try {
     for (const a of archivos) form.append("archivos", new Blob([await a.arrayBuffer()], { type: a.type || "application/octet-stream" }), a.name || "relacion");
@@ -4368,7 +4368,7 @@ async function subirRelacion(archivos) {
     const r = await fetch(radicado ? "/api/pagos/radicado" : "/api/pagos/relacion", { method: "POST", body: form });
     const cuerpo = await r.json().catch(() => null);
     if (r.status === 409 && cuerpo?.detail?.reporte_id) {
-      aviso(estado, "warn", "Este documento ya se había subido. Te muestro el que ya está guardado.");
+      aviso(estado, "warn", "Este documento ya se había subido. Se muestra el que ya está guardado.");
       return mostrarReportePago(cuerpo.detail.reporte_id);
     }
     if (!r.ok) return aviso(estado, "err", mensajeError(cuerpo, `No se pudo leer la relación (error ${r.status}).`));
@@ -4388,8 +4388,8 @@ document.querySelectorAll("#relacion-tipo [data-tipo]").forEach((b) => b.onclick
   const radicado = tipoRelacion === "RADICADO";
   $("#relacion-fecha-etiqueta").textContent = radicado ? "Fecha del radicado" : "Fecha del pago";
   $("#relacion-ayuda").textContent = radicado
-    ? "Si no pones la fecha se usa la del sello de recibido o la de la hoja. Al aplicarlo, las cirugías quedan facturadas (radicadas); cuando la clínica pague, registras el pago y quedan pagadas."
-    : "Si no pones la fecha del pago se usa la fecha de la relación. Al aplicarla, las cirugías quedan pagadas con el valor de cada línea.";
+    ? "Si no se pone la fecha, se usa la del sello de recibido o la de la hoja. Al aplicarlo, las cirugías quedan facturadas (radicadas); cuando la clínica pague, se registra el pago y quedan pagadas."
+    : "Si no se pone la fecha del pago, se usa la fecha de la relación. Al aplicarla, las cirugías quedan pagadas con el valor de cada línea.";
   $("#elegir-relacion").textContent = radicado ? "📄 Elegir radicado (foto o PDF de cada página)" : "📄 Elegir relación (PDF o fotos de cada página)";
 });
 
@@ -4432,7 +4432,7 @@ async function mostrarLiquidacion(reporteId) {
       ${fila("Tarjeta probienestar", d.probienestar)}
     </table>
     <h3 style="margin-top:16px">Revisar mi volante</h3>
-    <p class="sub">Sube el volante que te entregó AP y ve, concepto por concepto, cómo se compone tu pago.</p>
+    <p class="sub">Subir el volante que entregó AP para ver, concepto por concepto, cómo se compone el pago.</p>
     <div class="acciones-pago"><button type="button" id="revisar-volante">📄 Revisar mi volante</button></div>
     <div id="resultado-volante"></div>
   </section>`;
@@ -4451,8 +4451,8 @@ async function revisarVolante(reporteId, archivo) {
     const filas = cuerpo.comparacion, distintas = filas.filter((f) => !["COINCIDE", "OTRO"].includes(f.estado));
     const icono = { COINCIDE: "✓", DIFERENTE: "≠", NO_APARECE: "?", OTRO: "•" };
     cont.innerHTML = `${distintas.length
-        ? `<div class="aviso warn">Hay diferencias en ${distintas.length === 1 ? "este concepto" : `estos ${distintas.length} conceptos`}: revísalas con facturación.</div>`
-        : `<div class="aviso ok">✓ Tu volante cuadra con lo calculado.</div>`}
+        ? `<div class="aviso warn">Hay diferencias en ${distintas.length === 1 ? "este concepto" : `estos ${distintas.length} conceptos`}: conviene revisarlas con facturación.</div>`
+        : `<div class="aviso ok">✓ El volante cuadra con lo calculado.</div>`}
       ${cuerpo.avisos.map((t) => `<div class="aviso warn">${escapar(t)}</div>`).join("")}
       <div class="tabla-scroll"><table class="liq comparacion"><tr><th></th><th>Concepto</th><th class="v">Calculado</th><th class="v">Volante</th></tr>
       ${filas.filter((f) => !(Number(f.calculado) === 0 && f.calculado != null && f.volante == null)).map((f) => `<tr class="${f.estado}"><td>${icono[f.estado]}</td><td>${escapar(f.concepto)}</td>
@@ -4460,7 +4460,7 @@ async function revisarVolante(reporteId, archivo) {
           f.estado !== "DIFERENTE" ? "" : `<br><small>dif. ${pesos(f.diferencia)}</small>`}</td></tr>`).join("")}
       </table></div>`;
   } catch {
-    aviso(cont, "err", "No se pudo leer el archivo. Intenta de nuevo.");
+    aviso(cont, "err", "No se pudo leer el archivo. Intentar de nuevo.");
   }
 }
 
@@ -4476,11 +4476,11 @@ function htmlPagoGlobal(f, rep) {
   if (f.radicado_id) return `<div class="sub" style="margin-top:4px">✓ Es el pago del radicado de ${escapar(f.radicado_pagador || "la clínica")} del ${escapar(f.radicado_fecha || "—")}.</div>`;
   const abiertos = rep.radicados_por_cobrar || [];
   const texto = "En esta línea la clínica pone el nombre y la cédula del anestesiólogo: es el pago total de un radicado, no un paciente.";
-  if (!abiertos.length) return `<p class="sub" style="margin:4px 0 0">${texto} Sube el radicado en «Clínicas que pagan el total» para cruzarlo con este pago.</p>`;
+  if (!abiertos.length) return `<p class="sub" style="margin:4px 0 0">${texto} Subir el radicado en «Clínicas que pagan el total» para cruzarlo con este pago.</p>`;
   return `<div class="pago-global"><p class="sub" style="margin:4px 0 6px">${texto} ¿De cuál radicado es?</p>
     <div class="fila"><select id="radicado-de-${f.detalle_id}">${abiertos.map((r, i) => `<option value="${r.reporte_id}"${i === 0 ? " selected" : ""}>${
       escapar(r.fecha_proceso || "sin fecha")} · ${escapar(r.pagador || "Radicado")} · ${r.total_neto != null ? pesos(r.total_neto) : "sin total"} · ${r.cirugias} cirugías</option>`).join("")}</select>
-    <button type="button" class="primario" data-pagar-radicado="${f.detalle_id}" style="flex:0 0 auto">Es su pago</button></div></div>`;
+    <button type="button" class="primario" data-pagar-radicado="${f.detalle_id}" style="flex:0 0 auto">Es el pago de este</button></div></div>`;
 }
 
 function pintarReportePago(rep) {
@@ -4495,7 +4495,7 @@ function pintarReportePago(rep) {
   const cuadre = rep.cuadra === true
     ? `<div class="aviso ok">✓ Las ${rep.filas.length} líneas suman el total ${relacion ? "de la relación" : "del reporte"} (${pesos(rep.total_neto)}).</div>`
     : rep.cuadra === false
-      ? `<div class="aviso err">⚠ Las líneas leídas suman ${pesos(rep.suma_neto)} pero el reporte dice ${pesos(rep.total_neto)}. Revisa el original antes de aplicar: puede faltar o estar mal leída alguna línea.</div>`
+      ? `<div class="aviso err">⚠ Las líneas leídas suman ${pesos(rep.suma_neto)} pero el reporte dice ${pesos(rep.total_neto)}. Conviene revisar el original antes de aplicar: puede faltar o estar mal leída alguna línea.</div>`
       : `<div class="aviso warn">El reporte no muestra un total general para comprobar la lectura. Suma de líneas: ${pesos(rep.suma_neto)}.</div>`;
   $("#detalle-pago").innerHTML = `<section class="card">
     <h2>${relacion ? "Relación de AP · " : ""}${escapar(rep.pagador || (relacion ? "Clínica" : "Reporte de pagos"))}</h2>
@@ -4505,7 +4505,7 @@ function pintarReportePago(rep) {
       · <a href="/api/pagos/${rep.reporte_id}/archivo" data-visor="${relacion ? "Relación de AP" : "Reporte de pagos"}">📄 Ver original</a>${
       paginas > 1 ? " · " + Array.from({ length: paginas }, (_, i) => `<a href="/api/pagos/${rep.reporte_id}/archivo?pagina=${i + 1}" data-visor="Relación · página ${i + 1}">página ${i + 1}</a>`).join(" · ") : ""}</p>
     ${cuadre}
-    <p>${plural(cuenta("COINCIDE"), "pago encontrado en tus cirugías", "pagos encontrados en tus cirugías")} ·
+    <p>${plural(cuenta("COINCIDE"), "pago encontrado en las cirugías", "pagos encontrados en las cirugías")} ·
        ${plural(cuenta("SIN_CIRUGIA"), "sin cirugía en la app", "sin cirugía en la app")} ·
        ${plural(cuenta("OTRO_CONCEPTO"), "otro concepto", "otros conceptos")}${
        cuenta("PAGO_GLOBAL") ? ` · ${plural(cuenta("PAGO_GLOBAL"), "pago global de clínica", "pagos globales de clínica")}` : ""}</p>
@@ -4525,11 +4525,11 @@ function pintarReportePago(rep) {
       ${cuenta("SIN_CIRUGIA") ? `<button type="button" id="cruzar-pago">Volver a cruzar</button>` : ""}
       ${rep.estado === "LEIDO" ? `<button type="button" id="descartar-pago">Descartar reporte</button>` : ""}
     </div>
-    ${cuenta("SIN_CIRUGIA") ? `<p class="sub">Los pagos «sin cirugía en la app» son pacientes que no registraste, o con otro documento o una fecha muy distinta. Regístralos en «Nueva» y luego toca «Volver a cruzar».</p>` : ""}
+    ${cuenta("SIN_CIRUGIA") ? `<p class="sub">Los pagos «sin cirugía en la app» son pacientes no registrados, o con otro documento o una fecha muy distinta. Registrarlos en «Nueva» y luego tocar «Volver a cruzar».</p>` : ""}
   </section>`;
   document.querySelectorAll("#detalle-pago [data-pagar-radicado]").forEach((b) => b.onclick = async () => {
     const sel = $(`#radicado-de-${b.dataset.pagarRadicado}`);
-    if (!sel.value) return toast("Elige el radicado que paga esta línea");
+    if (!sel.value) return toast("Elegir el radicado que paga esta línea");
     if (!confirm("¿Registrar esta línea como el pago de ese radicado? Sus cirugías quedarán pagadas con la fecha de este reporte.")) return;
     b.disabled = true;
     const r = await fetch(`/api/pagos/lineas/${b.dataset.pagarRadicado}/radicado`, { method: "POST",
@@ -4583,7 +4583,7 @@ function pintarRepetidas(grupos) {
   $("#ficha-repetidas").innerHTML = `<div class="agarre"></div>
     <div class="arriba"><h3 style="margin:0">Cirugías registradas dos veces</h3><span style="flex:1"></span>
       <button type="button" data-rp="cerrar" aria-label="Cerrar" style="min-height:36px;padding:4px 12px">✕</button></div>
-    ${grupos.length ? `<p class="sub" style="margin:0">Elige cuál conservar. La que conservas toma de la otra lo que le falte (valor, orden,
+    ${grupos.length ? `<p class="sub" style="margin:0">Elegir cuál conservar. La que se conserva toma de la otra lo que le falte (valor, orden,
       procedimientos si los suyos están por confirmar), queda con el estado más avanzado y con sus líneas de los reportes. La otra se borra.</p>
     ${grupos.map((g, gi) => `<div class="grupo-repetidas">
       <strong>${escapar(g.paciente)}</strong>
@@ -4645,9 +4645,9 @@ async function buscarPacientePago() {
   if (q !== busquedaPagoActual) return;   // ya escribió otra cosa
   if (!r.ok) { cont.innerHTML = `<div class="aviso err">No se pudo buscar.</div>`; return; }
   const { cirugias, lineas } = await r.json();
-  if (!cirugias.length && !lineas.length) { cont.innerHTML = `<p class="sub" style="margin:8px 0 0">No encontré a «${escapar(q)}» en tus cirugías ni en los reportes.</p>`; return; }
+  if (!cirugias.length && !lineas.length) { cont.innerHTML = `<p class="sub" style="margin:8px 0 0">No se encontró a «${escapar(q)}» en las cirugías ni en los reportes.</p>`; return; }
   cont.innerHTML = `
-    ${cirugias.length ? `<h3 class="titulo-busqueda">En tus cirugías (${cirugias.length})</h3>
+    ${cirugias.length ? `<h3 class="titulo-busqueda">En las cirugías (${cirugias.length})</h3>
       ${cirugias.map((c) => `<button type="button" class="resultado-busqueda" data-cirugia="${c.cirugia_id}">
         <span class="item-cab"><strong>${escapar(c.paciente)}</strong>${c.valor_honorarios != null ? `<span class="valor">${pesos(c.valor_honorarios)}</span>` : ""}</span>
         <span class="sub">${escapar(c.tipo_documento)} ${escapar(c.numero_documento)} · ${escapar(fechaBreve(c.fecha_procedimiento, true))} · ${escapar(tipoTitulo(c.clinica))}${c.aseguradora ? ` · ${escapar(c.aseguradora)}` : ""}</span>
@@ -4660,7 +4660,7 @@ async function buscarPacientePago() {
         <span>${l.cirugia_id ? `<span class="chip ${l.estado_cirugia}">✓ ${{ PAGADA: "Pagada", FACTURADA: "Radicada" }[l.estado_cirugia] || "Encontrada"}</span>`
           : `<span class="chip SIN_CIRUGIA">⚠ Sin cirugía en la app</span>`}</span>
       </button>`).join("")}` : ""}
-    ${cirugias.length === 30 || lineas.length === 30 ? `<p class="sub" style="margin:8px 0 0">Se muestran los 30 más recientes. Escribe más para afinar.</p>` : ""}`;
+    ${cirugias.length === 30 || lineas.length === 30 ? `<p class="sub" style="margin:8px 0 0">Se muestran los 30 más recientes. Escribir más para afinar.</p>` : ""}`;
 }
 $("#resultado-busqueda-pago").addEventListener("click", async (e) => {
   const b = e.target.closest(".resultado-busqueda");
@@ -4674,7 +4674,7 @@ $("#resultado-busqueda-pago").addEventListener("click", async (e) => {
 const candidatasLinea = {};
 async function buscarCandidatas(rep, linea) {
   const cont = $(`#candidatas-${linea}`);
-  cont.innerHTML = `<p class="sub">Buscando en tus cirugías…</p>`;
+  cont.innerHTML = `<p class="sub">Buscando en las cirugías…</p>`;
   const r = await fetch(`/api/pagos/lineas/${linea}/candidatas`);
   if (!r.ok) { cont.innerHTML = `<div class="aviso err">No se pudo buscar.</div>`; return; }
   const { candidatas } = await r.json();
@@ -4685,13 +4685,13 @@ async function buscarCandidatas(rep, linea) {
         <div class="sub">${escapar(c.tipo_documento)} ${escapar(c.numero_documento)} · ${escapar(fechaBreve(c.fecha_procedimiento, true))} · ${escapar(tipoTitulo(c.clinica))}</div>
         <div class="sub">${c.cedula_parecida ? "Cédula casi igual" : ""}${c.cedula_parecida && c.parecido >= 75 ? " · " : ""}${c.parecido >= 75 ? `Nombre ${c.parecido === 100 ? "igual" : "parecido"}` : ""}</div></div>
       <button type="button" class="boton-linea primario" data-es-esta="${c.cirugia_id}">Es esta</button></div>`).join("")}`
-    : `<p class="sub" style="margin:6px 0 0">No encontré cirugías con nombre o cédula parecidos. Si AP se quedó con la orden, créala con «Crear las cirugías que faltan».</p>`;
+    : `<p class="sub" style="margin:6px 0 0">No se encontraron cirugías con nombre o cédula parecidos. Si AP se quedó con la orden, se puede crear con «Crear las cirugías que faltan».</p>`;
 }
 function elegirCedula(rep, linea, cirugiaId) {
   const f = rep.filas.find((x) => x.detalle_id === linea), c = (candidatasLinea[linea] || []).find((x) => x.cirugia_id === cirugiaId);
   if (!f || !c) return;
   $(`#candidatas-${linea}`).innerHTML = `<div class="aviso warn" style="margin-top:8px">
-    <strong>¿Cuál cédula es la correcta?</strong> Compárala con el original del radicado o con la orden.
+    <strong>¿Cuál cédula es la correcta?</strong> Conviene compararla con el original del radicado o con la orden.
     <div class="botones" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:8px">
       <button type="button" class="boton-linea" data-cedula="radicado" data-cirugia="${cirugiaId}">La del radicado: ${escapar(f.documento_paciente)}</button>
       <button type="button" class="boton-linea" data-cedula="app" data-cirugia="${cirugiaId}">La de la app: ${escapar(c.numero_documento)}</button></div>
@@ -4743,8 +4743,8 @@ function pintarRadicado(rep) {
         <span class="sub">${pagado ? `el ${escapar(rep.pagado_en)}` : todoPagado ? "sus cirugías ya están pagadas"
           : yaPagadas ? `${yaPagadas} de ${rep.filas.length} órdenes ya pagadas` : `${rep.filas.length} órdenes en la hoja`}</span></div>
     </div>
-    ${rep.cuadra === false ? `<div class="aviso err">⚠ Las líneas suman ${pesos(rep.suma_neto)} pero el total dice ${pesos(rep.total_neto)}. Revisa el original.</div>` : ""}
-    <p>${plural(encontradas, "orden encontrada en tus cirugías", "órdenes encontradas en tus cirugías")} ·
+    ${rep.cuadra === false ? `<div class="aviso err">⚠ Las líneas suman ${pesos(rep.suma_neto)} pero el total dice ${pesos(rep.total_neto)}. Conviene revisar el original.</div>` : ""}
+    <p>${plural(encontradas, "orden encontrada en las cirugías", "órdenes encontradas en las cirugías")} ·
        ${plural(cuenta("SIN_CIRUGIA"), "sin cirugía en la app", "sin cirugía en la app")}</p>
     <div id="lineas-radicado">${rep.filas.map((f) => `<div class="linea-pago" data-linea="${f.detalle_id}">
       <div class="item-cab"><strong>${escapar(f.paciente || "—")}</strong>${f.neto != null ? `<span class="valor">${pesos(f.neto)}</span>` : ""}</div>
@@ -4757,11 +4757,11 @@ function pintarRadicado(rep) {
     </div>`).join("")}</div>
     ${cuenta("SIN_CIRUGIA") ? `<div class="aviso warn faltantes">
       <strong>${cuenta("SIN_CIRUGIA")} paciente${cuenta("SIN_CIRUGIA") === 1 ? "" : "s"} del radicado no está${cuenta("SIN_CIRUGIA") === 1 ? "" : "n"} en la app.</strong>
-      Si AP se quedó con las órdenes, créalas desde el radicado: se usan el paciente, la cédula, la entidad y el procedimiento
+      Si AP se quedó con las órdenes, se pueden crear desde el radicado: se usan el paciente, la cédula, la entidad y el procedimiento
       de la hoja, con la fecha del radicado${pagado ? ", y quedan pagadas con la fecha del pago" : rep.estado === "APLICADO" ? ", y quedan radicadas" : ""}.
-      Después revisa en Cirugías la fecha, el código CUPS y el valor de cada una.
+      Después conviene revisar en Cirugías la fecha, el código CUPS y el valor de cada una.
       <button type="button" class="primario" id="crear-faltantes" style="margin-top:8px">➕ Crear ${cuenta("SIN_CIRUGIA") === 1 ? "la cirugía que falta" : `las ${cuenta("SIN_CIRUGIA")} cirugías que faltan`}</button>
-      <p class="sub" style="margin:8px 0 0">Si la cédula quedó mal leída, compárala con el original: corrígela en la cirugía que ya tienes y toca «Volver a cruzar».</p>
+      <p class="sub" style="margin:8px 0 0">Si la cédula quedó mal leída, compararla con el original, corregirla en la cirugía ya registrada y tocar «Volver a cruzar».</p>
     </div>` : ""}
     ${pagado ? `<div class="aviso ok">✓ ${escapar(rep.pagador || "La clínica")} pagó este radicado: ${pesos(rep.valor_pagado)} el ${escapar(rep.pagado_en)}. Sus cirugías quedaron pagadas.</div>` : ""}
     <div class="acciones-pago">
@@ -4770,18 +4770,18 @@ function pintarRadicado(rep) {
       ${rep.estado === "LEIDO" ? `<button type="button" id="descartar-pago">Descartar radicado</button>` : ""}
     </div>
     ${todoPagado ? `<div class="aviso ok">✓ Las ${yaPagadas} cirugías de este radicado ya están pagadas (por el reporte de pagos de AP o marcadas a mano), así que no queda nada por cobrar.
-      Si quieres, registra abajo el pago de la clínica para guardar su fecha y valor: las fechas de pago de las cirugías no cambian.</div>` : ""}
+      Opcional: registrar abajo el pago de la clínica para guardar su fecha y valor; las fechas de pago de las cirugías no cambian.</div>` : ""}
     ${!pagado && encontradas ? `<form class="pago-radicado" id="form-pagar" novalidate>
       <h3>¿Ya pagó la clínica?</h3>
       ${porPagar ? `<div class="segmentado seg-ancho" id="pagar-modo" style="margin:4px 0 8px">
         <button type="button" data-modo-pago="todo" aria-pressed="true">${yaPagadas ? "Pagó el resto" : "Pagó todo"}</button>
         <button type="button" data-modo-pago="pacientes" aria-pressed="false">Por paciente</button></div>` : ""}
       <div id="pagar-todo">
-        <p class="sub">${porPagar ? `Registra el pago y ${porPagar === 1 ? "la cirugía que falta queda pagada" : `las ${porPagar} cirugías que faltan quedan pagadas`} con esa fecha.` : "Registra el pago de la clínica."}
+        <p class="sub">${porPagar ? `Al registrar el pago, ${porPagar === 1 ? "la cirugía que falta queda pagada" : `las ${porPagar} cirugías que faltan quedan pagadas`} con esa fecha.` : "Registrar el pago de la clínica."}
           ${yaPagadas ? `${yaPagadas === 1 ? "La que ya estaba pagada conserva" : `Las ${yaPagadas} que ya estaban pagadas conservan`} su fecha.` : ""} El valor de cada cirugía no cambia.</p>
       </div>
       <div id="pagar-por-paciente" class="oculto">
-        <p class="sub">Marca los pacientes que pagó la clínica y revisa el valor de cada uno. Los demás siguen por cobrar.</p>
+        <p class="sub">Marcar los pacientes que pagó la clínica y revisar el valor de cada uno. Los demás siguen por cobrar.</p>
         <button type="button" class="enlace" id="pagar-marcar-todos" style="border:0;background:none;min-height:0;padding:2px 0">Marcar todos</button>
         ${rep.filas.filter((f) => f.cirugia_id && !["PAGADA", "CANCELADA"].includes(f.estado_cirugia))
           .filter((f, i, a) => a.findIndex((x) => x.cirugia_id === f.cirugia_id) === i).map((f) => `<div class="pago-paciente">
@@ -4834,7 +4834,7 @@ function pintarRadicado(rep) {
   };
   const faltantes = $("#crear-faltantes");
   if (faltantes) faltantes.onclick = async () => {
-    if (!confirm("¿Crear las cirugías que faltan con los datos del radicado? Quedarán con la fecha del radicado y sin valor, para que las revises.")) return;
+    if (!confirm("¿Crear las cirugías que faltan con los datos del radicado? Quedarán con la fecha del radicado y sin valor, para revisarlas.")) return;
     faltantes.disabled = true;
     const r = await fetch(`/api/pagos/${rep.reporte_id}/crear-faltantes`, { method: "POST" });
     const cuerpo = await r.json().catch(() => null);
@@ -4876,10 +4876,10 @@ function pintarRadicado(rep) {
   if (formPagar) formPagar.onsubmit = async (ev) => {
     ev.preventDefault();
     const fecha = $("#pagar-fecha").value;
-    if (!fecha) return toast("Pon la fecha del pago");
+    if (!fecha) return toast("Falta la fecha del pago");
     if (modoPago === "pacientes") {
       const m = marcados();
-      if (!m.length) return toast("Marca los pacientes que pagó la clínica");
+      if (!m.length) return toast("Marcar los pacientes que pagó la clínica");
       if (!confirm(`¿Marcar como pagad${m.length === 1 ? "o el paciente marcado" : `os los ${m.length} pacientes marcados`}, con fecha ${fecha}?`)) return;
       const boton = ev.submitter; boton.disabled = true;
       const r = await fetch(`/api/pagos/${rep.reporte_id}/pagar-pacientes`, { method: "POST", headers: { "Content-Type": "application/json" },
@@ -4912,7 +4912,7 @@ async function cargarReportesPago() {
   const cont = $("#lista-pagos");
   const r = await fetch("/api/pagos");
   const filas = await r.json().catch(() => []);
-  if (!r.ok || !filas.length) { cont.innerHTML = `<p class="sub">Aún no has subido reportes de pago.</p>`; return; }
+  if (!r.ok || !filas.length) { cont.innerHTML = `<p class="sub">Aún no hay reportes de pago subidos.</p>`; return; }
   cont.innerHTML = filas.map((p) => `<button type="button" class="item" data-reporte="${p.reporte_id}">
     <div class="item-cab"><strong>${escapar(p.fecha_proceso || p.subido_en.slice(0, 10))} · ${p.tipo === "RELACION" ? "Relación AP · " : p.tipo === "RADICADO" ? "Radicado · " : ""}${escapar(p.pagador || "Reporte")}</strong>
       <span class="valor">${pesos(p.total_neto)}</span></div>
@@ -4938,16 +4938,16 @@ function verPendientes() {
 $("#ver-pendientes").onclick = verPendientes;
 $("#cruzar-todos").onclick = async () => {
   const estado = $("#estado-cruzar");
-  estado.innerHTML = `<div class="cargando">Cruzando todos los reportes con tus cirugías…</div>`;
+  estado.innerHTML = `<div class="cargando">Cruzando todos los reportes con las cirugías…</div>`;
   const r = await fetch("/api/pagos/cruzar-todos", { method: "POST" });
   const c = await r.json().catch(() => null);
   if (!r.ok) return aviso(estado, "err", mensajeError(c, "No se pudo cruzar."));
-  aviso(estado, c.nuevas ? "ok" : "warn", `${c.encontradas} de ${c.lineas} pagos de pacientes encontrados en tus cirugías` +
+  aviso(estado, c.nuevas ? "ok" : "warn", `${c.encontradas} de ${c.lineas} pagos de pacientes encontrados en las cirugías` +
     (c.nuevas ? ` (${c.nuevas} nuevo${c.nuevas === 1 ? "" : "s"} ahora)` : " (ninguno nuevo)") +
     (c.marcadas_pagadas ? `; ${c.marcadas_pagadas} cirugía${c.marcadas_pagadas === 1 ? "" : "s"} marcada${c.marcadas_pagadas === 1 ? "" : "s"} como pagada${c.marcadas_pagadas === 1 ? "" : "s"}.` : "."));
   if (c.por_aplicar) {
     estado.insertAdjacentHTML("beforeend", `<p class="sub">${c.por_aplicar} cirugía${c.por_aplicar === 1 ? "" : "s"} encontrada${c.por_aplicar === 1 ? "" : "s"} aún sin marcar como pagada${c.por_aplicar === 1 ? "" : "s"}.
-      Revísalas abriendo cada reporte, o márcalas todas de una vez:</p>
+      Se pueden revisar abriendo cada reporte, o marcar todas de una vez:</p>
       <button type="button" class="primario" id="aplicar-todos">✓ Marcar las ${c.por_aplicar} como pagadas</button>`);
     $("#aplicar-todos").onclick = async () => {
       if (!confirm(`¿Marcar como pagadas las ${c.por_aplicar} cirugías encontradas en los reportes, con el valor y la fecha de cada reporte?`)) return;
@@ -5065,8 +5065,8 @@ async function cargarReporte() {
     const contadas = t.cirugias + t.canceladas;
     cont.innerHTML = `
       <p class="sub" style="margin:0 4px 10px"><strong>${escapar(nombrePeriodo())}</strong> · ${contadas === d.registradas
-        ? `todas tus ${d.registradas} cirugías registradas`
-        : `${contadas} de tus ${d.registradas} cirugías registradas; las demás tienen otra fecha (elige «Todo» en el periodo para verlas)`}</p>
+        ? `todas las ${d.registradas} cirugías registradas`
+        : `${contadas} de las ${d.registradas} cirugías registradas; las demás tienen otra fecha (elegir «Todo» en el periodo para verlas)`}</p>
       <div class="kpis">
         ${conValores ? `<div class="kpi destacado"><div class="etiqueta">Total generado</div><div class="cifra">${pesos(t.total)}</div></div>` : ""}
         <div class="kpi${conValores ? "" : " destacado"}"><div class="etiqueta">Cirugías</div><div class="cifra">${t.cirugias}</div></div>
@@ -5108,7 +5108,7 @@ function pedirTerminos() {
   $("#terminos-salir").onclick = () => $("#salir").click();
   $("#terminos-aceptar").onclick = async () => {
     const r = await fetch("/api/aceptar-terminos", { method: "POST" });
-    if (r.ok) { $("#capa-terminos").classList.add("oculto"); toast("Gracias. Quedó registrada tu aceptación."); }
+    if (r.ok) { $("#capa-terminos").classList.add("oculto"); toast("Gracias. Quedó registrada la aceptación."); }
   };
 }
 function exigirDosPasos() {
@@ -5188,7 +5188,7 @@ async function abrirVisor(url, titulo, peticion) {
     } else {  // Excel u otro: se guarda o se envía con la hoja de compartir del teléfono
       cuerpo.innerHTML = `<div class="visor-descarga"><div style="font-size:3rem">${blob.type === "application/zip" ? "🗄️" : "📊"}</div>
         <p><strong>${escapar(visorArchivo.name)}</strong></p>
-        <p class="sub">Toca «Guardar o enviar» para guardarlo en Archivos o mandarlo por WhatsApp o correo.</p>
+        <p class="sub">Tocar «Guardar o enviar» para guardarlo en Archivos o mandarlo por WhatsApp o correo.</p>
         <button type="button" class="primario grande" id="visor-guardar">📤 Guardar o enviar</button>
         <p><a href="${visorUrl}" download="${escapar(visorArchivo.name)}">o descargarlo aquí</a></p></div>`;
       $("#visor-guardar").onclick = compartirArchivo;
@@ -5252,7 +5252,7 @@ $("#form-copia").onsubmit = (e) => {
   const clave = $("#copia-clave").value, estado = $("#estado-copia");
   if (clave.length < 10) return aviso(estado, "err", "La clave debe tener al menos 10 caracteres.");
   if (clave !== $("#copia-clave2").value) return aviso(estado, "err", "Las dos claves no coinciden.");
-  aviso(estado, "ok", "Guarda el archivo y anota la clave: sin ella no se puede abrir.");
+  aviso(estado, "ok", "Guardar el archivo y anotar la clave: sin ella no se puede abrir.");
   abrirVisor("/api/copia-seguridad", "Copia de seguridad", { method: "POST",
     headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clave }) });
   $("#copia-clave").value = ""; $("#copia-clave2").value = "";
@@ -5289,8 +5289,8 @@ $("#form-clave").onsubmit = async (ev) => {
 // ---------------------------------------------------------------- verificación en dos pasos
 const JSON_POST = { method: "POST", headers: { "Content-Type": "application/json" } };
 function cajaCodigos(codigos) {
-  return `<div class="aviso warn"><strong>Guarda estos códigos de recuperación.</strong> Cada uno sirve <strong>una sola vez</strong> si pierdes el teléfono.
-    No se vuelven a mostrar. Anótalos en papel o en un lugar seguro, no en la misma app.</div>
+  return `<div class="aviso warn"><strong>Guardar estos códigos de recuperación.</strong> Cada uno sirve <strong>una sola vez</strong> si se pierde el teléfono.
+    No se vuelven a mostrar. Conviene anotarlos en papel o en un lugar seguro, no en la misma app.</div>
     <pre class="codigos-recuperacion" id="codigos-recuperacion">${codigos.map(escapar).join("\n")}</pre>
     <button type="button" id="copiar-codigos">Copiar los códigos</button>`;
 }
@@ -5298,15 +5298,15 @@ async function pintarDosPasos(u) {
   const cont = $("#dos-pasos-contenido");
   if (!u) { const r = await fetch("/api/yo"); if (!r.ok) return; u = await r.json(); }
   const enlazarCopiar = () => { const b = $("#copiar-codigos"); if (b) b.onclick = async () => {
-    try { await navigator.clipboard.writeText($("#codigos-recuperacion").textContent); toast("Códigos copiados"); } catch { toast("Selecciónalos y cópialos a mano"); } }; };
+    try { await navigator.clipboard.writeText($("#codigos-recuperacion").textContent); toast("Códigos copiados"); } catch { toast("Seleccionarlos y copiarlos a mano"); } }; };
   if (u.dos_pasos) {
-    cont.innerHTML = `<div class="aviso ok">✓ Activada. Te quedan <strong>${u.codigos_recuperacion}</strong> códigos de recuperación.</div>
+    cont.innerHTML = `<div class="aviso ok">✓ Activada. Quedan <strong>${u.codigos_recuperacion}</strong> códigos de recuperación.</div>
       <div class="fila"><button type="button" id="dp-nuevos">Códigos de recuperación nuevos</button>
       ${u.exigir_obligatoria ? "" : `<button type="button" id="dp-quitar">Desactivar</button>`}</div>
       <div id="dp-form"></div><div id="dp-estado"></div>`;
     const pedir = (titulo, boton, alEnviar) => {
       $("#dp-form").innerHTML = `<p class="sub" style="margin-top:12px">${titulo}</p>
-        <label for="dp-clave">Tu contraseña</label><input id="dp-clave" type="password" autocomplete="current-password">
+        <label for="dp-clave">Contraseña</label><input id="dp-clave" type="password" autocomplete="current-password">
         <label for="dp-codigo">Código de la app (o de recuperación)</label><input id="dp-codigo" inputmode="numeric" autocomplete="one-time-code">
         <button type="button" class="primario" id="dp-ok" style="margin-top:8px">${boton}</button>`;
       $("#dp-ok").onclick = async () => {
@@ -5322,8 +5322,8 @@ async function pintarDosPasos(u) {
       $("#dp-form").innerHTML = ""; $("#dp-estado").innerHTML = cajaCodigos(c.codigos); enlazarCopiar();
     });
     const quitar = $("#dp-quitar");
-    if (quitar) quitar.onclick = () => pedir("Para desactivarla escribe tu contraseña y un código.", "Desactivar", async (password, codigo) => {
-      if (!confirm("¿Desactivar la verificación en dos pasos? Tu cuenta quedará protegida solo por la contraseña.")) return;
+    if (quitar) quitar.onclick = () => pedir("Para desactivarla, escribir la contraseña y un código.", "Desactivar", async (password, codigo) => {
+      if (!confirm("¿Desactivar la verificación en dos pasos? La cuenta quedará protegida solo por la contraseña.")) return;
       const r = await fetch("/api/2fa/desactivar", { ...JSON_POST, body: JSON.stringify({ password, codigo }) });
       const c = await r.json().catch(() => null);
       if (!r.ok) return aviso($("#dp-estado"), "err", mensajeError(c, "No se pudo desactivar."));
@@ -5331,16 +5331,16 @@ async function pintarDosPasos(u) {
     });
     return;
   }
-  cont.innerHTML = `${u.exigir_dos_pasos ? `<div class="aviso warn">Como administrador, debes activarla para seguir usando la app.</div>` : ""}
-    <div class="aviso warn">No está activada. Tu cuenta solo se protege con la contraseña.</div>
-    <div id="dp-form"><label for="dp-clave">Tu contraseña</label><input id="dp-clave" type="password" autocomplete="current-password">
+  cont.innerHTML = `${u.exigir_dos_pasos ? `<div class="aviso warn">Las cuentas de administrador deben activarla para seguir usando la app.</div>` : ""}
+    <div class="aviso warn">No está activada. La cuenta solo se protege con la contraseña.</div>
+    <div id="dp-form"><label for="dp-clave">Contraseña</label><input id="dp-clave" type="password" autocomplete="current-password">
     <button type="button" class="primario" id="dp-iniciar" style="margin-top:8px">Activar</button></div><div id="dp-estado"></div>`;
   $("#dp-iniciar").onclick = async () => {
     const r = await fetch("/api/2fa/iniciar", { ...JSON_POST, body: JSON.stringify({ password: $("#dp-clave").value }) });
     const c = await r.json().catch(() => null);
     if (!r.ok) return aviso($("#dp-estado"), "err", mensajeError(c, "No se pudo iniciar."));
-    $("#dp-form").innerHTML = `<ol class="sub" style="padding-left:20px"><li>Abre tu app de verificación y agrega una cuenta nueva.</li>
-      <li>Escanea este código QR (o escribe la clave a mano).</li><li>Escribe aquí el código de 6 dígitos que muestra.</li></ol>
+    $("#dp-form").innerHTML = `<ol class="sub" style="padding-left:20px"><li>Abrir la app de verificación y agregar una cuenta nueva.</li>
+      <li>Escanear este código QR (o escribir la clave a mano).</li><li>Escribir aquí el código de 6 dígitos que muestra.</li></ol>
       <div class="qr-dos-pasos">${c.qr}</div>
       <p class="sub" style="text-align:center">Clave a mano: <strong class="clave-qr">${escapar(c.secreto.match(/.{1,4}/g).join(" "))}</strong></p>
       <label for="dp-codigo">Código de 6 dígitos</label><input id="dp-codigo" inputmode="numeric" autocomplete="one-time-code" maxlength="8">
@@ -5391,7 +5391,7 @@ async function cargarCalidad() {
     : `<p class="sub">Todavía no hay correcciones registradas.</p>`;
   const comentarios = d.comentarios.length ? `<ul class="lista-comentarios">${d.comentarios.map((k) =>
       `<li><span class="sub">${escapar(k.nombre)} · ${new Date(k.creado_en).toLocaleDateString("es-CO")}${k.documento_id ? ` · <a href="/api/documentos/${k.documento_id}/archivo" target="_blank" rel="noopener">orden</a>` : ""}</span><br>${escapar(k.texto)}</li>`).join("")}</ul>`
-    : `<p class="sub">Aún no hay comentarios de «¿Qué te faltó?».</p>`;
+    : `<p class="sub">Aún no hay comentarios de «¿Qué faltó?».</p>`;
   cont.innerHTML = `<p class="sub">Órdenes leídas y guardadas: <strong>${formatoMiles(d.ordenes_leidas)}</strong></p>${campos}
     <p class="sub" style="margin:12px 0 4px">Comentarios recientes:</p>${comentarios}`;
 }
@@ -5459,7 +5459,7 @@ async function cargarUsuarios() {
     destino.innerHTML = r.ok ? tarjetaClave(cuerpo.clave_temporal) : `<p class="aviso err">${escapar(mensajeError(cuerpo, "Error"))}</p>`;
   });
   cont.querySelectorAll("[data-quitar2fa]").forEach((b) => b.onclick = async () => {
-    if (!confirm(`¿Quitar la verificación en dos pasos de ${b.dataset.nombre}? Úsalo solo si perdió el teléfono y los códigos. Se cierran sus sesiones.`)) return;
+    if (!confirm(`¿Quitar la verificación en dos pasos de ${b.dataset.nombre}? Usar solo si perdió el teléfono y los códigos. Se cierran sus sesiones.`)) return;
     const r = await fetch(`/api/usuarios/${b.dataset.quitar2fa}/restablecer-2fa`, { method: "POST" });
     if (r.ok) { toast("Dos pasos quitados"); cargarUsuarios(); }
   });
@@ -5472,7 +5472,7 @@ async function cargarUsuarios() {
   });
 }
 
-const tarjetaClave = (clave) => `<div class="aviso ok">Clave temporal (se muestra <strong>una sola vez</strong>; entrégasela
+const tarjetaClave = (clave) => `<div class="aviso ok">Clave temporal (se muestra <strong>una sola vez</strong>; debe entregarse
   al anestesiólogo, que deberá cambiarla al entrar):<div class="clave-temporal">${escapar(clave)}</div></div>`;
 
 $("#form-usuario").onsubmit = async (ev) => {
@@ -5480,7 +5480,7 @@ $("#form-usuario").onsubmit = async (ev) => {
   const estado = $("#estado-usuario");
   const datos = { nombre: $("#u-nombre").value.trim(), email: $("#u-email").value.trim(),
                   registro_medico: $("#u-registro").value.trim() || null };
-  if (!datos.nombre || !datos.email) return aviso(estado, "err", "Escribe el nombre y el correo.");
+  if (!datos.nombre || !datos.email) return aviso(estado, "err", "Escribir el nombre y el correo.");
   const r = await fetch("/api/usuarios", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(datos) });
   const cuerpo = await r.json().catch(() => null);
   if (!r.ok) return aviso(estado, "err", mensajeError(cuerpo, "No se pudo crear la cuenta."));
