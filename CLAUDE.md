@@ -22,7 +22,8 @@ Backend (`app/`, FastAPI síncrono, psycopg3):
 - `extraccion.py` IA: órdenes, reportes de pago, relaciones/radicados, volantes (`_llamar_claude`) · `uso_ia.py` tokens y costo
 - `radicado.py` radicados de Santa Ana: crear faltantes, vincular líneas · `cartera.py` Inicio y línea de cobro
 - `liquidacion.py` volante de AP · `finanzas.py` + `extractos.py` finanzas personales y extractos del banco
-- `noticias.py` boletín/historias · `catalogo.py` CUPS · `calidad.py` «¿Qué te faltó?» · `validacion.py` bitácora TIVA
+- `noticias.py` boletín/historias · `catalogo.py` CUPS · `calidad.py` «¿Qué faltó?» · `validacion.py` bitácora TIVA
+- `demo.py` cuenta de demostración (`es_demo`): recarga datos ficticios y genera orden, reporte y volante en PDF
 - Seguridad: `auth.py` (scrypt, sesión) · `dospasos.py` (TOTP) · `seguridad.py` (cabeceras, CSRF, Excel) · `correo.py` · `copia.py`
 - `inicio.py` arranque: crea tablas, aplica migraciones, RLS, admin · `almacenamiento.py` fotos (Supabase/carpeta)
 

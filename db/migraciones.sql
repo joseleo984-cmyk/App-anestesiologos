@@ -436,3 +436,9 @@ ALTER TABLE anestesiologo ADD COLUMN IF NOT EXISTS totp_secreto VARCHAR(64);
 ALTER TABLE anestesiologo ADD COLUMN IF NOT EXISTS totp_activo BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE anestesiologo ADD COLUMN IF NOT EXISTS totp_ultimo_paso BIGINT NOT NULL DEFAULT 0;
 ALTER TABLE anestesiologo ADD COLUMN IF NOT EXISTS totp_recuperacion TEXT[] NOT NULL DEFAULT '{}';
+
+-- 34.
+-- Cuenta de demostración (datos ficticios que se pueden recargar) y opción de ocultar las herramientas clínicas
+ALTER TABLE anestesiologo ADD COLUMN IF NOT EXISTS es_demo BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE anestesiologo ADD COLUMN IF NOT EXISTS ocultar_clinicas BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE anestesiologo ADD COLUMN IF NOT EXISTS demo_fecha DATE;   -- fecha base de la última carga de la demo

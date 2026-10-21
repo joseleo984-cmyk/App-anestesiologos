@@ -25,7 +25,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from rapidfuzz import fuzz
 
-from app import (almacenamiento, auth, calidad, cartera, catalogo, config, copia, correo, dospasos, exportar, extraccion, extractos,
+from app import (almacenamiento, auth, calidad, cartera, catalogo, config, copia, correo, demo, dospasos, exportar, extraccion, extractos,
                  finanzas, inicio, liquidacion, noticias, radicado, repositorio, seguridad, uso_ia, validacion)
 from app.modelos import (ClaveCopia, CompromisoEntrada, CuentaEntrada, Favorita, FuenteNoticias, ImportacionConfirmada, MetaEntrada,
                          MovimientoEntrada, OrdenConfirmada, PartidaEntrada, PruebaValidacion, Sugerencia, TemasNoticias)
@@ -262,7 +262,47 @@ def usuario_actual(cuenta: dict = Depends(cuenta_sesion)):
             "debe_aceptar_terminos": cuenta["terminos_version"] != config.TERMINOS_VERSION,
             "dos_pasos": cuenta["totp_activo"], "codigos_recuperacion": len(cuenta["totp_recuperacion"] or []),
             "exigir_dos_pasos": bool(config.EXIGIR_2FA_ADMIN and cuenta["es_admin"] and not cuenta["totp_activo"]),
-            "ciudad_por_defecto": config.CIUDAD_POR_DEFECTO, "version": config.VERSION}
+            "ciudad_por_defecto": config.CIUDAD_POR_DEFECTO, "version": config.VERSION,
+            "es_demo": cuenta["es_demo"], "ocultar_clinicas": cuenta["ocultar_clinicas"], "demo_fecha": cuenta["demo_fecha"]}
+
+
+class Preferencias(BaseModel):
+    ocultar_clinicas: bool
+
+
+@app.put("/api/cuenta/preferencias")
+def guardar_preferencias(datos: Preferencias, conn=Depends(get_conn, scope="function"), anestesiologo_id=Depends(anestesiologo_actual)):
+    repositorio.guardar_preferencias(conn, anestesiologo_id, datos.ocultar_clinicas)
+    conn.commit()
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------- cuenta de demostración (datos ficticios)
+def cuenta_demo(cuenta: dict = Depends(cuenta_sesion)) -> dict:
+    if not cuenta["es_demo"]:
+        raise HTTPException(403, "Solo para cuentas de demostración.")
+    return cuenta
+
+
+@app.post("/api/demo/recargar")
+def recargar_demo(conn=Depends(get_conn, scope="function"), cuenta=Depends(cuenta_demo)):
+    """Borra los datos de la cuenta de demostración y vuelve a cargar los ficticios, con fecha de hoy."""
+    try:
+        resultado = demo.cargar(conn, cuenta["anestesiologo_id"], date.today())
+    except almacenamiento.AlmacenamientoError as e:
+        conn.rollback()
+        raise HTTPException(502, str(e))
+    repositorio.auditar(conn, "DEMO_RECARGADA", cuenta["anestesiologo_id"], f"{resultado['cirugias']} cirugías")
+    conn.commit()
+    return resultado
+
+
+@app.get("/api/demo/{documento}.pdf")
+def documento_demo(documento: Literal["orden", "reporte", "volante"], cuenta=Depends(cuenta_demo)):
+    """Orden, reporte de pagos y volante ficticios para la presentación, con la fecha de la última carga."""
+    nombre, generar = demo.DOCUMENTOS[documento]
+    return Response(generar(cuenta["demo_fecha"] or date.today()), media_type="application/pdf",
+                    headers={"Content-Disposition": f'inline; filename="{nombre}"'})
 
 
 class CambioClave(BaseModel):
@@ -599,6 +639,19 @@ def activar_usuario(usuario_id: int, datos: EstadoUsuario, conn=Depends(get_conn
     return {"ok": True}
 
 
+class MarcaDemo(BaseModel):
+    es_demo: bool
+
+
+@app.put("/api/usuarios/{usuario_id}/demo")
+def marcar_cuenta_demo(usuario_id: int, datos: MarcaDemo, conn=Depends(get_conn, scope="function"), admin=Depends(admin_actual)):
+    if not repositorio.marcar_demo(conn, usuario_id, datos.es_demo):
+        raise HTTPException(404, "Cuenta no encontrada (las de administrador no pueden ser de demostración).")
+    repositorio.auditar(conn, "CUENTA_DEMO" if datos.es_demo else "CUENTA_NO_DEMO", admin["anestesiologo_id"], f"cuenta {usuario_id}")
+    conn.commit()
+    return {"ok": True}
+
+
 @app.post("/api/usuarios/{usuario_id}/restablecer")
 def restablecer_clave(usuario_id: int, conn=Depends(get_conn, scope="function"), admin=Depends(admin_actual)):
     """Nueva clave temporal (se muestra una sola vez); cierra las sesiones abiertas de esa cuenta."""
@@ -897,7 +950,7 @@ def copia_de_seguridad(c: ClaveCopia, conn=Depends(get_conn, scope="function"), 
 
 @app.get("/api/sugerencias")
 def aseguradoras_y_cirujanos(conn=Depends(get_conn, scope="function"), _=Depends(anestesiologo_actual)):
-    return repositorio.catalogos_para_sugerir(conn)
+    return repositorio.catalogos_para_sugerir(conn, _)
 
 
 @app.get("/api/opciones")

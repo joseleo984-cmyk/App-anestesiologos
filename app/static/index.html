@@ -111,6 +111,8 @@
   .menu-tema { padding: 6px 10px 8px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
   .menu-tema .segmentado { display: flex; margin-top: 4px; }
   .menu-tema .segmentado button { flex: 1; text-align: center; white-space: nowrap; }
+  .menu-check { display: flex; gap: 8px; align-items: center; padding: 8px 10px; font-size: .9rem; border-bottom: 1px solid var(--line); }
+  .menu-check input { width: 18px; height: 18px; margin: 0; flex: 0 0 auto; }
   .clave-temporal { font: 600 1.3rem ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .05em;
                     padding: 10px; border: 1px dashed var(--accent); border-radius: 8px; text-align: center; margin: 8px 0; }
   .cargando { text-align: center; padding: 24px 0; color: var(--muted); }
@@ -647,12 +649,14 @@
       <div class="menu-opciones">
         <button type="button" id="ir-clave">Cambiar contraseña</button>
         <button type="button" id="ir-usuarios" class="oculto">Anestesiólogos (cuentas)</button>
+        <button type="button" id="ir-demo" class="oculto">Cuenta de demostración</button>
         <div class="menu-tema"><span class="sub">Apariencia</span>
           <div class="segmentado" id="tema" role="group" aria-label="Apariencia">
             <button type="button" data-tema="auto" aria-pressed="false" title="Como el teléfono">Auto</button>
             <button type="button" data-tema="claro" aria-pressed="false">☀️ Claro</button>
             <button type="button" data-tema="oscuro" aria-pressed="false">🌙 Oscuro</button>
           </div></div>
+        <label class="menu-check"><input type="checkbox" id="ocultar-clinicas"> Ocultar herramientas clínicas</label>
         <button type="button" id="salir">Salir</button>
       </div>
     </details>
@@ -1121,6 +1125,23 @@
   </div>
 
   <div id="pestana-clave" class="pestana oculto">
+    <section class="card oculto" id="demo-card">
+      <h2>Cuenta de demostración</h2>
+      <p class="sub">Todo en esta cuenta es ficticio: pacientes, documentos, cirujanos y valores. «Recargar» borra lo que haya
+        y vuelve a crear los datos de ejemplo con la fecha de hoy (cirugías en varios estados, dos reportes ya cruzados,
+        volantes y finanzas). Conviene recargar antes de cada presentación.</p>
+      <p class="sub" id="demo-fecha"></p>
+      <button type="button" class="primario" id="demo-recargar">↻ Recargar datos de demostración</button>
+      <div id="demo-estado"></div>
+      <h3 style="margin-top:16px">Documentos para la presentación en vivo</h3>
+      <p class="sub">Con la fecha de la última recarga. Imprimir la orden para tomarle la foto; subir el reporte en «Pagos»;
+        y en su liquidación, «Revisar mi volante» con el volante.</p>
+      <div class="atajos">
+        <a class="boton" href="/api/demo/orden.pdf" data-visor="Orden ficticia">📄 Orden quirúrgica</a>
+        <a class="boton" href="/api/demo/reporte.pdf" data-visor="Reporte de pagos ficticio">📄 Reporte de pagos</a>
+        <a class="boton" href="/api/demo/volante.pdf" data-visor="Volante ficticio">📄 Volante</a>
+      </div>
+    </section>
     <form class="card" id="form-clave" novalidate>
       <h2>Cambiar contraseña</h2>
       <div id="aviso-clave-obligatoria" class="aviso warn oculto">La contraseña actual es temporal. Para continuar, crear una nueva.</div>
@@ -5442,13 +5463,14 @@ async function cargarUsuarios() {
   });
   cont.innerHTML = usuarios.map((u) => `<div class="linea-pago">
     <div class="item-cab"><strong>${escapar(u.nombre)}</strong>
-      <span class="chip ${u.activo ? "" : "CANCELADA"}">${u.es_admin ? "ADMIN" : u.activo ? "ACTIVO" : "INACTIVO"}</span></div>
+      <span class="chip ${u.activo ? "" : "CANCELADA"}">${u.es_admin ? "ADMIN" : u.es_demo ? "DEMOSTRACIÓN" : u.activo ? "ACTIVO" : "INACTIVO"}</span></div>
     <div class="sub">${escapar(u.email)}${u.registro_medico ? ` · RM ${escapar(u.registro_medico)}` : ""} · ${u.cirugias} cirugía${u.cirugias === 1 ? "" : "s"}
       ${u.debe_cambiar_clave ? " · aún con clave temporal" : ""}</div>
     ${u.es_admin ? "" : `<div class="acciones-pago">
       <button type="button" data-restablecer="${u.anestesiologo_id}" data-nombre="${escapar(u.nombre)}">Nueva clave temporal</button>
       <button type="button" data-activar="${u.anestesiologo_id}" data-activo="${!u.activo}">${u.activo ? "Desactivar" : "Activar"}</button>
       ${u.dos_pasos ? `<button type="button" data-quitar2fa="${u.anestesiologo_id}" data-nombre="${escapar(u.nombre)}">Quitar dos pasos</button>` : ""}
+      <button type="button" data-demo="${u.anestesiologo_id}" data-valor="${!u.es_demo}" data-nombre="${escapar(u.nombre)}">${u.es_demo ? "Quitar demostración" : "Marcar como demostración"}</button>
     </div>`}
     <div class="resultado-usuario"></div>
   </div>`).join("");
@@ -5458,6 +5480,13 @@ async function cargarUsuarios() {
     const cuerpo = await r.json().catch(() => null);
     const destino = b.closest(".linea-pago").querySelector(".resultado-usuario");
     destino.innerHTML = r.ok ? tarjetaClave(cuerpo.clave_temporal) : `<p class="aviso err">${escapar(mensajeError(cuerpo, "Error"))}</p>`;
+  });
+  cont.querySelectorAll("[data-demo]").forEach((b) => b.onclick = async () => {
+    const marcar = b.dataset.valor === "true";
+    if (marcar && !confirm(`¿Marcar la cuenta de ${b.dataset.nombre} como demostración? Desde ella se pueden borrar y recargar sus datos con ejemplos ficticios. Solo para una cuenta creada para presentar la app.`)) return;
+    const r = await fetch(`/api/usuarios/${b.dataset.demo}/demo`, { method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ es_demo: marcar }) });
+    if (r.ok) { toast(marcar ? "Cuenta marcada como demostración" : "Ya no es de demostración"); cargarUsuarios(); }
   });
   cont.querySelectorAll("[data-quitar2fa]").forEach((b) => b.onclick = async () => {
     if (!confirm(`¿Quitar la verificación en dos pasos de ${b.dataset.nombre}? Usar solo si perdió el teléfono y los códigos. Se cierran sus sesiones.`)) return;
@@ -5491,8 +5520,45 @@ $("#form-usuario").onsubmit = async (ev) => {
   cargarUsuarios();
 };
 
+// ---------------------------------------------------------------- herramientas clínicas ocultas y cuenta de demostración
+const CLINICAS_PESTANAS = ["infusiones", "tiva", "regional", "validacion"];
+function aplicarOcultarClinicas(ocultar) {
+  $("#ocultar-clinicas").checked = ocultar;
+  CLINICAS_PESTANAS.forEach((p) => document.querySelectorAll(`#hoja-mas [data-pestana="${p}"]`)
+    .forEach((b) => b.classList.toggle("oculto", ocultar)));
+  if (ocultar && CLINICAS_PESTANAS.includes(pestanaActual)) mostrarPestana("inicio");
+}
+$("#ocultar-clinicas").onchange = async (e) => {
+  const ocultar = e.target.checked;
+  aplicarOcultarClinicas(ocultar);
+  const r = await fetch("/api/cuenta/preferencias", { method: "PUT", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ocultar_clinicas: ocultar }) }).catch(() => null);
+  if (!r || !r.ok) { aplicarOcultarClinicas(!ocultar); toast("No se pudo guardar la preferencia"); }
+  else toast(ocultar ? "Herramientas clínicas ocultas" : "Herramientas clínicas visibles");
+};
+function pintarDemo(u) {
+  $("#ir-demo").classList.toggle("oculto", !u.es_demo);
+  $("#demo-card").classList.toggle("oculto", !u.es_demo);
+  $("#demo-fecha").textContent = u.demo_fecha ? `Última recarga: ${fechaBreve(u.demo_fecha, true)}.` : "Aún no se han cargado los datos de ejemplo.";
+}
+$("#ir-demo").onclick = () => { $("#menu-cuenta").open = false; mostrarPestana("clave"); $("#demo-card").scrollIntoView({ block: "start" }); };
+$("#demo-recargar").onclick = async () => {
+  if (!confirm("¿Recargar los datos de demostración? Se borra todo lo de esta cuenta y se crean los datos de ejemplo.")) return;
+  const b = $("#demo-recargar"); b.disabled = true;
+  $("#demo-estado").innerHTML = `<div class="cargando">Cargando los datos de ejemplo…</div>`;
+  const r = await fetch("/api/demo/recargar", { method: "POST" }).catch(() => null);
+  const c = r ? await r.json().catch(() => null) : null;
+  b.disabled = false;
+  if (!r || !r.ok) return aviso($("#demo-estado"), "err", mensajeError(c, "No se pudieron recargar los datos."));
+  aviso($("#demo-estado"), "ok", `✓ Listo: ${c.cirugias} cirugías ficticias, reportes, volantes y finanzas de ejemplo.`);
+  pintarDemo({ es_demo: true, demo_fecha: c.fecha_base });
+  cargarOpciones(); cargarInicio();
+};
+
 fetch("/api/yo").then((r) => r.ok ? r.json() : null).then((u) => {
   if (!u) return;
+  aplicarOcultarClinicas(!!u.ocultar_clinicas);
+  pintarDemo(u);
   $("#nombre-usuario").textContent = u.nombre;
   $("#rel-anest").textContent = u.nombre.toUpperCase();
   ciudadPorDefecto = u.ciudad_por_defecto;

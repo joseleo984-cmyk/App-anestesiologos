@@ -168,11 +168,18 @@ def cargar_clinicas_base(conn, filas: list[dict]) -> int:
     return nuevas
 
 
-def catalogos_para_sugerir(conn) -> dict:
-    """Aseguradoras y cirujanos registrados, para sugerirlos al escribir (como las clínicas)."""
+def catalogos_para_sugerir(conn, anestesiologo_id: int) -> dict:
+    """Aseguradoras y cirujanos registrados, para sugerirlos al escribir (como las clínicas). Los cirujanos
+    ficticios que solo usa una cuenta de demostración no se le sugieren a nadie más."""
     return {
         "aseguradoras": conn.execute("SELECT aseguradora_id AS id, nombre, tipo FROM aseguradora ORDER BY nombre").fetchall(),
-        "cirujanos": conn.execute("SELECT cirujano_id AS id, nombre FROM cirujano ORDER BY nombre").fetchall(),
+        "cirujanos": conn.execute(
+            """SELECT ci.cirujano_id AS id, ci.nombre FROM cirujano ci
+                WHERE NOT EXISTS (SELECT 1 FROM cirugia c JOIN anestesiologo a USING (anestesiologo_id)
+                                   WHERE c.cirujano_id = ci.cirujano_id AND a.es_demo AND a.anestesiologo_id <> %(yo)s)
+                   OR EXISTS (SELECT 1 FROM cirugia c JOIN anestesiologo a USING (anestesiologo_id)
+                               WHERE c.cirujano_id = ci.cirujano_id AND (NOT a.es_demo OR a.anestesiologo_id = %(yo)s))
+                ORDER BY ci.nombre""", {"yo": anestesiologo_id}).fetchall(),
     }
 
 
@@ -548,7 +555,7 @@ def ciudad_conocida(conn, anestesiologo_id: int, clinica: str) -> Optional[str]:
 
 _CUENTA = """anestesiologo_id, nombre, email, password_hash, es_admin, activo, debe_cambiar_clave,
              version_sesion, estado_registro, intentos_fallidos, bloqueado_hasta, terminos_version,
-             totp_secreto, totp_activo, totp_ultimo_paso, totp_recuperacion"""
+             totp_secreto, totp_activo, totp_ultimo_paso, totp_recuperacion, es_demo, ocultar_clinicas, demo_fecha"""
 
 
 def obtener_cuenta(conn, anestesiologo_id: int) -> Optional[dict]:
@@ -607,10 +614,22 @@ def usar_enlace_clave(conn, token_hash: str) -> Optional[int]:
 def listar_usuarios(conn) -> list[dict]:
     return conn.execute(
         """SELECT a.anestesiologo_id, a.nombre, a.email, a.registro_medico, a.es_admin, a.activo,
-                  a.debe_cambiar_clave, a.creado_en, a.estado_registro, a.telefono, a.totp_activo AS dos_pasos,
+                  a.debe_cambiar_clave, a.creado_en, a.estado_registro, a.telefono, a.totp_activo AS dos_pasos, a.es_demo,
                   (SELECT COUNT(*) FROM cirugia c WHERE c.anestesiologo_id = a.anestesiologo_id) AS cirugias
              FROM anestesiologo a ORDER BY a.estado_registro = 'PENDIENTE' DESC, a.activo DESC, a.nombre"""
     ).fetchall()
+
+
+def marcar_demo(conn, anestesiologo_id: int, es_demo: bool) -> bool:
+    """Marca o desmarca una cuenta como de demostración; al marcarla se ocultan sus herramientas clínicas."""
+    return conn.execute("""UPDATE anestesiologo SET es_demo = %s, ocultar_clinicas = (ocultar_clinicas OR %s)
+                            WHERE anestesiologo_id = %s AND NOT es_admin""",
+                        (es_demo, es_demo, anestesiologo_id)).rowcount == 1
+
+
+def guardar_preferencias(conn, anestesiologo_id: int, ocultar_clinicas: bool) -> None:
+    conn.execute("UPDATE anestesiologo SET ocultar_clinicas = %s WHERE anestesiologo_id = %s",
+                 (ocultar_clinicas, anestesiologo_id))
 
 
 class EmailYaRegistrado(Exception):
